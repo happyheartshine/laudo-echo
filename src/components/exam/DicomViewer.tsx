@@ -16,6 +16,8 @@ export function DicomViewer({ file, onClose }: DicomViewerProps) {
   const [selectedTool, setSelectedTool] = useState<string>("ZoomAndPan");
 
   useEffect(() => {
+    console.log('DicomViewer: Starting to load file', file.name, file.type, file.size);
+    
     // Create app
     const app = new App();
     
@@ -30,39 +32,56 @@ export function DicomViewer({ file, onClose }: DicomViewerProps) {
       }
     } as unknown as AppOptions;
     
+    console.log('DicomViewer: Initializing app with options', options);
     app.init(options);
 
     // Load progress event
-    app.addEventListener('loadprogress', (event: { loaded: number; total: number }) => {
+    app.addEventListener('loadprogress', (event: any) => {
+      console.log('DicomViewer: Load progress', event);
       const percent = Math.round((event.loaded / event.total) * 100);
       setLoadProgress(percent);
     });
 
-    app.addEventListener('loadstart', () => {
+    app.addEventListener('loadstart', (event: any) => {
+      console.log('DicomViewer: Load start', event);
       setIsLoading(true);
       setError(null);
       setLoadProgress(0);
     });
 
-    app.addEventListener('loadend', () => {
+    app.addEventListener('loadend', (event: any) => {
+      console.log('DicomViewer: Load end', event);
       setIsLoading(false);
       setLoadProgress(100);
       // Set default tool after load
       app.setTool('ZoomAndPan');
     });
 
-    app.addEventListener('error', (event: { error: Error }) => {
+    app.addEventListener('error', (event: any) => {
+      console.error('DicomViewer: Error event', event);
       setIsLoading(false);
-      console.error('DICOM load error:', event);
-      setError(event.error?.message || 'Erro ao carregar arquivo DICOM');
+      const errorMsg = event.error?.message || event.message || 'Erro ao carregar arquivo DICOM';
+      console.error('DicomViewer: Error message', errorMsg);
+      setError(errorMsg);
+    });
+
+    app.addEventListener('loaditem', (event: any) => {
+      console.log('DicomViewer: Load item', event);
     });
 
     setDwvApp(app);
 
     // Load the DICOM file
-    app.loadFiles([file]);
+    console.log('DicomViewer: Calling loadFiles with', [file]);
+    try {
+      app.loadFiles([file]);
+    } catch (e) {
+      console.error('DicomViewer: Exception during loadFiles', e);
+      setError(`Erro ao iniciar carregamento: ${e}`);
+    }
 
     return () => {
+      console.log('DicomViewer: Cleanup');
       app.reset();
     };
   }, [file]);
