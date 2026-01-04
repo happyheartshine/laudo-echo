@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { loadExamImages } from "@/lib/imageStorage";
+import { useProfile } from "@/hooks/useProfile";
 
 interface StoredImageData {
   name: string;
@@ -22,6 +23,7 @@ interface StoredImageData {
 export default function DadosExame() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { clinic, profile } = useProfile();
   const reportRef = useRef<HTMLDivElement>(null);
 
   const [patientData, setPatientData] = useState<PatientData>({
@@ -128,27 +130,60 @@ export default function DadosExame() {
     });
   };
 
-  const addHeader = (pdf: jsPDF, pageWidth: number) => {
+  const addHeader = async (pdf: jsPDF, pageWidth: number) => {
     const navyBlue = [26, 42, 82];
     
     pdf.setFillColor(navyBlue[0], navyBlue[1], navyBlue[2]);
     pdf.rect(0, 0, pageWidth, 25, 'F');
+
+    // Try to add clinic logo if available
+    if (clinic?.logo_url) {
+      try {
+        // Load the logo image
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject();
+          img.src = clinic.logo_url!;
+        });
+        
+        // Calculate logo dimensions (max height 18mm, maintain aspect ratio)
+        const maxHeight = 18;
+        const ratio = img.width / img.height;
+        const logoHeight = maxHeight;
+        const logoWidth = logoHeight * ratio;
+        
+        pdf.addImage(img, 'PNG', 10, 3, logoWidth, logoHeight);
+      } catch (e) {
+        // Fallback to text if logo fails to load
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(18);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(clinic?.nome_fantasia || "VitaeCor", 15, 12);
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "normal");
+        pdf.text("Cardiologia Veterinária", 15, 18);
+      }
+    } else {
+      // Default VitaeCor text header
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(clinic?.nome_fantasia || "VitaeCor", 15, 12);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Cardiologia Veterinária", 15, 18);
+    }
     
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(18);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VitaeCor", 15, 12);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Cardiologia Veterinária", 15, 18);
-    
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
     pdf.text("Ecodopplercardiograma", pageWidth - 15, 12, { align: "right" });
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "normal");
-    pdf.text("Paulo Roberto de Sousa, MV. MSc. Esp. Dipl. (SBCV)", pageWidth - 15, 17, { align: "right" });
-    pdf.text("CRMV-GO 6414 | Fone: (62) 99332-2002", pageWidth - 15, 21, { align: "right" });
+    pdf.text(profile?.nome || "Veterinário Responsável", pageWidth - 15, 17, { align: "right" });
+    pdf.text(clinic?.endereco || "", pageWidth - 15, 21, { align: "right" });
   };
 
   const handleGeneratePDF = async () => {
@@ -160,18 +195,18 @@ export default function DadosExame() {
 
     const navyBlue = [26, 42, 82];
 
-    const checkPageBreak = (neededHeight: number) => {
+    const checkPageBreak = async (neededHeight: number) => {
       if (yPosition + neededHeight > pageHeight - 20) {
         pdf.addPage();
-        addHeader(pdf, pageWidth);
+        await addHeader(pdf, pageWidth);
         yPosition = 35;
         return true;
       }
       return false;
     };
 
-    const addSectionHeader = (title: string) => {
-      checkPageBreak(15);
+    const addSectionHeader = async (title: string) => {
+      await checkPageBreak(15);
       pdf.setFillColor(240, 240, 240);
       pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
@@ -193,7 +228,7 @@ export default function DadosExame() {
     };
 
     // Page 1 Header
-    addHeader(pdf, pageWidth);
+    await addHeader(pdf, pageWidth);
     yPosition = 35;
 
     // Title
@@ -261,12 +296,12 @@ export default function DadosExame() {
     yPosition += 10;
 
     // Parâmetros Observados
-    addSectionHeader("PARÂMETROS OBSERVADOS");
+    await addSectionHeader("PARÂMETROS OBSERVADOS");
     addTableRow("Ritmo", examInfo.ritmo || '-', "Frequência Cardíaca", `${examInfo.frequenciaCardiaca || '-'} bpm`);
     yPosition += 5;
 
     // Ventrículo Esquerdo
-    addSectionHeader("VENTRÍCULO ESQUERDO (MODO M)");
+    await addSectionHeader("VENTRÍCULO ESQUERDO (MODO M)");
     
     const pesoNum = parseFloat(patientData.peso);
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
@@ -285,7 +320,7 @@ export default function DadosExame() {
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
-    addSectionHeader("ÁTRIO ESQUERDO E AORTA (MODO B)");
+    await addSectionHeader("ÁTRIO ESQUERDO E AORTA (MODO B)");
     const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
       ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
       : '-';
@@ -295,7 +330,7 @@ export default function DadosExame() {
     yPosition += 3;
 
     // Função Diastólica
-    addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
+    await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
     addTableRow("Velocidade da onda E", `${funcaoDiastolica.ondaE || '-'} cm/s`);
     addTableRow("Velocidade da onda A", `${funcaoDiastolica.ondaA || '-'} cm/s`);
     addTableRow("Relação onda E/A", funcaoDiastolica.relacaoEA || '-');
@@ -309,7 +344,7 @@ export default function DadosExame() {
     yPosition += 3;
 
     // Avaliação Hemodinâmica - Valvas
-    addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
+    await addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
     yPosition += 2;
 
     // Valva Mitral
@@ -347,7 +382,7 @@ export default function DadosExame() {
     yPosition += 3;
 
     // Outros
-    addSectionHeader("OUTROS");
+    await addSectionHeader("OUTROS");
     addTableRow("Câmaras Direitas", outros.camarasDireitas);
     addTableRow("Septos", outros.septos);
     addTableRow("Pericárdio", outros.pericardio);
@@ -355,38 +390,38 @@ export default function DadosExame() {
 
     // Achados
     if (achados) {
-      addSectionHeader("ACHADOS ECOCARDIOGRÁFICOS");
+      await addSectionHeader("ACHADOS ECOCARDIOGRÁFICOS");
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       const lines = pdf.splitTextToSize(achados, pageWidth - 2 * margin);
-      lines.forEach((line: string) => {
-        checkPageBreak(5);
+      for (const line of lines) {
+        await checkPageBreak(5);
         pdf.text(line, margin, yPosition);
         yPosition += 5;
-      });
+      }
       yPosition += 3;
     }
 
     // Conclusões
     if (conclusoes) {
-      addSectionHeader("CONCLUSÕES E COMENTÁRIOS");
+      await addSectionHeader("CONCLUSÕES E COMENTÁRIOS");
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       const lines = pdf.splitTextToSize(conclusoes, pageWidth - 2 * margin);
-      lines.forEach((line: string) => {
-        checkPageBreak(5);
+      for (const line of lines) {
+        await checkPageBreak(5);
         pdf.text(line, margin, yPosition);
         yPosition += 5;
-      });
+      }
     }
 
     // Images - 8 per page (2 columns x 4 rows for better visibility)
     const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
     if (selectedImageData.length > 0) {
       pdf.addPage();
-      addHeader(pdf, pageWidth);
+      await addHeader(pdf, pageWidth);
       
       // Add section title
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
@@ -409,7 +444,7 @@ export default function DadosExame() {
       while (imageIndex < selectedImageData.length) {
         if (imageIndex > 0 && imageIndex % imagesPerPage === 0) {
           pdf.addPage();
-          addHeader(pdf, pageWidth);
+          await addHeader(pdf, pageWidth);
           pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
           pdf.setFontSize(12);
           pdf.setFont("helvetica", "bold");
