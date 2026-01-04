@@ -8,6 +8,7 @@ import { ImageUploadSection } from "@/components/exam/ImageUploadSection";
 import { DicomPatientInfo } from "@/lib/dicomUtils";
 import { useToast } from "@/hooks/use-toast";
 import { saveExamImages } from "@/lib/imageStorage";
+import { dicomFileToJpegDataUrl } from "@/lib/dicomRender";
 
 const defaultPatientData: PatientData = {
   nome: "",
@@ -45,14 +46,33 @@ export default function NovoExame() {
 
   const handleContinueToExam = async () => {
     setIsSaving(true);
-    
+
+    const isLikelyDicom = (file: File) => {
+      const lower = file.name.toLowerCase();
+      const hasExtension = lower.includes(".");
+      return (
+        lower.endsWith(".dcm") ||
+        file.type === "application/dicom" ||
+        file.type === "application/octet-stream" ||
+        (!hasExtension && !file.type)
+      );
+    };
+
+    const readFileAsDataUrl = (file: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+
     try {
       // Store patient data in sessionStorage (small data)
       sessionStorage.setItem("examPatientData", JSON.stringify(patientData));
-      
+
       // Filter only selected images
       const selectedImageFiles = images.filter((_, index) => selectedImages.has(index));
-      
+
       if (selectedImageFiles.length === 0) {
         // No images selected, save empty and navigate
         await saveExamImages([]);
@@ -60,27 +80,33 @@ export default function NovoExame() {
         return;
       }
 
-      // Convert selected images to data URLs
-      const imageDataPromises = selectedImageFiles.map((file) => {
-        return new Promise<{ name: string; type: string; dataUrl: string }>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            resolve({
-              name: file.name,
-              type: file.type || "application/octet-stream",
-              dataUrl: e.target?.result as string,
-            });
-          };
-          reader.onerror = () => reject(new Error("Failed to read file"));
-          reader.readAsDataURL(file);
-        });
-      });
+      // Convert selected files to *real image* data URLs.
+      // - Standard JPG/PNG: FileReader
+      // - DICOM: render to canvas and export as JPEG base64
+      const imageData = await Promise.all(
+        selectedImageFiles.map(async (file) => {
+          if (isLikelyDicom(file)) {
+            const jpgDataUrl = await dicomFileToJpegDataUrl(file, 0.8);
+            const baseName = file.name.replace(/\.[^/.]+$/, "") || "dicom";
+            return {
+              name: `${baseName}.jpg`,
+              type: "image/jpeg",
+              dataUrl: jpgDataUrl,
+            };
+          }
 
-      const imageData = await Promise.all(imageDataPromises);
-      
+          const dataUrl = await readFileAsDataUrl(file);
+          return {
+            name: file.name,
+            type: file.type || (dataUrl.startsWith("data:image/png") ? "image/png" : "image/jpeg"),
+            dataUrl,
+          };
+        })
+      );
+
       // Use IndexedDB for large image data (no quota limits like sessionStorage)
       await saveExamImages(imageData);
-      
+
       navigate("/novo-exame/dados-exame");
     } catch (error) {
       console.error("Error saving images:", error);

@@ -426,7 +426,8 @@ export default function DadosExame() {
         const img = selectedImageData[imageIndex];
         if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image')) {
           try {
-            pdf.addImage(img.dataUrl, 'JPEG', x, y, imgWidth, imgHeight);
+            const format = img.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            pdf.addImage(img.dataUrl, format as any, x, y, imgWidth, imgHeight);
           } catch (e) {
             console.error('Error adding image to PDF:', e);
           }
