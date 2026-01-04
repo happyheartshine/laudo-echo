@@ -382,19 +382,25 @@ export default function DadosExame() {
       });
     }
 
-    // Images - 8 per page (4x2 grid)
+    // Images - 8 per page (2 columns x 4 rows for better visibility)
     const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
     if (selectedImageData.length > 0) {
       pdf.addPage();
       addHeader(pdf, pageWidth);
-      yPosition = 35;
+      
+      // Add section title
+      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, { align: "center" });
 
       const imagesPerPage = 8;
-      const cols = 4;
-      const rows = 2;
-      const imgMargin = 5;
+      const cols = 2; // 2 columns
+      const rows = 4; // 4 rows
+      const imgMargin = 6;
+      const startY = 42; // Start below title
       const availableWidth = pageWidth - 2 * margin;
-      const availableHeight = pageHeight - 50 - margin;
+      const availableHeight = pageHeight - startY - 15; // Leave space for footer
       const imgWidth = (availableWidth - (cols - 1) * imgMargin) / cols;
       const imgHeight = (availableHeight - (rows - 1) * imgMargin) / rows;
 
@@ -404,7 +410,10 @@ export default function DadosExame() {
         if (imageIndex > 0 && imageIndex % imagesPerPage === 0) {
           pdf.addPage();
           addHeader(pdf, pageWidth);
-          yPosition = 35;
+          pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+          pdf.setFontSize(12);
+          pdf.setFont("helvetica", "bold");
+          pdf.text("ANEXOS / IMAGENS DO EXAME (continuação)", pageWidth / 2, 35, { align: "center" });
         }
 
         const pageImageIndex = imageIndex % imagesPerPage;
@@ -412,7 +421,7 @@ export default function DadosExame() {
         const col = pageImageIndex % cols;
 
         const x = margin + col * (imgWidth + imgMargin);
-        const y = 35 + row * (imgHeight + imgMargin);
+        const y = startY + row * (imgHeight + imgMargin);
 
         const img = selectedImageData[imageIndex];
         if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image')) {
