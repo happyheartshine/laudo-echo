@@ -76,10 +76,7 @@ export function ImageUploadSection({
         const newImages = [...images, ...validFiles];
         onImagesChange(newImages);
 
-        // Auto-select newly added images
-        const newSelected = new Set(selectedImages);
-        validFiles.forEach((_, i) => newSelected.add(images.length + i));
-        onSelectedImagesChange(newSelected);
+        // Images start UNSELECTED by default - user must click to select
 
         // Extract metadata from first DICOM file
         for (const file of validFiles) {
@@ -301,7 +298,7 @@ export function ImageUploadSection({
                   className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
                     isSelected
                       ? "ring-4 ring-cta shadow-lg scale-[1.02]"
-                      : "ring-1 ring-border hover:ring-2 hover:ring-muted-foreground"
+                      : "ring-1 ring-border hover:ring-2 hover:ring-muted-foreground opacity-60"
                   }`}
                   onClick={() => toggleImageSelection(index)}
                 >
