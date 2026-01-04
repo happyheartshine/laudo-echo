@@ -1,5 +1,6 @@
-import { ImagePlus, X, Upload, Check } from "lucide-react";
+import { ImagePlus, X, Upload, Check, Eye } from "lucide-react";
 import { useState, useCallback } from "react";
+import { DicomViewer } from "./DicomViewer";
 
 interface ImageUploadSectionProps {
   images: File[];
@@ -14,6 +15,7 @@ export function ImageUploadSection({
   selectedImages, 
   onSelectedImagesChange 
 }: ImageUploadSectionProps) {
+  const [viewingDicomFile, setViewingDicomFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const acceptedTypes = ['image/jpeg', 'image/png', 'application/dicom', '.dcm'];
@@ -101,6 +103,14 @@ export function ImageUploadSection({
 
   const isDicomFile = (file: File) => file.name.toLowerCase().endsWith('.dcm');
 
+  const handleViewDicom = (file: File) => {
+    setViewingDicomFile(file);
+  };
+
+  const closeDicomViewer = () => {
+    setViewingDicomFile(null);
+  };
+
   return (
     <div className="card-vitaecor animate-fade-in">
       <h2 className="section-title">
@@ -184,6 +194,20 @@ export function ImageUploadSection({
                       </span>
                     </div>
                   )}
+
+                  {/* View DICOM button */}
+                  {isDicom && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewDicom(file);
+                      }}
+                      className="absolute top-2 left-10 p-1.5 bg-primary text-primary-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                      title="Visualizar DICOM"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                  )}
                   
                   {/* Remove button */}
                   <button
@@ -207,6 +231,11 @@ export function ImageUploadSection({
             })}
           </div>
         </div>
+      )}
+
+      {/* DICOM Viewer Modal */}
+      {viewingDicomFile && (
+        <DicomViewer file={viewingDicomFile} onClose={closeDicomViewer} />
       )}
     </div>
   );
