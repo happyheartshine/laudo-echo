@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { FileUp, Edit, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PatientSection, PatientData } from "@/components/exam/PatientSection";
 import { ImageUploadSection } from "@/components/exam/ImageUploadSection";
@@ -21,7 +21,6 @@ const defaultPatientData: PatientData = {
 export default function NovoExame() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [mode, setMode] = useState<"select" | "import" | "manual" | null>(null);
   const [patientData, setPatientData] = useState<PatientData>(defaultPatientData);
   const [images, setImages] = useState<File[]>([]);
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
@@ -37,7 +36,7 @@ export default function NovoExame() {
       peso: prev.peso || info.peso,
     }));
     toast({
-      title: "Dados extraídos do DICOM",
+      title: "Dados extraídos do arquivo",
       description: "As informações do paciente foram preenchidas automaticamente.",
     });
   };
@@ -68,12 +67,11 @@ export default function NovoExame() {
     });
   };
 
-  // Selection screen
-  if (!mode) {
-    return (
-      <Layout>
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-8">
+  return (
+    <Layout>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate('/')}
               className="p-2 rounded-lg hover:bg-secondary transition-colors"
@@ -82,137 +80,34 @@ export default function NovoExame() {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Novo Exame Ecocardiográfico</h1>
-              <p className="text-muted-foreground">Escolha como deseja iniciar</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Import DICOM option */}
-            <button
-              onClick={() => setMode("import")}
-              className="card-vitaecor hover:ring-2 hover:ring-accent transition-all text-left group"
-            >
-              <div className="flex flex-col items-center py-8">
-                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
-                  <FileUp className="w-8 h-8 text-accent" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Importar DICOM</h3>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  Importe arquivos DICOM do ecocardiógrafo. Os dados do paciente serão extraídos automaticamente.
-                </p>
-              </div>
-            </button>
-
-            {/* Manual entry option */}
-            <button
-              onClick={() => setMode("manual")}
-              className="card-vitaecor hover:ring-2 hover:ring-accent transition-all text-left group"
-            >
-              <div className="flex flex-col items-center py-8">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                  <Edit className="w-8 h-8 text-primary" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Digitar Manualmente</h3>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  Preencha os dados do paciente e do exame manualmente.
-                </p>
-              </div>
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Import DICOM mode
-  if (mode === "import") {
-    return (
-      <Layout>
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setMode(null)}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Importar Arquivos DICOM</h1>
-                <p className="text-muted-foreground">Arraste os arquivos do ecocardiógrafo</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <ImageUploadSection 
-              images={images} 
-              onImagesChange={setImages}
-              selectedImages={selectedImages}
-              onSelectedImagesChange={setSelectedImages}
-              onDicomMetadataExtracted={handleDicomMetadataExtracted}
-            />
-
-            <PatientSection data={patientData} onChange={setPatientData} />
-
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setMode(null)}>
-                Voltar
-              </Button>
-              <Button className="btn-cta" onClick={handleContinueToExam}>
-                Continuar
-              </Button>
+              <p className="text-muted-foreground">Importe arquivos ou digite os dados manualmente</p>
             </div>
           </div>
         </div>
-      </Layout>
-    );
-  }
 
-  // Manual mode
-  if (mode === "manual") {
-    return (
-      <Layout>
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setMode(null)}
-                className="p-2 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Dados do Paciente</h1>
-                <p className="text-muted-foreground">Preencha as informações manualmente</p>
-              </div>
-            </div>
-          </div>
+        <div className="space-y-6">
+          {/* Image/File Import Section */}
+          <ImageUploadSection 
+            images={images} 
+            onImagesChange={setImages}
+            selectedImages={selectedImages}
+            onSelectedImagesChange={setSelectedImages}
+            onDicomMetadataExtracted={handleDicomMetadataExtracted}
+          />
 
-          <div className="space-y-6">
-            <PatientSection data={patientData} onChange={setPatientData} />
+          {/* Patient Data Section */}
+          <PatientSection data={patientData} onChange={setPatientData} />
 
-            <ImageUploadSection 
-              images={images} 
-              onImagesChange={setImages}
-              selectedImages={selectedImages}
-              onSelectedImagesChange={setSelectedImages}
-              onDicomMetadataExtracted={handleDicomMetadataExtracted}
-            />
-
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setMode(null)}>
-                Voltar
-              </Button>
-              <Button className="btn-cta" onClick={handleContinueToExam}>
-                Continuar
-              </Button>
-            </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Cancelar
+            </Button>
+            <Button className="btn-cta" onClick={handleContinueToExam}>
+              Continuar
+            </Button>
           </div>
         </div>
-      </Layout>
-    );
-  }
-
-  return null;
+      </div>
+    </Layout>
+  );
 }

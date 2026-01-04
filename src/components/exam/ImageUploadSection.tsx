@@ -206,7 +206,7 @@ export function ImageUploadSection({
     <div className="card-vitaecor animate-fade-in">
       <h2 className="section-title">
         <ImagePlus className="w-5 h-5 text-accent" />
-        Imagens do Exame (DICOM/JPG)
+        Importar Arquivos
       </h2>
 
       {/* Hidden inputs */}
