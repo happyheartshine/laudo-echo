@@ -21,11 +21,16 @@ export function ImageUploadSection({
   const acceptedTypes = ['image/jpeg', 'image/png', 'application/dicom', '.dcm'];
 
   const isValidFile = (file: File) => {
-    return (
-      file.type === 'image/jpeg' || 
-      file.type === 'image/png' || 
-      file.name.toLowerCase().endsWith('.dcm')
-    );
+    const lower = file.name.toLowerCase();
+    const hasExtension = lower.includes('.');
+
+    // Alguns ecocardiógrafos exportam DICOM sem extensão e sem MIME type.
+    const isLikelyDicom =
+      lower.endsWith('.dcm') ||
+      file.type === 'application/dicom' ||
+      (!hasExtension && !file.type);
+
+    return file.type === 'image/jpeg' || file.type === 'image/png' || isLikelyDicom;
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -101,7 +106,11 @@ export function ImageUploadSection({
     return null;
   };
 
-  const isDicomFile = (file: File) => file.name.toLowerCase().endsWith('.dcm');
+  const isDicomFile = (file: File) => {
+    const lower = file.name.toLowerCase();
+    const hasExtension = lower.includes('.');
+    return lower.endsWith('.dcm') || file.type === 'application/dicom' || (!hasExtension && !file.type);
+  };
 
   const handleViewDicom = (file: File) => {
     setViewingDicomFile(file);
@@ -130,7 +139,7 @@ export function ImageUploadSection({
           id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.dcm,image/jpeg,image/png"
+          accept=".jpg,.jpeg,.png,.dcm,application/dicom"
           className="hidden"
           onChange={handleFileInput}
         />
@@ -140,7 +149,7 @@ export function ImageUploadSection({
           Arraste as imagens aqui ou clique para selecionar
         </p>
         <p className="text-sm text-muted-foreground">
-          Formatos aceitos: JPG, PNG, DICOM (.dcm)
+          Formatos aceitos: JPG, PNG, DICOM (.dcm ou sem extensão)
         </p>
       </div>
 
@@ -235,7 +244,20 @@ export function ImageUploadSection({
 
       {/* DICOM Viewer Modal */}
       {viewingDicomFile && (
-        <DicomViewer file={viewingDicomFile} onClose={closeDicomViewer} />
+        <DicomViewer
+          file={viewingDicomFile}
+          onClose={closeDicomViewer}
+          onCapture={(jpg) => {
+            const newImages = [...images, jpg];
+            onImagesChange(newImages);
+
+            const newSelected = new Set(selectedImages);
+            newSelected.add(images.length);
+            onSelectedImagesChange(newSelected);
+
+            closeDicomViewer();
+          }}
+        />
       )}
     </div>
   );
