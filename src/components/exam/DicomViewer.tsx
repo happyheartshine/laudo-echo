@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { App, AppOptions, ViewConfig } from "dwv";
-import { X, ZoomIn, ZoomOut, RotateCw, Maximize2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { App, AppOptions } from "dwv";
+import { X, RotateCw, Maximize2, Hand, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DicomViewerProps {
@@ -9,34 +9,51 @@ interface DicomViewerProps {
 }
 
 export function DicomViewer({ file, onClose }: DicomViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [dwvApp, setDwvApp] = useState<App | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadProgress, setLoadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTool, setSelectedTool] = useState<string>("ZoomAndPan");
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
+    // Create app
     const app = new App();
     
-    // Create view config using the class constructor
-    const viewConfig = new ViewConfig('dwv-layer-group');
-    const viewConfigs: { [key: string]: ViewConfig[] } = { '*': [viewConfig] };
-    const options = new AppOptions(viewConfigs);
+    // Initialize app with config - using unknown assertion since the library types are overly strict
+    // The official dwv-react example uses this exact structure
+    const options = {
+      dataViewConfigs: { '*': [{ divId: 'dwv-layer-group' }] },
+      tools: {
+        ZoomAndPan: {},
+        WindowLevel: {},
+        Scroll: {}
+      }
+    } as unknown as AppOptions;
     
     app.init(options);
+
+    // Load progress event
+    app.addEventListener('loadprogress', (event: { loaded: number; total: number }) => {
+      const percent = Math.round((event.loaded / event.total) * 100);
+      setLoadProgress(percent);
+    });
 
     app.addEventListener('loadstart', () => {
       setIsLoading(true);
       setError(null);
+      setLoadProgress(0);
     });
 
     app.addEventListener('loadend', () => {
       setIsLoading(false);
+      setLoadProgress(100);
+      // Set default tool after load
+      app.setTool('ZoomAndPan');
     });
 
     app.addEventListener('error', (event: { error: Error }) => {
       setIsLoading(false);
+      console.error('DICOM load error:', event);
       setError(event.error?.message || 'Erro ao carregar arquivo DICOM');
     });
 
@@ -50,15 +67,10 @@ export function DicomViewer({ file, onClose }: DicomViewerProps) {
     };
   }, [file]);
 
-  const handleZoomIn = () => {
+  const handleToolChange = (tool: string) => {
     if (dwvApp) {
-      dwvApp.setTool('ZoomAndPan');
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (dwvApp) {
-      dwvApp.setTool('ZoomAndPan');
+      dwvApp.setTool(tool);
+      setSelectedTool(tool);
     }
   };
 
@@ -73,31 +85,32 @@ export function DicomViewer({ file, onClose }: DicomViewerProps) {
       <div className="bg-card rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="font-semibold text-foreground">
+          <h3 className="font-semibold text-foreground truncate max-w-md">
             Visualizador DICOM - {file.name}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
-              variant="ghost"
+              variant={selectedTool === "ZoomAndPan" ? "default" : "ghost"}
               size="icon"
-              onClick={handleZoomIn}
-              title="Zoom In"
+              onClick={() => handleToolChange("ZoomAndPan")}
+              title="Zoom e Pan"
             >
-              <ZoomIn className="w-4 h-4" />
+              <Hand className="w-4 h-4" />
             </Button>
             <Button
-              variant="ghost"
+              variant={selectedTool === "WindowLevel" ? "default" : "ghost"}
               size="icon"
-              onClick={handleZoomOut}
-              title="Zoom Out"
+              onClick={() => handleToolChange("WindowLevel")}
+              title="Brilho/Contraste"
             >
-              <ZoomOut className="w-4 h-4" />
+              <Sun className="w-4 h-4" />
             </Button>
+            <div className="w-px h-6 bg-border mx-1" />
             <Button
               variant="ghost"
               size="icon"
               onClick={handleReset}
-              title="Resetar"
+              title="Resetar visualização"
             >
               <RotateCw className="w-4 h-4" />
             </Button>
@@ -112,38 +125,50 @@ export function DicomViewer({ file, onClose }: DicomViewerProps) {
           </div>
         </div>
 
+        {/* Progress bar */}
+        {isLoading && loadProgress > 0 && (
+          <div className="h-1 bg-muted">
+            <div 
+              className="h-full bg-cta transition-all duration-300"
+              style={{ width: `${loadProgress}%` }}
+            />
+          </div>
+        )}
+
         {/* Viewer Container */}
-        <div 
-          ref={containerRef}
-          className="flex-1 min-h-[500px] bg-black relative overflow-hidden"
-        >
+        <div className="flex-1 min-h-[500px] bg-black relative overflow-hidden">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
               <div className="text-white text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cta mx-auto mb-4"></div>
                 <p>Carregando arquivo DICOM...</p>
+                {loadProgress > 0 && (
+                  <p className="text-sm text-muted-foreground mt-2">{loadProgress}%</p>
+                )}
               </div>
             </div>
           )}
           
           {error && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center text-destructive">
-                <p className="font-medium mb-2">Erro ao carregar DICOM</p>
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="text-center p-6 bg-card rounded-lg max-w-md">
+                <p className="font-medium mb-2 text-destructive">Erro ao carregar DICOM</p>
                 <p className="text-sm text-muted-foreground">{error}</p>
               </div>
             </div>
           )}
 
-          <div id="dwv-layer-group" className="w-full h-full" />
+          <div id="dwv-layer-group" className="layerGroup w-full h-full" />
         </div>
 
         {/* Footer with instructions */}
         <div className="p-3 border-t border-border bg-muted/50">
           <p className="text-xs text-muted-foreground text-center">
             <Maximize2 className="w-3 h-3 inline mr-1" />
-            Use o scroll do mouse para zoom • Arraste para mover a imagem • 
-            Shift + Arraste para ajustar brilho/contraste
+            {selectedTool === "ZoomAndPan" 
+              ? "Arraste para mover • Scroll para zoom"
+              : "Arraste para ajustar brilho/contraste"
+            }
           </p>
         </div>
       </div>
