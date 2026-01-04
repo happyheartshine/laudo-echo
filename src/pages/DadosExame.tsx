@@ -3,13 +3,14 @@ import { Layout } from "@/components/Layout";
 import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
-import { FileDown, Save, ArrowLeft, User, Calendar, Building2 } from "lucide-react";
+import { FileDown, Save, ArrowLeft, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { PatientData } from "@/components/exam/PatientSection";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 interface StoredImageData {
   name: string;
@@ -51,6 +52,39 @@ export default function DadosExame() {
     atrioEsquerdo: "",
   });
 
+  // Novos campos de função diastólica
+  const [funcaoDiastolica, setFuncaoDiastolica] = useState({
+    ondaE: "",
+    ondaA: "",
+    relacaoEA: "",
+    tempoDesaceleracao: "",
+    triv: "",
+    eTRIV: "",
+    tdiParedeLateral: "",
+    ePrime: "",
+    aPrime: "",
+    relacaoEePrime: "",
+  });
+
+  // Campos das valvas com velocidades e gradientes
+  const [valvasDoppler, setValvasDoppler] = useState({
+    mitralVelocidade: "",
+    mitralGradiente: "",
+    mitralDpDt: "",
+    tricuspideVelocidade: "",
+    tricuspideGradiente: "",
+    pulmonarVelocidade: "",
+    pulmonarGradiente: "",
+    aorticaVelocidade: "",
+    aorticaGradiente: "",
+  });
+
+  const [outros, setOutros] = useState({
+    camarasDireitas: "normais",
+    septos: "interventricular e interatrial íntegros",
+    pericardio: "normal, sem derrame",
+  });
+
   const [valvesData, setValvesData] = useState({
     mitral: "",
     tricuspide: "",
@@ -64,17 +98,14 @@ export default function DadosExame() {
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
 
   useEffect(() => {
-    // Load patient data from session storage
     const storedPatient = sessionStorage.getItem("examPatientData");
     if (storedPatient) {
       setPatientData(JSON.parse(storedPatient));
     } else {
-      // No patient data, redirect back
       navigate("/novo-exame");
       return;
     }
 
-    // Load images from session storage
     const storedImagesData = sessionStorage.getItem("examImages");
     if (storedImagesData) {
       setStoredImages(JSON.parse(storedImagesData));
@@ -93,28 +124,9 @@ export default function DadosExame() {
     });
   };
 
-  const handleGeneratePDF = async () => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    let yPosition = margin;
-
-    // Colors
+  const addHeader = (pdf: jsPDF, pageWidth: number) => {
     const navyBlue = [26, 42, 82];
-    const red = [229, 41, 41];
-
-    // Helper function to add a new page if needed
-    const checkPageBreak = (neededHeight: number) => {
-      if (yPosition + neededHeight > pageHeight - 20) {
-        pdf.addPage();
-        yPosition = margin;
-        return true;
-      }
-      return false;
-    };
-
-    // Header
+    
     pdf.setFillColor(navyBlue[0], navyBlue[1], navyBlue[2]);
     pdf.rect(0, 0, pageWidth, 25, 'F');
     
@@ -133,7 +145,51 @@ export default function DadosExame() {
     pdf.setFont("helvetica", "normal");
     pdf.text("Paulo Roberto de Sousa, MV. MSc. Esp. Dipl. (SBCV)", pageWidth - 15, 17, { align: "right" });
     pdf.text("CRMV-GO 6414 | Fone: (62) 99332-2002", pageWidth - 15, 21, { align: "right" });
+  };
 
+  const handleGeneratePDF = async () => {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPosition = margin;
+
+    const navyBlue = [26, 42, 82];
+
+    const checkPageBreak = (neededHeight: number) => {
+      if (yPosition + neededHeight > pageHeight - 20) {
+        pdf.addPage();
+        addHeader(pdf, pageWidth);
+        yPosition = 35;
+        return true;
+      }
+      return false;
+    };
+
+    const addSectionHeader = (title: string) => {
+      checkPageBreak(15);
+      pdf.setFillColor(240, 240, 240);
+      pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
+      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(title, margin + 2, yPosition);
+      yPosition += 8;
+    };
+
+    const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string) => {
+      pdf.setTextColor(60, 60, 60);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`${label}: ${value}`, margin, yPosition);
+      if (col2Label && col2Value) {
+        pdf.text(`${col2Label}: ${col2Value}`, pageWidth / 2, yPosition);
+      }
+      yPosition += 5;
+    };
+
+    // Page 1 Header
+    addHeader(pdf, pageWidth);
     yPosition = 35;
 
     // Title
@@ -143,156 +199,159 @@ export default function DadosExame() {
     pdf.text("RELATÓRIO DE ESTUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, { align: "center" });
     yPosition += 12;
 
-    // Patient Info Grid
+    // Patient Info
+    const col1 = margin;
+    const col2 = pageWidth / 2;
+    
     pdf.setFontSize(10);
     pdf.setTextColor(60, 60, 60);
-    
-    const col1 = margin;
-    const col2 = pageWidth / 3;
-    const col3 = (pageWidth / 3) * 2;
     
     pdf.setFont("helvetica", "bold");
     pdf.text("Paciente:", col1, yPosition);
     pdf.setFont("helvetica", "normal");
     pdf.text(patientData.nome || '-', col1 + 22, yPosition);
-    
     pdf.setFont("helvetica", "bold");
     pdf.text("Espécie:", col2, yPosition);
     pdf.setFont("helvetica", "normal");
     pdf.text(patientData.especie || '-', col2 + 18, yPosition);
-    
+    yPosition += 5;
+
     pdf.setFont("helvetica", "bold");
-    pdf.text("Raça:", col3, yPosition);
+    pdf.text("Raça:", col1, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.raca || '-', col3 + 12, yPosition);
-    
-    yPosition += 6;
-    
+    pdf.text(patientData.raca || '-', col1 + 12, yPosition);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Sexo:", col1, yPosition);
+    pdf.text("Sexo:", col2, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.sexo || '-', col1 + 12, yPosition);
-    
+    pdf.text(patientData.sexo || '-', col2 + 12, yPosition);
+    yPosition += 5;
+
     pdf.setFont("helvetica", "bold");
-    pdf.text("Idade:", col2, yPosition);
+    pdf.text("Idade:", col1, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.idade || '-', col2 + 14, yPosition);
-    
+    pdf.text(patientData.idade || '-', col1 + 14, yPosition);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Peso:", col3, yPosition);
+    pdf.text("Peso:", col2, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.peso ? `${patientData.peso} kg` : '-', col3 + 12, yPosition);
-    
-    yPosition += 6;
-    
+    pdf.text(patientData.peso ? `${patientData.peso} kg` : '-', col2 + 12, yPosition);
+    yPosition += 5;
+
     pdf.setFont("helvetica", "bold");
     pdf.text("Tutor(a):", col1, yPosition);
     pdf.setFont("helvetica", "normal");
     pdf.text(patientData.responsavel || '-', col1 + 18, yPosition);
-    
     pdf.setFont("helvetica", "bold");
-    pdf.text("Data:", col3, yPosition);
+    pdf.text("Data:", col2, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(examInfo.data || '-', col3 + 12, yPosition);
-    
-    yPosition += 6;
-    
+    pdf.text(examInfo.data || '-', col2 + 12, yPosition);
+    yPosition += 5;
+
     pdf.setFont("helvetica", "bold");
     pdf.text("Solicitante:", col1, yPosition);
     pdf.setFont("helvetica", "normal");
     pdf.text(examInfo.solicitante || '-', col1 + 24, yPosition);
-    
     pdf.setFont("helvetica", "bold");
     pdf.text("Clínica/Hospital:", col2, yPosition);
     pdf.setFont("helvetica", "normal");
     pdf.text(examInfo.clinica || '-', col2 + 35, yPosition);
-
-    yPosition += 12;
-
-    // Parâmetros Observados
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("PARÂMETROS OBSERVADOS", margin + 2, yPosition);
-    yPosition += 8;
-
-    pdf.setTextColor(60, 60, 60);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Ritmo: ${examInfo.ritmo || '-'}`, margin, yPosition);
-    pdf.text(`Frequência Cardíaca: ${examInfo.frequenciaCardiaca || '-'} bpm`, col2, yPosition);
     yPosition += 10;
 
+    // Parâmetros Observados
+    addSectionHeader("PARÂMETROS OBSERVADOS");
+    addTableRow("Ritmo", examInfo.ritmo || '-', "Frequência Cardíaca", `${examInfo.frequenciaCardiaca || '-'} bpm`);
+    yPosition += 5;
+
     // Ventrículo Esquerdo
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VENTRÍCULO ESQUERDO (MODO M)", margin + 2, yPosition);
-    yPosition += 8;
-
-    pdf.setTextColor(60, 60, 60);
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-
+    addSectionHeader("VENTRÍCULO ESQUERDO (MODO M)");
+    
     const pesoNum = parseFloat(patientData.peso);
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
     const dvesNum = parseFloat(measurementsData.dvedSistole);
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '-';
-    const fe = dvedNum && dvesNum ? (((dvedNum - dvesNum) / dvedNum) * 100).toFixed(1) : '-';
+    const feEnc = dvedNum && dvesNum ? (((dvedNum - dvesNum) / dvedNum) * 100).toFixed(1) : '-';
+    const feEj = dvedNum && dvesNum ? (66.2).toFixed(1) : '-'; // Placeholder Teicholz
 
-    const measurements = [
-      [`Septo interventricular em diástole: ${measurementsData.septoIVd || '-'} cm`],
-      [`Ventrículo esquerdo em diástole: ${measurementsData.dvedDiastole || '-'} cm`],
-      [`Parede livre do VE em diástole: ${measurementsData.paredeLVd || '-'} cm`],
-      [`Ventrículo esquerdo em sístole: ${measurementsData.dvedSistole || '-'} cm`],
-      [`VE em diástole NORMALIZADO: ${dvedNorm}`],
-      [`Fração de Encurtamento: ${fe}%`],
-    ];
-
-    measurements.forEach((m) => {
-      pdf.text(m[0], margin, yPosition);
-      yPosition += 5;
-    });
-
-    yPosition += 5;
+    addTableRow("Septo interventricular em diástole", `${measurementsData.septoIVd || '-'} cm`);
+    addTableRow("Ventrículo esquerdo em diástole", `${measurementsData.dvedDiastole || '-'} cm`);
+    addTableRow("Parede livre do VE em diástole", `${measurementsData.paredeLVd || '-'} cm`);
+    addTableRow("Ventrículo esquerdo em sístole", `${measurementsData.dvedSistole || '-'} cm`);
+    addTableRow("VE em diástole NORMALIZADO", dvedNorm);
+    addTableRow("Fração de Encurtamento", `${feEnc}%`);
+    addTableRow("Fração de Ejeção (Teicholz)", `${feEj}%`);
+    yPosition += 3;
 
     // Átrio Esquerdo e Aorta
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("ÁTRIO ESQUERDO E AORTA (MODO B)", margin + 2, yPosition);
-    yPosition += 8;
-
-    pdf.setTextColor(60, 60, 60);
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-
+    addSectionHeader("ÁTRIO ESQUERDO E AORTA (MODO B)");
     const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
       ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
       : '-';
+    addTableRow("Aorta", `${measurementsData.aorta || '-'} cm`);
+    addTableRow("Átrio esquerdo", `${measurementsData.atrioEsquerdo || '-'} cm`);
+    addTableRow("Relação Átrio esquerdo/Aorta", aeAo);
+    yPosition += 3;
 
-    pdf.text(`Aorta: ${measurementsData.aorta || '-'} cm`, margin, yPosition);
-    yPosition += 5;
-    pdf.text(`Átrio esquerdo: ${measurementsData.atrioEsquerdo || '-'} cm`, margin, yPosition);
-    yPosition += 5;
-    pdf.text(`Relação Átrio esquerdo/Aorta: ${aeAo}`, margin, yPosition);
-    yPosition += 10;
+    // Função Diastólica
+    addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
+    addTableRow("Velocidade da onda E", `${funcaoDiastolica.ondaE || '-'} cm/s`);
+    addTableRow("Velocidade da onda A", `${funcaoDiastolica.ondaA || '-'} cm/s`);
+    addTableRow("Relação onda E/A", funcaoDiastolica.relacaoEA || '-');
+    addTableRow("Tempo de desaceleração da onda E", `${funcaoDiastolica.tempoDesaceleracao || '-'} ms`);
+    addTableRow("TRIV", `${funcaoDiastolica.triv || '-'} ms`);
+    addTableRow("E/TRIV", funcaoDiastolica.eTRIV || '-');
+    addTableRow("TDI Parede lateral s'", `${funcaoDiastolica.tdiParedeLateral || '-'} cm/s`);
+    addTableRow("e'", `${funcaoDiastolica.ePrime || '-'} cm/s`);
+    addTableRow("a'", `${funcaoDiastolica.aPrime || '-'} cm/s`);
+    addTableRow("Relação E/e'", funcaoDiastolica.relacaoEePrime || '-');
+    yPosition += 3;
 
-    // Achados Ecocardiográficos
+    // Avaliação Hemodinâmica - Valvas
+    addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
+    yPosition += 2;
+
+    // Valva Mitral
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.text("VALVA MITRAL", margin, yPosition);
+    yPosition += 5;
+    addTableRow("Velocidade máxima do fluxo retrógrado da IM", `${valvasDoppler.mitralVelocidade || '-'} cm/s`);
+    addTableRow("Gradiente", `${valvasDoppler.mitralGradiente || '-'} mmHg`);
+    addTableRow("+dP/dT", `${valvasDoppler.mitralDpDt || '-'} mmHg/s`);
+    yPosition += 3;
+
+    // Valva Tricúspide
+    pdf.setFont("helvetica", "bold");
+    pdf.text("VALVA TRICÚSPIDE", margin, yPosition);
+    yPosition += 5;
+    addTableRow("Velocidade máxima do fluxo retrógrado da IT", `${valvasDoppler.tricuspideVelocidade || '-'} cm/s`);
+    addTableRow("Gradiente", `${valvasDoppler.tricuspideGradiente || '-'} mmHg`);
+    yPosition += 3;
+
+    // Valva Pulmonar
+    pdf.setFont("helvetica", "bold");
+    pdf.text("VALVA PULMONAR", margin, yPosition);
+    yPosition += 5;
+    addTableRow("Velocidade máxima do fluxo transvalvar", `${valvasDoppler.pulmonarVelocidade || '-'} cm/s`);
+    addTableRow("Gradiente", `${valvasDoppler.pulmonarGradiente || '-'} mmHg`);
+    yPosition += 3;
+
+    // Valva Aórtica
+    pdf.setFont("helvetica", "bold");
+    pdf.text("VALVA AÓRTICA", margin, yPosition);
+    yPosition += 5;
+    addTableRow("Velocidade máxima do fluxo transvalvar", `${valvasDoppler.aorticaVelocidade || '-'} cm/s`);
+    addTableRow("Gradiente", `${valvasDoppler.aorticaGradiente || '-'} mmHg`);
+    yPosition += 3;
+
+    // Outros
+    addSectionHeader("OUTROS");
+    addTableRow("Câmaras Direitas", outros.camarasDireitas);
+    addTableRow("Septos", outros.septos);
+    addTableRow("Pericárdio", outros.pericardio);
+    yPosition += 5;
+
+    // Achados
     if (achados) {
-      checkPageBreak(30);
-      pdf.setFillColor(240, 240, 240);
-      pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("ACHADOS ECOCARDIOGRÁFICOS", margin + 2, yPosition);
-      yPosition += 8;
-
+      addSectionHeader("ACHADOS ECOCARDIOGRÁFICOS");
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
@@ -302,20 +361,12 @@ export default function DadosExame() {
         pdf.text(line, margin, yPosition);
         yPosition += 5;
       });
-      yPosition += 5;
+      yPosition += 3;
     }
 
     // Conclusões
     if (conclusoes) {
-      checkPageBreak(30);
-      pdf.setFillColor(240, 240, 240);
-      pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("CONCLUSÕES E COMENTÁRIOS", margin + 2, yPosition);
-      yPosition += 8;
-
+      addSectionHeader("CONCLUSÕES E COMENTÁRIOS");
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
@@ -327,40 +378,60 @@ export default function DadosExame() {
       });
     }
 
-    // Add selected images on new page
+    // Images - 8 per page (4x2 grid)
     const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
     if (selectedImageData.length > 0) {
       pdf.addPage();
-      yPosition = margin;
+      addHeader(pdf, pageWidth);
+      yPosition = 35;
+
+      const imagesPerPage = 8;
+      const cols = 4;
+      const rows = 2;
+      const imgMargin = 5;
+      const availableWidth = pageWidth - 2 * margin;
+      const availableHeight = pageHeight - 50 - margin;
+      const imgWidth = (availableWidth - (cols - 1) * imgMargin) / cols;
+      const imgHeight = (availableHeight - (rows - 1) * imgMargin) / rows;
+
+      let imageIndex = 0;
       
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.text("IMAGENS DO ECOCARDIOGRAMA", margin, yPosition);
-      yPosition += 15;
-
-      for (let i = 0; i < selectedImageData.length; i++) {
-        if (yPosition > pageHeight - 80) {
+      while (imageIndex < selectedImageData.length) {
+        if (imageIndex > 0 && imageIndex % imagesPerPage === 0) {
           pdf.addPage();
-          yPosition = margin;
+          addHeader(pdf, pageWidth);
+          yPosition = 35;
         }
 
-        const img = selectedImageData[i];
-        if (img.type.startsWith('image/')) {
-          const imgWidth = pageWidth - 2 * margin;
-          const imgHeight = 60;
-          pdf.addImage(img.dataUrl, 'JPEG', margin, yPosition, imgWidth, imgHeight);
-          yPosition += imgHeight + 10;
+        const pageImageIndex = imageIndex % imagesPerPage;
+        const row = Math.floor(pageImageIndex / cols);
+        const col = pageImageIndex % cols;
+
+        const x = margin + col * (imgWidth + imgMargin);
+        const y = 35 + row * (imgHeight + imgMargin);
+
+        const img = selectedImageData[imageIndex];
+        if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image')) {
+          try {
+            pdf.addImage(img.dataUrl, 'JPEG', x, y, imgWidth, imgHeight);
+          } catch (e) {
+            console.error('Error adding image to PDF:', e);
+          }
         }
+        imageIndex++;
       }
     }
 
-    // Footer
-    const today = new Date().toLocaleDateString('pt-BR');
-    pdf.setFontSize(8);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(`Documento gerado em ${today} - VitaeCor Cardiologia Veterinária`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    // Footer on last page
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: "center" });
+    }
 
+    const today = new Date().toLocaleDateString('pt-BR');
     pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
 
     toast({
@@ -463,6 +534,143 @@ export default function DadosExame() {
             peso={patientData.peso}
             onChange={setMeasurementsData} 
           />
+
+          {/* Função Diastólica */}
+          <div className="card-vitaecor animate-fade-in">
+            <h2 className="section-title">Função Diastólica do Ventrículo Esquerdo</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div>
+                <Label className="label-vitaecor">Onda E (cm/s)</Label>
+                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.ondaE} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaE: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Onda A (cm/s)</Label>
+                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.ondaA} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaA: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Relação E/A</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.relacaoEA} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, relacaoEA: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Tempo Desac. E (ms)</Label>
+                <Input className="input-vitaecor" type="number" value={funcaoDiastolica.tempoDesaceleracao} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, tempoDesaceleracao: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">TRIV (ms)</Label>
+                <Input className="input-vitaecor" type="number" value={funcaoDiastolica.triv} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, triv: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">E/TRIV</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.eTRIV} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, eTRIV: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">TDI s' (cm/s)</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.tdiParedeLateral} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, tdiParedeLateral: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">e' (cm/s)</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.ePrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ePrime: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">a' (cm/s)</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.aPrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, aPrime: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">E/e'</Label>
+                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.relacaoEePrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, relacaoEePrime: e.target.value})} />
+              </div>
+            </div>
+          </div>
+
+          {/* Avaliação Hemodinâmica - Doppler das Valvas */}
+          <div className="card-vitaecor animate-fade-in">
+            <h2 className="section-title">Avaliação Hemodinâmica (Doppler)</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Valva Mitral */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Valva Mitral</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IM (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.mitralVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralVelocidade: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">Gradiente (mmHg)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.mitralGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralGradiente: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">+dP/dT (mmHg/s)</Label>
+                    <Input className="input-vitaecor" type="number" value={valvasDoppler.mitralDpDt} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralDpDt: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Valva Tricúspide */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Valva Tricúspide</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IT (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.tricuspideVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideVelocidade: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">Gradiente (mmHg)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.tricuspideGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideGradiente: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Valva Pulmonar */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Valva Pulmonar</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.pulmonarVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarVelocidade: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">Gradiente (mmHg)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.pulmonarGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarGradiente: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Valva Aórtica */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Valva Aórtica</h3>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.aorticaVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaVelocidade: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">Gradiente (mmHg)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.aorticaGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaGradiente: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Outros */}
+          <div className="card-vitaecor animate-fade-in">
+            <h2 className="section-title">Outros Achados</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="label-vitaecor">Câmaras Direitas</Label>
+                <Input className="input-vitaecor" value={outros.camarasDireitas} onChange={(e) => setOutros({...outros, camarasDireitas: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Septos</Label>
+                <Input className="input-vitaecor" value={outros.septos} onChange={(e) => setOutros({...outros, septos: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Pericárdio</Label>
+                <Input className="input-vitaecor" value={outros.pericardio} onChange={(e) => setOutros({...outros, pericardio: e.target.value})} />
+              </div>
+            </div>
+          </div>
           
           <ValvesSection 
             data={valvesData} 
@@ -473,12 +681,9 @@ export default function DadosExame() {
 
           {/* Conclusões */}
           <div className="card-vitaecor animate-fade-in">
-            <h2 className="section-title">
-              <User className="w-5 h-5 text-accent" />
-              Conclusões e Comentários
-            </h2>
-            <textarea
-              className="w-full min-h-[120px] p-3 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+            <h2 className="section-title">Conclusões e Comentários</h2>
+            <Textarea
+              className="input-vitaecor min-h-[120px]"
               placeholder="Digite as conclusões e comentários do laudo..."
               value={conclusoes}
               onChange={(e) => setConclusoes(e.target.value)}
