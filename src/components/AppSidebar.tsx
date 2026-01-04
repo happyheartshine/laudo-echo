@@ -1,16 +1,24 @@
-import { FileText, Home, History, Settings, User } from "lucide-react";
+import { FileText, Home, History, Settings, User, LogOut, Building2 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import logoVitaecor from "@/assets/logo-vitaecor.png";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Novo Exame", url: "/novo-exame", icon: FileText },
   { title: "Histórico", url: "/historico", icon: History },
-  { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
+  const { signOut, user } = useAuth();
+  const { profile, clinic, isGestor } = useProfile();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar flex flex-col">
@@ -22,6 +30,14 @@ export function AppSidebar() {
           className="h-16 w-auto brightness-0 invert"
         />
       </div>
+
+      {/* Clinic Name */}
+      {clinic && (
+        <div className="px-4 py-3 border-b border-sidebar-border">
+          <p className="text-xs text-sidebar-foreground/60 uppercase tracking-wider">Clínica</p>
+          <p className="text-sm font-medium text-sidebar-foreground truncate">{clinic.nome_fantasia}</p>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
@@ -38,17 +54,41 @@ export function AppSidebar() {
             </NavLink>
           );
         })}
+
+        {/* Configurações da Clínica - only for Gestor */}
+        {isGestor && (
+          <NavLink
+            to="/configuracoes-clinica"
+            className={`sidebar-link ${location.pathname === '/configuracoes-clinica' ? 'active' : ''}`}
+          >
+            <Building2 className="w-5 h-5" />
+            <span>Config. Clínica</span>
+          </NavLink>
+        )}
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
         <div className="sidebar-link">
           <User className="w-5 h-5" />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">Dr. Veterinário</span>
-            <span className="text-xs text-sidebar-foreground/60">CRMV-SP 12345</span>
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-sm font-medium truncate">{profile?.nome || user?.email}</span>
+            <span className="text-xs text-sidebar-foreground/60 capitalize">
+              {profile?.cargo === 'gestor' ? 'Gestor' : 
+               profile?.cargo === 'veterinario' ? 'Veterinário' : 
+               profile?.cargo === 'super_admin' ? 'Super Admin' : ''}
+            </span>
           </div>
         </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+          onClick={handleLogout}
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sair
+        </Button>
       </div>
     </aside>
   );
