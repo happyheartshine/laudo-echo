@@ -41,30 +41,50 @@ export default function NovoExame() {
     });
   };
 
-  const handleContinueToExam = () => {
-    // Store patient data and images in sessionStorage to pass to next page
+  const handleContinueToExam = async () => {
+    // Store patient data in sessionStorage
     sessionStorage.setItem("examPatientData", JSON.stringify(patientData));
-    // For images, we need to handle them differently since File objects can't be serialized
-    // We'll use a different approach - store image data URLs
-    const saveImagesPromises = images.map((file) => {
-      return new Promise<{ name: string; type: string; dataUrl: string }>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          resolve({
-            name: file.name,
-            type: file.type,
-            dataUrl: e.target?.result as string,
-          });
-        };
-        reader.readAsDataURL(file);
-      });
-    });
-
-    Promise.all(saveImagesPromises).then((imageData) => {
-      sessionStorage.setItem("examImages", JSON.stringify(imageData));
-      sessionStorage.setItem("examSelectedImages", JSON.stringify([...selectedImages]));
+    
+    // Filter only selected images
+    const selectedImageFiles = images.filter((_, index) => selectedImages.has(index));
+    
+    if (selectedImageFiles.length === 0) {
+      // No images selected, just save empty array and navigate
+      sessionStorage.setItem("examImages", JSON.stringify([]));
+      sessionStorage.setItem("examSelectedImages", JSON.stringify([]));
       navigate("/novo-exame/dados-exame");
-    });
+      return;
+    }
+
+    // Convert selected images to data URLs for storage
+    try {
+      const imageDataPromises = selectedImageFiles.map((file) => {
+        return new Promise<{ name: string; type: string; dataUrl: string }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve({
+              name: file.name,
+              type: file.type || "application/octet-stream",
+              dataUrl: e.target?.result as string,
+            });
+          };
+          reader.onerror = () => reject(new Error("Failed to read file"));
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const imageData = await Promise.all(imageDataPromises);
+      sessionStorage.setItem("examImages", JSON.stringify(imageData));
+      sessionStorage.setItem("examSelectedImages", JSON.stringify([...Array(imageData.length).keys()]));
+      navigate("/novo-exame/dados-exame");
+    } catch (error) {
+      console.error("Error saving images:", error);
+      toast({
+        title: "Erro ao salvar imagens",
+        description: "Ocorreu um erro ao processar as imagens. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
