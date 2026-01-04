@@ -1,24 +1,37 @@
 import { ImagePlus, X, Upload, Check, Eye } from "lucide-react";
 import { useState, useCallback } from "react";
 import { DicomViewer } from "./DicomViewer";
+import { extractDicomMetadata, DicomPatientInfo } from "@/lib/dicomUtils";
 
 interface ImageUploadSectionProps {
   images: File[];
   onImagesChange: (images: File[]) => void;
   selectedImages: Set<number>;
   onSelectedImagesChange: (selected: Set<number>) => void;
+  onDicomMetadataExtracted?: (info: DicomPatientInfo) => void;
+}
+
+// Helper function to check if a file is DICOM
+function checkIsDicomFile(file: File): boolean {
+  const lower = file.name.toLowerCase();
+  const hasExtension = lower.includes('.');
+  return (
+    lower.endsWith('.dcm') ||
+    file.type === 'application/dicom' ||
+    file.type === 'application/octet-stream' ||
+    (!hasExtension && !file.type)
+  );
 }
 
 export function ImageUploadSection({ 
   images, 
   onImagesChange, 
   selectedImages, 
-  onSelectedImagesChange 
+  onSelectedImagesChange,
+  onDicomMetadataExtracted
 }: ImageUploadSectionProps) {
   const [viewingDicomFile, setViewingDicomFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  const acceptedTypes = ['image/jpeg', 'image/png', 'application/dicom', '.dcm'];
 
   const isValidFile = (file: File) => {
     const lower = file.name.toLowerCase();
@@ -28,6 +41,7 @@ export function ImageUploadSection({
     const isLikelyDicom =
       lower.endsWith('.dcm') ||
       file.type === 'application/dicom' ||
+      file.type === 'application/octet-stream' ||
       (!hasExtension && !file.type);
 
     return file.type === 'image/jpeg' || file.type === 'image/png' || isLikelyDicom;
@@ -43,7 +57,7 @@ export function ImageUploadSection({
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     
@@ -57,10 +71,21 @@ export function ImageUploadSection({
       const newSelected = new Set(selectedImages);
       files.forEach((_, i) => newSelected.add(images.length + i));
       onSelectedImagesChange(newSelected);
-    }
-  }, [images, onImagesChange, selectedImages, onSelectedImagesChange]);
 
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      // Extract metadata from first DICOM file
+      for (const file of files) {
+        if (checkIsDicomFile(file)) {
+          const metadata = await extractDicomMetadata(file);
+          if (metadata && onDicomMetadataExtracted) {
+            onDicomMetadataExtracted(metadata);
+            break; // Only extract from first DICOM
+          }
+        }
+      }
+    }
+  }, [images, onImagesChange, selectedImages, onSelectedImagesChange, onDicomMetadataExtracted]);
+
+  const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files).filter(isValidFile);
       
@@ -72,9 +97,20 @@ export function ImageUploadSection({
         const newSelected = new Set(selectedImages);
         files.forEach((_, i) => newSelected.add(images.length + i));
         onSelectedImagesChange(newSelected);
+
+        // Extract metadata from first DICOM file
+        for (const file of files) {
+          if (checkIsDicomFile(file)) {
+            const metadata = await extractDicomMetadata(file);
+            if (metadata && onDicomMetadataExtracted) {
+              onDicomMetadataExtracted(metadata);
+              break; // Only extract from first DICOM
+            }
+          }
+        }
       }
     }
-  }, [images, onImagesChange, selectedImages, onSelectedImagesChange]);
+  }, [images, onImagesChange, selectedImages, onSelectedImagesChange, onDicomMetadataExtracted]);
 
   const removeImage = useCallback((index: number) => {
     onImagesChange(images.filter((_, i) => i !== index));
@@ -106,12 +142,6 @@ export function ImageUploadSection({
     return null;
   };
 
-  const isDicomFile = (file: File) => {
-    const lower = file.name.toLowerCase();
-    const hasExtension = lower.includes('.');
-    return lower.endsWith('.dcm') || file.type === 'application/dicom' || (!hasExtension && !file.type);
-  };
-
   const handleViewDicom = (file: File) => {
     setViewingDicomFile(file);
   };
@@ -139,7 +169,7 @@ export function ImageUploadSection({
           id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.dcm,application/dicom"
+          accept="*/*"
           className="hidden"
           onChange={handleFileInput}
         />
@@ -169,7 +199,7 @@ export function ImageUploadSection({
             {images.map((file, index) => {
               const isSelected = selectedImages.has(index);
               const preview = getImagePreview(file);
-              const isDicom = isDicomFile(file);
+              const isDicom = checkIsDicomFile(file);
               
               return (
                 <div 
