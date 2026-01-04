@@ -46,6 +46,7 @@ export default function NovoExame() {
 
   const [achados, setAchados] = useState("");
   const [images, setImages] = useState<File[]>([]);
+  const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
 
   const handleSave = () => {
     toast({
@@ -195,8 +196,9 @@ export default function NovoExame() {
       });
     }
 
-    // Add images on new pages if any
-    if (images.length > 0) {
+    // Add only selected images on new pages
+    const selectedImagesList = images.filter((_, index) => selectedImages.has(index));
+    if (selectedImagesList.length > 0) {
       pdf.addPage();
       yPosition = margin;
       
@@ -206,13 +208,24 @@ export default function NovoExame() {
       pdf.text("IMAGENS DO ECOCARDIOGRAMA", margin, yPosition);
       yPosition += 15;
 
-      for (let i = 0; i < images.length; i++) {
+      for (let i = 0; i < selectedImagesList.length; i++) {
         if (yPosition > pageHeight - 80) {
           pdf.addPage();
           yPosition = margin;
         }
 
-        const img = images[i];
+        const img = selectedImagesList[i];
+        
+        // Skip DICOM files (can't render in PDF directly)
+        if (img.name.toLowerCase().endsWith('.dcm')) {
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "italic");
+          pdf.setTextColor(100, 100, 100);
+          pdf.text(`[Arquivo DICOM: ${img.name}]`, margin, yPosition);
+          yPosition += 10;
+          continue;
+        }
+        
         const imgData = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target?.result as string);
@@ -272,6 +285,12 @@ export default function NovoExame() {
 
         {/* Form Sections */}
         <div ref={reportRef} className="space-y-6">
+          <ImageUploadSection 
+            images={images} 
+            onImagesChange={setImages}
+            selectedImages={selectedImages}
+            onSelectedImagesChange={setSelectedImages}
+          />
           <PatientSection data={patientData} onChange={setPatientData} />
           <MeasurementsSection 
             data={measurementsData} 
@@ -284,7 +303,6 @@ export default function NovoExame() {
             achados={achados}
             onTextChange={setAchados}
           />
-          <ImageUploadSection images={images} onImagesChange={setImages} />
         </div>
 
         {/* Bottom Actions */}

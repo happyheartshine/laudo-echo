@@ -1,13 +1,30 @@
-import { ImagePlus, X, Upload } from "lucide-react";
+import { ImagePlus, X, Upload, Check } from "lucide-react";
 import { useState, useCallback } from "react";
 
 interface ImageUploadSectionProps {
   images: File[];
   onImagesChange: (images: File[]) => void;
+  selectedImages: Set<number>;
+  onSelectedImagesChange: (selected: Set<number>) => void;
 }
 
-export function ImageUploadSection({ images, onImagesChange }: ImageUploadSectionProps) {
+export function ImageUploadSection({ 
+  images, 
+  onImagesChange, 
+  selectedImages, 
+  onSelectedImagesChange 
+}: ImageUploadSectionProps) {
   const [isDragging, setIsDragging] = useState(false);
+
+  const acceptedTypes = ['image/jpeg', 'image/png', 'application/dicom', '.dcm'];
+
+  const isValidFile = (file: File) => {
+    return (
+      file.type === 'image/jpeg' || 
+      file.type === 'image/png' || 
+      file.name.toLowerCase().endsWith('.dcm')
+    );
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -23,31 +40,72 @@ export function ImageUploadSection({ images, onImagesChange }: ImageUploadSectio
     e.preventDefault();
     setIsDragging(false);
     
-    const files = Array.from(e.dataTransfer.files).filter(
-      file => file.type === 'image/jpeg' || file.type === 'image/png'
-    );
+    const files = Array.from(e.dataTransfer.files).filter(isValidFile);
     
-    onImagesChange([...images, ...files]);
-  }, [images, onImagesChange]);
+    if (files.length > 0) {
+      const newImages = [...images, ...files];
+      onImagesChange(newImages);
+      
+      // Auto-select newly added images
+      const newSelected = new Set(selectedImages);
+      files.forEach((_, i) => newSelected.add(images.length + i));
+      onSelectedImagesChange(newSelected);
+    }
+  }, [images, onImagesChange, selectedImages, onSelectedImagesChange]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).filter(
-        file => file.type === 'image/jpeg' || file.type === 'image/png'
-      );
-      onImagesChange([...images, ...files]);
+      const files = Array.from(e.target.files).filter(isValidFile);
+      
+      if (files.length > 0) {
+        const newImages = [...images, ...files];
+        onImagesChange(newImages);
+        
+        // Auto-select newly added images
+        const newSelected = new Set(selectedImages);
+        files.forEach((_, i) => newSelected.add(images.length + i));
+        onSelectedImagesChange(newSelected);
+      }
     }
-  }, [images, onImagesChange]);
+  }, [images, onImagesChange, selectedImages, onSelectedImagesChange]);
 
   const removeImage = useCallback((index: number) => {
     onImagesChange(images.filter((_, i) => i !== index));
-  }, [images, onImagesChange]);
+    
+    // Update selected images
+    const newSelected = new Set<number>();
+    selectedImages.forEach((i) => {
+      if (i < index) newSelected.add(i);
+      else if (i > index) newSelected.add(i - 1);
+    });
+    onSelectedImagesChange(newSelected);
+  }, [images, onImagesChange, selectedImages, onSelectedImagesChange]);
+
+  const toggleImageSelection = useCallback((index: number) => {
+    const newSelected = new Set(selectedImages);
+    if (newSelected.has(index)) {
+      newSelected.delete(index);
+    } else {
+      newSelected.add(index);
+    }
+    onSelectedImagesChange(newSelected);
+  }, [selectedImages, onSelectedImagesChange]);
+
+  const getImagePreview = (file: File): string | null => {
+    if (file.type === 'image/jpeg' || file.type === 'image/png') {
+      return URL.createObjectURL(file);
+    }
+    // For DICOM files, return null (no preview available)
+    return null;
+  };
+
+  const isDicomFile = (file: File) => file.name.toLowerCase().endsWith('.dcm');
 
   return (
-    <div className="card-vitaecor animate-fade-in" style={{ animationDelay: '0.3s' }}>
+    <div className="card-vitaecor animate-fade-in">
       <h2 className="section-title">
         <ImagePlus className="w-5 h-5 text-accent" />
-        Imagens do Ecocardiograma
+        Imagens do Exame (DICOM/JPG)
       </h2>
 
       {/* Dropzone */}
@@ -62,7 +120,7 @@ export function ImageUploadSection({ images, onImagesChange }: ImageUploadSectio
           id="file-input"
           type="file"
           multiple
-          accept="image/jpeg,image/png"
+          accept=".jpg,.jpeg,.png,.dcm,image/jpeg,image/png"
           className="hidden"
           onChange={handleFileInput}
         />
@@ -72,39 +130,81 @@ export function ImageUploadSection({ images, onImagesChange }: ImageUploadSectio
           Arraste as imagens aqui ou clique para selecionar
         </p>
         <p className="text-sm text-muted-foreground">
-          Formatos aceitos: JPG, PNG
+          Formatos aceitos: JPG, PNG, DICOM (.dcm)
         </p>
       </div>
 
-      {/* Preview das Imagens */}
+      {/* Image Gallery */}
       {images.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-            Imagens Anexadas ({images.length})
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Imagens Anexadas ({images.length})
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Clique para selecionar as imagens que irão para o PDF ({selectedImages.size} selecionadas)
+            </p>
+          </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {images.map((file, index) => (
-              <div key={index} className="relative group">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={`Imagem ${index + 1}`}
-                  className="w-full h-32 object-cover rounded-lg border border-border"
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeImage(index);
-                  }}
-                  className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            {images.map((file, index) => {
+              const isSelected = selectedImages.has(index);
+              const preview = getImagePreview(file);
+              const isDicom = isDicomFile(file);
+              
+              return (
+                <div 
+                  key={index} 
+                  className={`relative group cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
+                    isSelected 
+                      ? 'ring-4 ring-cta shadow-lg scale-[1.02]' 
+                      : 'ring-1 ring-border hover:ring-2 hover:ring-muted-foreground'
+                  }`}
+                  onClick={() => toggleImageSelection(index)}
                 >
-                  <X className="w-4 h-4" />
-                </button>
-                <p className="mt-2 text-xs text-muted-foreground truncate">
-                  {file.name}
-                </p>
-              </div>
-            ))}
+                  {/* Selection indicator */}
+                  {isSelected && (
+                    <div className="absolute top-2 left-2 z-10 w-6 h-6 bg-cta rounded-full flex items-center justify-center">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                  
+                  {/* Image or placeholder */}
+                  {preview ? (
+                    <img
+                      src={preview}
+                      alt={`Imagem ${index + 1}`}
+                      className="w-full h-32 object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-32 bg-secondary flex flex-col items-center justify-center">
+                      <ImagePlus className="w-8 h-8 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {isDicom ? 'DICOM' : 'Arquivo'}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Remove button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(index);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  
+                  {/* File name */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                    <p className="text-xs text-white truncate">
+                      {file.name}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
