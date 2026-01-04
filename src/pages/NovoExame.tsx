@@ -1,267 +1,79 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/Layout";
-import { PatientSection, PatientData } from "@/components/exam/PatientSection";
-import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
-import { ValvesSection } from "@/components/exam/ValvesSection";
-import { ImageUploadSection } from "@/components/exam/ImageUploadSection";
 import { Button } from "@/components/ui/button";
-import { FileDown, Save, ArrowLeft } from "lucide-react";
+import { FileUp, Edit, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import logoVitaecor from "@/assets/logo-vitaecor.png";
+import { PatientSection, PatientData } from "@/components/exam/PatientSection";
+import { ImageUploadSection } from "@/components/exam/ImageUploadSection";
 import { DicomPatientInfo } from "@/lib/dicomUtils";
+import { useToast } from "@/hooks/use-toast";
+
+const defaultPatientData: PatientData = {
+  nome: "",
+  responsavel: "",
+  especie: "",
+  raca: "",
+  sexo: "",
+  idade: "",
+  peso: "",
+};
 
 export default function NovoExame() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const reportRef = useRef<HTMLDivElement>(null);
-
-  const [patientData, setPatientData] = useState({
-    nome: "",
-    responsavel: "",
-    especie: "",
-    raca: "",
-    sexo: "",
-    idade: "",
-    peso: "",
-  });
-
-  const [measurementsData, setMeasurementsData] = useState({
-    dvedDiastole: "",
-    dvedSistole: "",
-    septoIVd: "",
-    septoIVs: "",
-    paredeLVd: "",
-    paredeLVs: "",
-    aorta: "",
-    atrioEsquerdo: "",
-  });
-
-  const [valvesData, setValvesData] = useState({
-    mitral: "",
-    tricuspide: "",
-    aortica: "",
-    pulmonar: "",
-  });
-
-  const [achados, setAchados] = useState("");
+  const [mode, setMode] = useState<"select" | "import" | "manual" | null>(null);
+  const [patientData, setPatientData] = useState<PatientData>(defaultPatientData);
   const [images, setImages] = useState<File[]>([]);
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
 
-  const handleSave = () => {
+  const handleDicomMetadataExtracted = (info: DicomPatientInfo) => {
+    setPatientData((prev) => ({
+      nome: prev.nome || info.nome,
+      responsavel: prev.responsavel || info.responsavel,
+      especie: prev.especie || info.especie,
+      raca: prev.raca || info.raca,
+      sexo: prev.sexo || info.sexo,
+      idade: prev.idade || info.idade,
+      peso: prev.peso || info.peso,
+    }));
     toast({
-      title: "Laudo salvo!",
-      description: "O laudo foi salvo com sucesso no sistema.",
+      title: "Dados extraídos do DICOM",
+      description: "As informações do paciente foram preenchidas automaticamente.",
     });
   };
 
-  const handleGeneratePDF = async () => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 20;
-    let yPosition = margin;
-
-    // Colors
-    const navyBlue = [26, 42, 82];
-    const red = [229, 41, 41];
-
-    // Header with logo
-    pdf.setFillColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.rect(0, 0, pageWidth, 35, 'F');
-
-    // Add logo text (since we can't easily add image)
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(20);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VitaeCor", pageWidth / 2, 15, { align: "center" });
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text("Cardiologia Veterinária", pageWidth / 2, 22, { align: "center" });
-
-    yPosition = 45;
-
-    // Title
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.setFontSize(16);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("LAUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, { align: "center" });
-    yPosition += 15;
-
-    // Patient Data Section
-    pdf.setFontSize(12);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.text("DADOS DO PACIENTE", margin, yPosition);
-    yPosition += 8;
-
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(60, 60, 60);
-
-    const patientInfo = [
-      `Nome: ${patientData.nome || '-'}`,
-      `Responsável: ${patientData.responsavel || '-'}`,
-      `Espécie: ${patientData.especie || '-'}`,
-      `Raça: ${patientData.raca || '-'}`,
-      `Sexo: ${patientData.sexo || '-'}`,
-      `Idade: ${patientData.idade || '-'}`,
-      `Peso: ${patientData.peso ? patientData.peso + ' kg' : '-'}`,
-    ];
-
-    patientInfo.forEach((info) => {
-      pdf.text(info, margin, yPosition);
-      yPosition += 6;
-    });
-
-    yPosition += 10;
-
-    // Measurements Section
-    pdf.setFontSize(12);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-    pdf.text("MEDIDAS ECOCARDIOGRÁFICAS", margin, yPosition);
-    yPosition += 10;
-
-    // Table header
-    pdf.setFillColor(245, 245, 245);
-    pdf.rect(margin, yPosition - 5, pageWidth - 2 * margin, 8, 'F');
-    pdf.setFontSize(9);
-    pdf.setTextColor(60, 60, 60);
-    pdf.text("Parâmetro", margin + 5, yPosition);
-    pdf.text("Valor", margin + 80, yPosition);
-    pdf.text("Unidade", margin + 120, yPosition);
-    yPosition += 8;
-
-    const measurements = [
-      ["DVED (LVIDd)", measurementsData.dvedDiastole, "cm"],
-      ["DVES (LVIDs)", measurementsData.dvedSistole, "cm"],
-      ["Septo IVd", measurementsData.septoIVd, "cm"],
-      ["Septo IVs", measurementsData.septoIVs, "cm"],
-      ["Parede LVd", measurementsData.paredeLVd, "cm"],
-      ["Parede LVs", measurementsData.paredeLVs, "cm"],
-      ["Aorta (Ao)", measurementsData.aorta, "cm"],
-      ["Átrio Esquerdo (AE)", measurementsData.atrioEsquerdo, "cm"],
-    ];
-
-    measurements.forEach((row, index) => {
-      if (index % 2 === 0) {
-        pdf.setFillColor(250, 250, 250);
-        pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 6, 'F');
-      }
-      pdf.setFont("helvetica", "normal");
-      pdf.text(row[0], margin + 5, yPosition);
-      pdf.text(row[1] || '-', margin + 80, yPosition);
-      pdf.text(row[2], margin + 120, yPosition);
-      yPosition += 6;
-    });
-
-    // Calculated values
-    yPosition += 5;
-    const pesoNum = parseFloat(patientData.peso);
-    const dvedNum = parseFloat(measurementsData.dvedDiastole);
-    const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '-';
-    const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
-      ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
-      : '-';
-    const fe = measurementsData.dvedDiastole && measurementsData.dvedSistole
-      ? (((parseFloat(measurementsData.dvedDiastole) - parseFloat(measurementsData.dvedSistole)) / parseFloat(measurementsData.dvedDiastole)) * 100).toFixed(1)
-      : '-';
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text(`DVED Normalizado: ${dvedNorm}`, margin + 5, yPosition);
-    pdf.text(`Relação AE/Ao: ${aeAo}`, margin + 70, yPosition);
-    pdf.text(`Fração Encurt.: ${fe}%`, margin + 120, yPosition);
-    yPosition += 15;
-
-    // Findings Section
-    if (achados) {
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.text("ACHADOS ECOCARDIOGRÁFICOS", margin, yPosition);
-      yPosition += 8;
-
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(60, 60, 60);
-
-      const lines = pdf.splitTextToSize(achados, pageWidth - 2 * margin);
-      lines.forEach((line: string) => {
-        if (yPosition > pageHeight - 30) {
-          pdf.addPage();
-          yPosition = margin;
-        }
-        pdf.text(line, margin, yPosition);
-        yPosition += 5;
+  const handleContinueToExam = () => {
+    // Store patient data and images in sessionStorage to pass to next page
+    sessionStorage.setItem("examPatientData", JSON.stringify(patientData));
+    // For images, we need to handle them differently since File objects can't be serialized
+    // We'll use a different approach - store image data URLs
+    const saveImagesPromises = images.map((file) => {
+      return new Promise<{ name: string; type: string; dataUrl: string }>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve({
+            name: file.name,
+            type: file.type,
+            dataUrl: e.target?.result as string,
+          });
+        };
+        reader.readAsDataURL(file);
       });
-    }
+    });
 
-    // Add only selected images on new pages
-    const selectedImagesList = images.filter((_, index) => selectedImages.has(index));
-    if (selectedImagesList.length > 0) {
-      pdf.addPage();
-      yPosition = margin;
-      
-      pdf.setFontSize(12);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.text("IMAGENS DO ECOCARDIOGRAMA", margin, yPosition);
-      yPosition += 15;
-
-      for (let i = 0; i < selectedImagesList.length; i++) {
-        if (yPosition > pageHeight - 80) {
-          pdf.addPage();
-          yPosition = margin;
-        }
-
-        const img = selectedImagesList[i];
-        
-        // Skip DICOM files (can't render in PDF directly)
-        if (img.name.toLowerCase().endsWith('.dcm')) {
-          pdf.setFontSize(10);
-          pdf.setFont("helvetica", "italic");
-          pdf.setTextColor(100, 100, 100);
-          pdf.text(`[Arquivo DICOM: ${img.name}]`, margin, yPosition);
-          yPosition += 10;
-          continue;
-        }
-        
-        const imgData = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.readAsDataURL(img);
-        });
-
-        const imgWidth = pageWidth - 2 * margin;
-        const imgHeight = 60;
-        pdf.addImage(imgData, 'JPEG', margin, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      }
-    }
-
-    // Footer
-    const today = new Date().toLocaleDateString('pt-BR');
-    pdf.setFontSize(8);
-    pdf.setTextColor(120, 120, 120);
-    pdf.text(`Documento gerado em ${today} - VitaeCor Cardiologia Veterinária`, pageWidth / 2, pageHeight - 10, { align: "center" });
-
-    pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
-
-    toast({
-      title: "PDF gerado!",
-      description: "O laudo foi exportado em formato PDF.",
+    Promise.all(saveImagesPromises).then((imageData) => {
+      sessionStorage.setItem("examImages", JSON.stringify(imageData));
+      sessionStorage.setItem("examSelectedImages", JSON.stringify([...selectedImages]));
+      navigate("/novo-exame/dados-exame");
     });
   };
 
-  return (
-    <Layout>
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+  // Selection screen
+  if (!mode) {
+    return (
+      <Layout>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-4 mb-8">
             <button 
               onClick={() => navigate('/')}
               className="p-2 rounded-lg hover:bg-secondary transition-colors"
@@ -270,72 +82,137 @@ export default function NovoExame() {
             </button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Novo Exame Ecocardiográfico</h1>
-              <p className="text-muted-foreground">Preencha os dados do laudo</p>
+              <p className="text-muted-foreground">Escolha como deseja iniciar</p>
             </div>
           </div>
-          
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={handleSave}>
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Rascunho
-            </Button>
-            <Button className="btn-cta" onClick={handleGeneratePDF}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Gerar PDF
-            </Button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Import DICOM option */}
+            <button
+              onClick={() => setMode("import")}
+              className="card-vitaecor hover:ring-2 hover:ring-accent transition-all text-left group"
+            >
+              <div className="flex flex-col items-center py-8">
+                <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
+                  <FileUp className="w-8 h-8 text-accent" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Importar DICOM</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-xs">
+                  Importe arquivos DICOM do ecocardiógrafo. Os dados do paciente serão extraídos automaticamente.
+                </p>
+              </div>
+            </button>
+
+            {/* Manual entry option */}
+            <button
+              onClick={() => setMode("manual")}
+              className="card-vitaecor hover:ring-2 hover:ring-accent transition-all text-left group"
+            >
+              <div className="flex flex-col items-center py-8">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                  <Edit className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Digitar Manualmente</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-xs">
+                  Preencha os dados do paciente e do exame manualmente.
+                </p>
+              </div>
+            </button>
           </div>
         </div>
+      </Layout>
+    );
+  }
 
-        {/* Form Sections */}
-        <div ref={reportRef} className="space-y-6">
-          <ImageUploadSection 
-            images={images} 
-            onImagesChange={setImages}
-            selectedImages={selectedImages}
-            onSelectedImagesChange={setSelectedImages}
-            onDicomMetadataExtracted={(info: DicomPatientInfo) => {
-              // Merge extracted data with existing patient data (only fill empty fields)
-              setPatientData((prev) => ({
-                nome: prev.nome || info.nome,
-                responsavel: prev.responsavel || info.responsavel,
-                especie: prev.especie || info.especie,
-                raca: prev.raca || info.raca,
-                sexo: prev.sexo || info.sexo,
-                idade: prev.idade || info.idade,
-                peso: prev.peso || info.peso,
-              }));
-              toast({
-                title: "Dados extraídos do DICOM",
-                description: "As informações do paciente foram preenchidas automaticamente.",
-              });
-            }}
-          />
-          <PatientSection data={patientData} onChange={setPatientData} />
-          <MeasurementsSection 
-            data={measurementsData} 
-            peso={patientData.peso}
-            onChange={setMeasurementsData} 
-          />
-          <ValvesSection 
-            data={valvesData} 
-            onChange={setValvesData}
-            achados={achados}
-            onTextChange={setAchados}
-          />
-        </div>
+  // Import DICOM mode
+  if (mode === "import") {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setMode(null)}
+                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Importar Arquivos DICOM</h1>
+                <p className="text-muted-foreground">Arraste os arquivos do ecocardiógrafo</p>
+              </div>
+            </div>
+          </div>
 
-        {/* Bottom Actions */}
-        <div className="mt-8 flex justify-end gap-3 pb-8">
-          <Button variant="outline" size="lg" onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Rascunho
-          </Button>
-          <Button className="btn-cta" size="lg" onClick={handleGeneratePDF}>
-            <FileDown className="w-4 h-4 mr-2" />
-            Gerar PDF do Laudo
-          </Button>
+          <div className="space-y-6">
+            <ImageUploadSection 
+              images={images} 
+              onImagesChange={setImages}
+              selectedImages={selectedImages}
+              onSelectedImagesChange={setSelectedImages}
+              onDicomMetadataExtracted={handleDicomMetadataExtracted}
+            />
+
+            <PatientSection data={patientData} onChange={setPatientData} />
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setMode(null)}>
+                Voltar
+              </Button>
+              <Button className="btn-cta" onClick={handleContinueToExam}>
+                Continuar para Dados do Exame
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
-    </Layout>
-  );
+      </Layout>
+    );
+  }
+
+  // Manual mode
+  if (mode === "manual") {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setMode(null)}
+                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Dados do Paciente</h1>
+                <p className="text-muted-foreground">Preencha as informações manualmente</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <PatientSection data={patientData} onChange={setPatientData} />
+
+            <ImageUploadSection 
+              images={images} 
+              onImagesChange={setImages}
+              selectedImages={selectedImages}
+              onSelectedImagesChange={setSelectedImages}
+              onDicomMetadataExtracted={handleDicomMetadataExtracted}
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setMode(null)}>
+                Voltar
+              </Button>
+              <Button className="btn-cta" onClick={handleContinueToExam}>
+                Continuar para Dados do Exame
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  return null;
 }

@@ -111,13 +111,11 @@ export function PatientSection({ data, onChange }: PatientSectionProps) {
           />
         </div>
 
-        {/* Peso - Campo Crítico */}
+        {/* Peso */}
         <div>
-          <Label className="label-vitaecor">
-            Peso (kg) - Crítico
-          </Label>
+          <Label className="label-vitaecor">Peso (kg)</Label>
           <Input
-            className="input-vitaecor border-accent/30 focus:border-accent"
+            className="input-vitaecor"
             placeholder="Ex: 12.5"
             type="number"
             step="0.1"
