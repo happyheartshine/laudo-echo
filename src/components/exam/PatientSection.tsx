@@ -1,4 +1,4 @@
-import { PawPrint, Scale } from "lucide-react";
+import { PawPrint } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -9,8 +9,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface PatientData {
+export interface PatientData {
   nome: string;
+  responsavel: string;
   especie: string;
   raca: string;
   sexo: string;
@@ -44,6 +45,17 @@ export function PatientSection({ data, onChange }: PatientSectionProps) {
             placeholder="Ex: Rex"
             value={data.nome}
             onChange={(e) => handleChange('nome', e.target.value)}
+          />
+        </div>
+
+        {/* Responsável */}
+        <div>
+          <Label className="label-vitaecor">Responsável</Label>
+          <Input
+            className="input-vitaecor"
+            placeholder="Ex: João Silva"
+            value={data.responsavel}
+            onChange={(e) => handleChange('responsavel', e.target.value)}
           />
         </div>
 
@@ -101,8 +113,7 @@ export function PatientSection({ data, onChange }: PatientSectionProps) {
 
         {/* Peso - Campo Crítico */}
         <div>
-          <Label className="label-vitaecor flex items-center gap-2">
-            <Scale className="w-4 h-4 text-accent" />
+          <Label className="label-vitaecor">
             Peso (kg) - Crítico
           </Label>
           <Input

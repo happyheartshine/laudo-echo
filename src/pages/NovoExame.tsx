@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Layout } from "@/components/Layout";
-import { PatientSection } from "@/components/exam/PatientSection";
+import { PatientSection, PatientData } from "@/components/exam/PatientSection";
 import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { ImageUploadSection } from "@/components/exam/ImageUploadSection";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logoVitaecor from "@/assets/logo-vitaecor.png";
+import { DicomPatientInfo } from "@/lib/dicomUtils";
 
 export default function NovoExame() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function NovoExame() {
 
   const [patientData, setPatientData] = useState({
     nome: "",
+    responsavel: "",
     especie: "",
     raca: "",
     sexo: "",
@@ -101,6 +103,7 @@ export default function NovoExame() {
 
     const patientInfo = [
       `Nome: ${patientData.nome || '-'}`,
+      `Responsável: ${patientData.responsavel || '-'}`,
       `Espécie: ${patientData.especie || '-'}`,
       `Raça: ${patientData.raca || '-'}`,
       `Sexo: ${patientData.sexo || '-'}`,
@@ -290,6 +293,22 @@ export default function NovoExame() {
             onImagesChange={setImages}
             selectedImages={selectedImages}
             onSelectedImagesChange={setSelectedImages}
+            onDicomMetadataExtracted={(info: DicomPatientInfo) => {
+              // Merge extracted data with existing patient data (only fill empty fields)
+              setPatientData((prev) => ({
+                nome: prev.nome || info.nome,
+                responsavel: prev.responsavel || info.responsavel,
+                especie: prev.especie || info.especie,
+                raca: prev.raca || info.raca,
+                sexo: prev.sexo || info.sexo,
+                idade: prev.idade || info.idade,
+                peso: prev.peso || info.peso,
+              }));
+              toast({
+                title: "Dados extraídos do DICOM",
+                description: "As informações do paciente foram preenchidas automaticamente.",
+              });
+            }}
           />
           <PatientSection data={patientData} onChange={setPatientData} />
           <MeasurementsSection 
