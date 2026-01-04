@@ -160,7 +160,7 @@ export default function NovoExame() {
                 Voltar
               </Button>
               <Button className="btn-cta" onClick={handleContinueToExam}>
-                Continuar para Dados do Exame
+                Continuar
               </Button>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function NovoExame() {
                 Voltar
               </Button>
               <Button className="btn-cta" onClick={handleContinueToExam}>
-                Continuar para Dados do Exame
+                Continuar
               </Button>
             </div>
           </div>
