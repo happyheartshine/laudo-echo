@@ -11,6 +11,7 @@ import { PatientData } from "@/components/exam/PatientSection";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { loadExamImages } from "@/lib/imageStorage";
 
 interface StoredImageData {
   name: string;
@@ -98,23 +99,26 @@ export default function DadosExame() {
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
 
   useEffect(() => {
-    const storedPatient = sessionStorage.getItem("examPatientData");
-    if (storedPatient) {
-      setPatientData(JSON.parse(storedPatient));
-    } else {
-      navigate("/novo-exame");
-      return;
-    }
+    const loadData = async () => {
+      const storedPatient = sessionStorage.getItem("examPatientData");
+      if (storedPatient) {
+        setPatientData(JSON.parse(storedPatient));
+      } else {
+        navigate("/novo-exame");
+        return;
+      }
 
-    const storedImagesData = sessionStorage.getItem("examImages");
-    if (storedImagesData) {
-      setStoredImages(JSON.parse(storedImagesData));
-    }
+      // Load images from IndexedDB
+      try {
+        const images = await loadExamImages();
+        setStoredImages(images);
+        setSelectedImages(images.map((_, i) => i));
+      } catch (error) {
+        console.error("Error loading images:", error);
+      }
+    };
 
-    const storedSelected = sessionStorage.getItem("examSelectedImages");
-    if (storedSelected) {
-      setSelectedImages(JSON.parse(storedSelected));
-    }
+    loadData();
   }, [navigate]);
 
   const handleSave = () => {
