@@ -192,7 +192,7 @@ export default function Configuracoes() {
             </TabsTrigger>
             <TabsTrigger value="clinica" className="flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              Personalização da Clínica
+              Clínica/Hospital
             </TabsTrigger>
           </TabsList>
 
@@ -265,7 +265,7 @@ export default function Configuracoes() {
                 <div className="flex justify-end pt-4">
                   <Button onClick={handleSaveProfile} disabled={savingProfile}>
                     {savingProfile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Salvar Alterações
+                    Salvar
                   </Button>
                 </div>
               </CardContent>
@@ -275,7 +275,7 @@ export default function Configuracoes() {
           <TabsContent value="clinica" className="mt-6">
             <Card>
               <CardHeader>
-                <CardTitle>Personalização da Clínica</CardTitle>
+                <CardTitle>Clínica/Hospital</CardTitle>
                 <CardDescription>
                   Estas informações aparecerão no cabeçalho do laudo PDF.
                 </CardDescription>
@@ -355,9 +355,9 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <Button onClick={handleSaveClinic} disabled={savingClinic}>
+                  <Button onClick={handleSaveClinic} disabled={savingClinic || uploadingLogo}>
                     {savingClinic && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Salvar Alterações
+                    Salvar
                   </Button>
                 </div>
               </CardContent>
