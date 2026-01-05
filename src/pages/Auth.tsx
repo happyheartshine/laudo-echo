@@ -117,15 +117,13 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="bg-primary p-4 rounded-xl mb-4">
+          <div className="bg-primary p-4 rounded-xl">
             <img 
               src={logoVitaecor} 
               alt="VitaeCor" 
               className="h-16 w-auto brightness-0 invert"
             />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">VitaeCor</h1>
-          <p className="text-muted-foreground">Cardiologia Veterinária</p>
         </div>
 
         <Card>
@@ -139,7 +137,7 @@ export default function Auth() {
             
             <CardContent>
               <TabsContent value="login" className="mt-0">
-                <CardTitle className="mb-2">Bem-vindo de volta</CardTitle>
+                <CardTitle className="mb-2 text-center">Bem-Vindo</CardTitle>
                 <CardDescription className="mb-4">
                   Entre com suas credenciais para acessar o sistema.
                 </CardDescription>
