@@ -337,26 +337,26 @@ export default function DadosExame() {
         }
       }
 
-      // Name - fonte maior (12)
+      // Name - fonte reduzida e linhas mais próximas
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setFontSize(12);
+      pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
       pdf.text(name, pageWidth / 2, yPosition, { align: "center" });
 
-      pdf.setFontSize(11);
+      pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
 
       if (crmvText) {
-        yPosition += 5;
+        yPosition += 4;
         pdf.text(crmvText, pageWidth / 2, yPosition, { align: "center" });
       }
 
       if (specialtyText) {
-        yPosition += 5;
+        yPosition += 4;
         pdf.text(specialtyText, pageWidth / 2, yPosition, { align: "center" });
       }
 
-      yPosition += 5;
+      yPosition += 4;
     };
 
     // Page 1 Header
@@ -640,20 +640,31 @@ export default function DadosExame() {
   const handlePreviewPDF = async () => {
     try {
       const pdf = await generatePdfDocument();
-      const blob = pdf.output("blob");
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank");
+      const pdfBlob = pdf.output("blob");
+      const blobUrl = URL.createObjectURL(pdfBlob);
       
-      if (!win) {
-        URL.revokeObjectURL(url);
+      const newWindow = window.open(blobUrl, "_blank");
+      
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        URL.revokeObjectURL(blobUrl);
         toast({
-          title: "Pop-up bloqueado",
-          description: "Use o botão 'Baixar PDF' para ver o arquivo.",
+          title: "Aba bloqueada",
+          description: "Se a aba não abrir, por favor use o botão 'Baixar PDF'.",
+          variant: "destructive",
         });
+        // Fallback: tentar abrir via link clicável
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
         return;
       }
       
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
     } catch (error) {
       console.error("Error generating PDF preview:", error);
       toast({
