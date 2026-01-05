@@ -195,7 +195,7 @@ export default function DadosExame() {
     const margin = 15;
     const headerHeight = 25; // Height of the header area
     const contentStartY = headerHeight + 10; // Content starts below header with padding
-    const HEADER_HEIGHT = 60; // altura segura para começar abaixo da logo (exigência)
+    const SAFE_PAGE_START_Y = 80; // exigência: garantir conteúdo abaixo da logo após quebra de página
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
@@ -409,6 +409,7 @@ export default function DadosExame() {
       
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(9);
+      pdf.setTextColor(0, 0, 0); // evita herdar branco do cabeçalho ao trocar de página
       pdf.text(title, margin, yPosition);
       yPosition += 5;
       
@@ -431,16 +432,16 @@ export default function DadosExame() {
       { label: "Gradiente", value: `${valvasDoppler.tricuspideGradiente || '-'} mmHg` },
     ]);
 
-    // Valva Pulmonar (garante que nunca comece sobre o cabeçalho)
-    if (yPosition > 240) {
+    // Valva Pulmonar (quebra de página + altura segura abaixo da logo)
+    if (yPosition > 220) {
       pdf.addPage();
       await addHeader(pdf, pageWidth);
-      yPosition = HEADER_HEIGHT;
+      yPosition = SAFE_PAGE_START_Y;
     }
 
-    // Se já está no começo da página (página anterior acabou), força começar abaixo do cabeçalho
-    if (yPosition <= contentStartY + 1) {
-      yPosition = HEADER_HEIGHT;
+    // Se já estiver no início de uma página, força começar abaixo do cabeçalho
+    if (yPosition < SAFE_PAGE_START_Y) {
+      yPosition = SAFE_PAGE_START_Y;
     }
 
     await addValveBlock("VALVA PULMONAR", [
@@ -448,7 +449,17 @@ export default function DadosExame() {
       { label: "Gradiente", value: `${valvasDoppler.pulmonarGradiente || '-'} mmHg` },
     ]);
 
-    // Valva Aórtica
+    // Valva Aórtica (mesma regra de quebra de página + altura segura)
+    if (yPosition > 220) {
+      pdf.addPage();
+      await addHeader(pdf, pageWidth);
+      yPosition = SAFE_PAGE_START_Y;
+    }
+
+    if (yPosition < SAFE_PAGE_START_Y) {
+      yPosition = SAFE_PAGE_START_Y;
+    }
+
     await addValveBlock("VALVA AÓRTICA", [
       { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.aorticaVelocidade || '-'} cm/s` },
       { label: "Gradiente", value: `${valvasDoppler.aorticaGradiente || '-'} mmHg` },
@@ -562,29 +573,12 @@ export default function DadosExame() {
   const handlePreviewPDF = async () => {
     try {
       const pdf = await generatePdfDocument();
-      const blob = pdf.output("blob");
-      const url = URL.createObjectURL(blob);
-
-      const win = window.open(url, "_blank");
-      if (!win) {
-        URL.revokeObjectURL(url);
-        toast({
-          title: "Pop-up bloqueado",
-          description:
-            "Seu navegador bloqueou a pré-visualização. Use o botão “Baixar PDF”.",
-        });
-        return;
-      }
-
-      // Revoke URL after a delay to allow the new tab to load
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 10000);
+      pdf.save("preview_laudo.pdf");
     } catch (error) {
       console.error("Error generating PDF preview:", error);
       toast({
-        title: "Erro ao gerar preview",
-        description: "Não foi possível gerar o preview do PDF.",
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o arquivo para download.",
         variant: "destructive",
       });
     }
