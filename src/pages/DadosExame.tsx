@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { loadExamImages } from "@/lib/imageStorage";
 import { useProfile } from "@/hooks/useProfile";
-import { PdfPreviewDialog } from "@/components/exam/PdfPreviewDialog";
+
 
 interface StoredImageData {
   name: string;
@@ -100,8 +100,7 @@ export default function DadosExame() {
   const [conclusoes, setConclusoes] = useState("");
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  // Preview state no longer needed - opening in new tab
 
   useEffect(() => {
     const loadData = async () => {
@@ -194,6 +193,8 @@ export default function DadosExame() {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
+    const headerHeight = 25; // Height of the header area
+    const contentStartY = headerHeight + 10; // Content starts below header with padding
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
@@ -203,7 +204,7 @@ export default function DadosExame() {
       if (yPosition + neededHeight > pageHeight - bottomSafeArea) {
         pdf.addPage();
         await addHeader(pdf, pageWidth);
-        yPosition = 35;
+        yPosition = contentStartY; // Reset Y to below header
         return true;
       }
       return false;
@@ -551,11 +552,14 @@ export default function DadosExame() {
       const pdf = await generatePdfDocument();
       const blob = pdf.output("blob");
       const url = URL.createObjectURL(blob);
-      setPdfBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return url;
-      });
-      setPreviewOpen(true);
+      
+      // Open PDF in new tab for reliable viewing
+      window.open(url, "_blank");
+      
+      // Revoke URL after a delay to allow the new tab to load
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 5000);
     } catch (error) {
       console.error("Error generating PDF preview:", error);
       toast({
@@ -571,12 +575,6 @@ export default function DadosExame() {
       const pdf = await generatePdfDocument();
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
-
-      setPreviewOpen(false);
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-        setPdfBlobUrl(null);
-      }
 
       toast({
         title: "PDF gerado!",
@@ -863,19 +861,6 @@ export default function DadosExame() {
           </Button>
         </div>
 
-        <PdfPreviewDialog
-          open={previewOpen}
-          onOpenChange={(open) => {
-            setPreviewOpen(open);
-            if (!open && pdfBlobUrl) {
-              URL.revokeObjectURL(pdfBlobUrl);
-              setPdfBlobUrl(null);
-            }
-          }}
-          pdfBlobUrl={pdfBlobUrl}
-          onDownload={handleDownloadPDF}
-          patientName={patientData.nome || 'Paciente'}
-        />
       </div>
     </Layout>
   );
