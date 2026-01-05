@@ -234,10 +234,13 @@ export default function DadosExame() {
         ? `CRMV ${profile?.uf_crmv ? `${profile.uf_crmv} ` : ""}${profile.crmv}`
         : "";
       const specialtyText = profile?.especialidade || "";
+      const signatureUrl = profile?.signature_url;
 
-      // Approximate block height; if it doesn't fit, start a new page just for the signature.
+      // Approximate block height: signature image (if any) + text lines
+      const hasSignatureImage = !!signatureUrl;
+      const signatureImgHeight = hasSignatureImage ? 15 : 0; // ~1.5cm height
       const lineCount = 1 + (crmvText ? 1 : 0) + (specialtyText ? 1 : 0);
-      const blockHeight = 8 /* gap */ + 1 /* line */ + 5 /* gap */ + lineCount * 4 + 4;
+      const blockHeight = 10 + signatureImgHeight + lineCount * 4 + 4;
       const footerReserved = 12;
 
       if (yPosition + blockHeight > pageHeight - footerReserved) {
@@ -246,15 +249,34 @@ export default function DadosExame() {
         yPosition = 35;
       }
 
-      yPosition += 8;
+      yPosition += 10;
 
-      const lineY = yPosition;
-      pdf.setDrawColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setLineWidth(0.3);
-      pdf.line(pageWidth / 2 - 40, lineY, pageWidth / 2 + 40, lineY);
+      // If we have a signature image, add it instead of line
+      if (signatureUrl) {
+        try {
+          const sigImg = new Image();
+          sigImg.crossOrigin = "anonymous";
+          await new Promise<void>((resolve, reject) => {
+            sigImg.onload = () => resolve();
+            sigImg.onerror = () => reject();
+            sigImg.src = signatureUrl;
+          });
+          
+          // Calculate proportional dimensions (width ~4cm = 40mm)
+          const targetWidth = 40;
+          const ratio = sigImg.height / sigImg.width;
+          const targetHeight = targetWidth * ratio;
+          
+          const imgX = pageWidth / 2 - targetWidth / 2;
+          pdf.addImage(sigImg, 'PNG', imgX, yPosition, targetWidth, Math.min(targetHeight, 15));
+          yPosition += Math.min(targetHeight, 15) + 2;
+        } catch (e) {
+          // Fallback: no image, just skip
+          console.error('Error loading signature image:', e);
+        }
+      }
 
-      yPosition += 5;
-
+      // Name
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "bold");
@@ -287,62 +309,35 @@ export default function DadosExame() {
     pdf.text("RELATÓRIO DE ESTUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, { align: "center" });
     yPosition += 12;
 
-    // Patient Info
+    // Patient Info - More compact layout with reduced label-value spacing
     const col1 = margin;
     const col2 = pageWidth / 2;
+    const labelOffset = 2; // Reduced spacing between label and value
     
-    pdf.setFontSize(10);
+    pdf.setFontSize(9);
     pdf.setTextColor(60, 60, 60);
     
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Paciente:", col1, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.nome || '-', col1 + 22, yPosition);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Espécie:", col2, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.especie || '-', col2 + 18, yPosition);
-    yPosition += 5;
+    const addCompactRow = (label1: string, value1: string, label2: string, value2: string) => {
+      pdf.setFont("helvetica", "bold");
+      pdf.text(label1, col1, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const label1Width = pdf.getTextWidth(label1);
+      pdf.text(value1, col1 + label1Width + labelOffset, yPosition);
+      
+      pdf.setFont("helvetica", "bold");
+      pdf.text(label2, col2, yPosition);
+      pdf.setFont("helvetica", "normal");
+      const label2Width = pdf.getTextWidth(label2);
+      pdf.text(value2, col2 + label2Width + labelOffset, yPosition);
+      yPosition += 4.5;
+    };
 
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Raça:", col1, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.raca || '-', col1 + 12, yPosition);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Sexo:", col2, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.sexo || '-', col2 + 12, yPosition);
-    yPosition += 5;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Idade:", col1, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.idade || '-', col1 + 14, yPosition);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Peso:", col2, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.peso ? `${patientData.peso} kg` : '-', col2 + 12, yPosition);
-    yPosition += 5;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Tutor(a):", col1, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(patientData.responsavel || '-', col1 + 18, yPosition);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Data:", col2, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(examInfo.data || '-', col2 + 12, yPosition);
-    yPosition += 5;
-
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Solicitante:", col1, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(examInfo.solicitante || '-', col1 + 24, yPosition);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Clínica/Hospital:", col2, yPosition);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(examInfo.clinica || '-', col2 + 35, yPosition);
-    yPosition += 10;
+    addCompactRow("Paciente:", patientData.nome || '-', "Espécie:", patientData.especie || '-');
+    addCompactRow("Raça:", patientData.raca || '-', "Sexo:", patientData.sexo || '-');
+    addCompactRow("Idade:", patientData.idade || '-', "Peso:", patientData.peso ? `${patientData.peso} kg` : '-');
+    addCompactRow("Tutor(a):", patientData.responsavel || '-', "Data:", examInfo.data || '-');
+    addCompactRow("Solicitante:", examInfo.solicitante || '-', "Clínica/Hospital:", examInfo.clinica || '-');
+    yPosition += 6;
 
     // Parâmetros Observados
     await addSectionHeader("PARÂMETROS OBSERVADOS");
@@ -386,9 +381,15 @@ export default function DadosExame() {
     addTableRow("Tempo de desaceleração da onda E", `${funcaoDiastolica.tempoDesaceleracao || '-'} ms`);
     addTableRow("TRIV", `${funcaoDiastolica.triv || '-'} ms`);
     addTableRow("E/TRIV", funcaoDiastolica.eTRIV || '-');
-    addTableRow("TDI Parede lateral s'", `${funcaoDiastolica.tdiParedeLateral || '-'} cm/s`);
-    addTableRow("e'", `${funcaoDiastolica.ePrime || '-'} cm/s`);
-    addTableRow("a'", `${funcaoDiastolica.aPrime || '-'} cm/s`);
+    
+    // TDI em linha única
+    const tdiLine = `TDI Parede lateral: s': ${funcaoDiastolica.tdiParedeLateral || '-'} cm/s | e': ${funcaoDiastolica.ePrime || '-'} cm/s | a': ${funcaoDiastolica.aPrime || '-'} cm/s`;
+    pdf.setTextColor(60, 60, 60);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(tdiLine, margin, yPosition);
+    yPosition += 5;
+    
     addTableRow("Relação E/e'", funcaoDiastolica.relacaoEePrime || '-');
     yPosition += 3;
 
@@ -396,39 +397,46 @@ export default function DadosExame() {
     await addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
     yPosition += 2;
 
+    // Helper to check page break before each valve block
+    const addValveBlock = async (title: string, rows: Array<{ label: string; value: string }>) => {
+      const blockHeight = 5 + rows.length * 5 + 3; // title + rows + spacing
+      await checkPageBreak(blockHeight);
+      
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text(title, margin, yPosition);
+      yPosition += 5;
+      
+      for (const row of rows) {
+        addTableRow(row.label, row.value);
+      }
+      yPosition += 3;
+    };
+
     // Valva Mitral
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.text("VALVA MITRAL", margin, yPosition);
-    yPosition += 5;
-    addTableRow("Velocidade máxima do fluxo retrógrado da IM", `${valvasDoppler.mitralVelocidade || '-'} cm/s`);
-    addTableRow("Gradiente", `${valvasDoppler.mitralGradiente || '-'} mmHg`);
-    addTableRow("+dP/dT", `${valvasDoppler.mitralDpDt || '-'} mmHg/s`);
-    yPosition += 3;
+    await addValveBlock("VALVA MITRAL", [
+      { label: "Velocidade máxima do fluxo retrógrado da IM", value: `${valvasDoppler.mitralVelocidade || '-'} cm/s` },
+      { label: "Gradiente", value: `${valvasDoppler.mitralGradiente || '-'} mmHg` },
+      { label: "+dP/dT", value: `${valvasDoppler.mitralDpDt || '-'} mmHg/s` },
+    ]);
 
     // Valva Tricúspide
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VALVA TRICÚSPIDE", margin, yPosition);
-    yPosition += 5;
-    addTableRow("Velocidade máxima do fluxo retrógrado da IT", `${valvasDoppler.tricuspideVelocidade || '-'} cm/s`);
-    addTableRow("Gradiente", `${valvasDoppler.tricuspideGradiente || '-'} mmHg`);
-    yPosition += 3;
+    await addValveBlock("VALVA TRICÚSPIDE", [
+      { label: "Velocidade máxima do fluxo retrógrado da IT", value: `${valvasDoppler.tricuspideVelocidade || '-'} cm/s` },
+      { label: "Gradiente", value: `${valvasDoppler.tricuspideGradiente || '-'} mmHg` },
+    ]);
 
     // Valva Pulmonar
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VALVA PULMONAR", margin, yPosition);
-    yPosition += 5;
-    addTableRow("Velocidade máxima do fluxo transvalvar", `${valvasDoppler.pulmonarVelocidade || '-'} cm/s`);
-    addTableRow("Gradiente", `${valvasDoppler.pulmonarGradiente || '-'} mmHg`);
-    yPosition += 3;
+    await addValveBlock("VALVA PULMONAR", [
+      { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.pulmonarVelocidade || '-'} cm/s` },
+      { label: "Gradiente", value: `${valvasDoppler.pulmonarGradiente || '-'} mmHg` },
+    ]);
 
     // Valva Aórtica
-    pdf.setFont("helvetica", "bold");
-    pdf.text("VALVA AÓRTICA", margin, yPosition);
-    yPosition += 5;
-    addTableRow("Velocidade máxima do fluxo transvalvar", `${valvasDoppler.aorticaVelocidade || '-'} cm/s`);
-    addTableRow("Gradiente", `${valvasDoppler.aorticaGradiente || '-'} mmHg`);
-    yPosition += 3;
+    await addValveBlock("VALVA AÓRTICA", [
+      { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.aorticaVelocidade || '-'} cm/s` },
+      { label: "Gradiente", value: `${valvasDoppler.aorticaGradiente || '-'} mmHg` },
+    ]);
 
     // Outros
     await addSectionHeader("OUTROS");

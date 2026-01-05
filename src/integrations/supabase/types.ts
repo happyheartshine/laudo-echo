@@ -53,6 +53,7 @@ export type Database = {
           especialidade: string | null
           id: string
           nome: string
+          signature_url: string | null
           telefone: string | null
           uf_crmv: string | null
           updated_at: string
@@ -66,6 +67,7 @@ export type Database = {
           especialidade?: string | null
           id?: string
           nome: string
+          signature_url?: string | null
           telefone?: string | null
           uf_crmv?: string | null
           updated_at?: string
@@ -79,6 +81,7 @@ export type Database = {
           especialidade?: string | null
           id?: string
           nome?: string
+          signature_url?: string | null
           telefone?: string | null
           uf_crmv?: string | null
           updated_at?: string
