@@ -2,13 +2,22 @@ import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileDown, Calendar, User, Stethoscope } from "lucide-react";
+import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 interface Exam {
   id: string;
   patient_name: string;
@@ -31,9 +40,13 @@ export default function Historico() {
   const { user } = useAuth();
   const { profile, clinic } = useProfile();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [selectedExamForEmail, setSelectedExamForEmail] = useState<Exam | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -432,6 +445,52 @@ export default function Historico() {
     }
   };
 
+  const handleEdit = (exam: Exam) => {
+    // Navigate to edit page with exam ID
+    navigate(`/novo-exame/dados-exame?id=${exam.id}`);
+  };
+
+  const handleOpenEmailDialog = (exam: Exam) => {
+    setSelectedExamForEmail(exam);
+    setEmailAddress("");
+    setEmailDialogOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedExamForEmail || !emailAddress) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um endereço de email válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Simulate sending email (console.log for now)
+    console.log("=== SIMULAÇÃO DE ENVIO DE EMAIL ===");
+    console.log("Para:", emailAddress);
+    console.log("Assunto:", `Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
+    console.log("Corpo: Segue em anexo o laudo ecocardiográfico do paciente", selectedExamForEmail.patient_name);
+    console.log("Exame ID:", selectedExamForEmail.id);
+    console.log("===================================");
+
+    // Fallback: open mailto link
+    const subject = encodeURIComponent(`Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
+    const body = encodeURIComponent(
+      `Prezado(a),\n\nSegue em anexo o laudo ecocardiográfico do paciente ${selectedExamForEmail.patient_name}.\n\nAtenciosamente,\n${profile?.nome || "Equipe Veterinária"}`
+    );
+    
+    window.open(`mailto:${emailAddress}?subject=${subject}&body=${body}`, "_blank");
+
+    toast({
+      title: "Email preparado!",
+      description: "O cliente de email foi aberto. Anexe o PDF manualmente.",
+    });
+
+    setEmailDialogOpen(false);
+    setSelectedExamForEmail(null);
+  };
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
@@ -499,15 +558,33 @@ export default function Historico() {
                       <td className="py-3 px-4 text-muted-foreground">{exam.owner_name || "-"}</td>
                       <td className="py-3 px-4 text-muted-foreground">{exam.species || "-"}</td>
                       <td className="py-3 px-4 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleReprint(exam)}
-                          className="gap-2"
-                        >
-                          <FileDown className="w-4 h-4" />
-                          Reimprimir PDF
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(exam)}
+                            title="Editar exame"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEmailDialog(exam)}
+                            title="Enviar por email"
+                          >
+                            <Mail className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleReprint(exam)}
+                            className="gap-2"
+                          >
+                            <FileDown className="w-4 h-4" />
+                            PDF
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -523,6 +600,39 @@ export default function Historico() {
             {filteredExams.length} exame{filteredExams.length !== 1 ? "s" : ""} encontrado{filteredExams.length !== 1 ? "s" : ""}
           </div>
         )}
+
+        {/* Email Dialog */}
+        <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Enviar Laudo por Email</DialogTitle>
+              <DialogDescription>
+                Digite o endereço de email do destinatário para enviar o laudo do paciente{" "}
+                <strong>{selectedExamForEmail?.patient_name}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label htmlFor="email">Email do destinatário</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="exemplo@email.com"
+                value={emailAddress}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSendEmail}>
+                <Mail className="w-4 h-4 mr-2" />
+                Enviar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

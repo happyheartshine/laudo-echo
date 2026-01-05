@@ -5,7 +5,7 @@ import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
 import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { PatientData } from "@/components/exam/PatientSection";
@@ -34,11 +34,16 @@ interface StoredImageData {
 
 export default function DadosExame() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const examId = searchParams.get("id"); // If present, we're in edit mode
+  const isEditMode = !!examId;
+  
   const { toast } = useToast();
   const { user } = useAuth();
   const { clinic, profile } = useProfile();
   const reportRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
@@ -152,28 +157,90 @@ export default function DadosExame() {
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   // Preview state no longer needed - opening in new tab
 
-  useEffect(() => {
-    const loadData = async () => {
-      const storedPatient = sessionStorage.getItem("examPatientData");
-      if (storedPatient) {
-        setPatientData(JSON.parse(storedPatient));
-      } else {
-        navigate("/novo-exame");
+  // Load existing exam data if in edit mode
+  const loadExamData = useCallback(async (id: string) => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from("exams")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        toast({
+          title: "Exame não encontrado",
+          description: "O exame solicitado não foi encontrado.",
+          variant: "destructive",
+        });
+        navigate("/historico");
         return;
       }
 
-      // Load images from IndexedDB
-      try {
-        const images = await loadExamImages();
-        setStoredImages(images);
-        setSelectedImages(images.map((_, i) => i));
-      } catch (error) {
-        console.error("Error loading images:", error);
+      // Parse content and populate all fields
+      const content = data.content as {
+        patientData?: PatientData;
+        examInfo?: typeof examInfo;
+        measurementsData?: typeof measurementsData;
+        funcaoDiastolica?: typeof funcaoDiastolica;
+        valvasDoppler?: typeof valvasDoppler;
+        outros?: typeof outros;
+        valvesData?: typeof valvesData;
+        achados?: string;
+        conclusoes?: string;
+      };
+
+      if (content.patientData) setPatientData(content.patientData);
+      if (content.examInfo) setExamInfo(content.examInfo);
+      if (content.measurementsData) setMeasurementsData(content.measurementsData);
+      if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
+      if (content.valvasDoppler) setValvasDoppler(content.valvasDoppler);
+      if (content.outros) setOutros(content.outros);
+      if (content.valvesData) setValvesData(content.valvesData);
+      if (content.achados) setAchados(content.achados);
+      if (content.conclusoes) setConclusoes(content.conclusoes);
+
+    } catch (error) {
+      console.error("Erro ao carregar exame:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar o exame.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate, toast]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (isEditMode && examId) {
+        // Edit mode: load from database
+        await loadExamData(examId);
+      } else {
+        // New exam mode: load from sessionStorage
+        const storedPatient = sessionStorage.getItem("examPatientData");
+        if (storedPatient) {
+          setPatientData(JSON.parse(storedPatient));
+        } else {
+          navigate("/novo-exame");
+          return;
+        }
+
+        // Load images from IndexedDB
+        try {
+          const images = await loadExamImages();
+          setStoredImages(images);
+          setSelectedImages(images.map((_, i) => i));
+        } catch (error) {
+          console.error("Error loading images:", error);
+        }
       }
     };
 
     loadData();
-  }, [navigate]);
+  }, [navigate, isEditMode, examId, loadExamData]);
 
   const handleSave = () => {
     toast({
@@ -754,22 +821,41 @@ export default function DadosExame() {
         calculatedValues,
       };
 
-      const { error } = await supabase.from("exams").insert([{
-        user_id: user.id,
-        clinic_id: profile?.clinic_id || null,
+      const examData = {
         patient_name: patientData.nome || "Paciente sem nome",
         owner_name: patientData.responsavel || null,
         species: patientData.especie || null,
         breed: patientData.raca || null,
         exam_date: examDate,
         content: JSON.parse(JSON.stringify(examContent)),
-      }]);
+      };
+
+      let error;
+
+      if (isEditMode && examId) {
+        // UPDATE existing exam
+        const result = await supabase
+          .from("exams")
+          .update(examData)
+          .eq("id", examId);
+        error = result.error;
+      } else {
+        // INSERT new exam
+        const result = await supabase.from("exams").insert([{
+          ...examData,
+          user_id: user.id,
+          clinic_id: profile?.clinic_id || null,
+        }]);
+        error = result.error;
+      }
 
       if (error) throw error;
 
       toast({
-        title: "Exame salvo!",
-        description: "O exame foi salvo no histórico com sucesso.",
+        title: isEditMode ? "Exame atualizado!" : "Exame salvo!",
+        description: isEditMode 
+          ? "O exame foi atualizado com sucesso."
+          : "O exame foi salvo no histórico com sucesso.",
       });
       
       return true;
@@ -809,6 +895,16 @@ export default function DadosExame() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
@@ -816,13 +912,15 @@ export default function DadosExame() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => navigate('/novo-exame')}
+              onClick={() => navigate(isEditMode ? '/historico' : '/novo-exame')}
               className="p-2 rounded-lg hover:bg-secondary transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Dados do Exame</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                {isEditMode ? "Editar Exame" : "Dados do Exame"}
+              </h1>
               <p className="text-muted-foreground">Paciente: {patientData.nome || 'Não informado'}</p>
             </div>
           </div>
