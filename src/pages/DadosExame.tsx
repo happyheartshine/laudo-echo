@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { Json } from "@/integrations/supabase/types";
 import { Layout } from "@/components/Layout";
 import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
@@ -14,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { loadExamImages } from "@/lib/imageStorage";
 import { useProfile } from "@/hooks/useProfile";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -32,8 +35,10 @@ interface StoredImageData {
 export default function DadosExame() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { clinic, profile } = useProfile();
   const reportRef = useRef<HTMLDivElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
@@ -716,8 +721,76 @@ export default function DadosExame() {
     }
   };
 
+  // Função para salvar o exame no banco de dados
+  const saveExam = async (): Promise<boolean> => {
+    if (!user) {
+      toast({
+        title: "Erro",
+        description: "Você precisa estar logado para salvar o exame.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      setIsSaving(true);
+      
+      // Converter a data do formato PT-BR para ISO
+      const dateParts = examInfo.data.split('/');
+      const examDate = dateParts.length === 3 
+        ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
+        : new Date().toISOString().split('T')[0];
+
+      const examContent = {
+        patientData,
+        examInfo,
+        measurementsData,
+        funcaoDiastolica,
+        valvasDoppler,
+        outros,
+        valvesData,
+        achados,
+        conclusoes,
+        calculatedValues,
+      };
+
+      const { error } = await supabase.from("exams").insert([{
+        user_id: user.id,
+        clinic_id: profile?.clinic_id || null,
+        patient_name: patientData.nome || "Paciente sem nome",
+        owner_name: patientData.responsavel || null,
+        species: patientData.especie || null,
+        breed: patientData.raca || null,
+        exam_date: examDate,
+        content: JSON.parse(JSON.stringify(examContent)),
+      }]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Exame salvo!",
+        description: "O exame foi salvo no histórico com sucesso.",
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Erro ao salvar exame:", error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o exame no histórico.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
     try {
+      // Salvar exame antes de gerar o PDF
+      await saveExam();
+      
       const pdf = await generatePdfDocument();
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);

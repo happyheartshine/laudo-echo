@@ -44,6 +44,56 @@ export type Database = {
         }
         Relationships: []
       }
+      exams: {
+        Row: {
+          breed: string | null
+          clinic_id: string | null
+          content: Json
+          created_at: string
+          exam_date: string
+          id: string
+          owner_name: string | null
+          patient_name: string
+          species: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          breed?: string | null
+          clinic_id?: string | null
+          content?: Json
+          created_at?: string
+          exam_date?: string
+          id?: string
+          owner_name?: string | null
+          patient_name: string
+          species?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          breed?: string | null
+          clinic_id?: string | null
+          content?: Json
+          created_at?: string
+          exam_date?: string
+          id?: string
+          owner_name?: string | null
+          patient_name?: string
+          species?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exams_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           cargo: Database["public"]["Enums"]["user_role"]

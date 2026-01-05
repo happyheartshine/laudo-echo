@@ -11,6 +11,7 @@ import DadosExame from "./pages/DadosExame";
 import Auth from "./pages/Auth";
 import Configuracoes from "./pages/Configuracoes";
 import MinhaEquipe from "./pages/MinhaEquipe";
+import Historico from "./pages/Historico";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/novo-exame/dados-exame" element={<ProtectedRoute><DadosExame /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
             <Route path="/minha-equipe" element={<ProtectedRoute><MinhaEquipe /></ProtectedRoute>} />
+            <Route path="/historico" element={<ProtectedRoute><Historico /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
