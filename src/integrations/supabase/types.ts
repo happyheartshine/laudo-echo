@@ -21,6 +21,7 @@ export type Database = {
           id: string
           logo_url: string | null
           nome_fantasia: string
+          telefone: string | null
           updated_at: string
         }
         Insert: {
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           nome_fantasia: string
+          telefone?: string | null
           updated_at?: string
         }
         Update: {
@@ -37,6 +39,7 @@ export type Database = {
           id?: string
           logo_url?: string | null
           nome_fantasia?: string
+          telefone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -46,8 +49,12 @@ export type Database = {
           cargo: Database["public"]["Enums"]["user_role"]
           clinic_id: string | null
           created_at: string
+          crmv: string | null
+          especialidade: string | null
           id: string
           nome: string
+          telefone: string | null
+          uf_crmv: string | null
           updated_at: string
           user_id: string
         }
@@ -55,8 +62,12 @@ export type Database = {
           cargo?: Database["public"]["Enums"]["user_role"]
           clinic_id?: string | null
           created_at?: string
+          crmv?: string | null
+          especialidade?: string | null
           id?: string
           nome: string
+          telefone?: string | null
+          uf_crmv?: string | null
           updated_at?: string
           user_id: string
         }
@@ -64,8 +75,12 @@ export type Database = {
           cargo?: Database["public"]["Enums"]["user_role"]
           clinic_id?: string | null
           created_at?: string
+          crmv?: string | null
+          especialidade?: string | null
           id?: string
           nome?: string
+          telefone?: string | null
+          uf_crmv?: string | null
           updated_at?: string
           user_id?: string
         }

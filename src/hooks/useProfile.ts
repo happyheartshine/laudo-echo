@@ -8,6 +8,10 @@ export interface Profile {
   nome: string;
   cargo: "super_admin" | "gestor" | "veterinario";
   clinic_id: string | null;
+  crmv: string | null;
+  uf_crmv: string | null;
+  telefone: string | null;
+  especialidade: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -16,6 +20,7 @@ export interface Clinic {
   id: string;
   nome_fantasia: string;
   endereco: string | null;
+  telefone: string | null;
   logo_url: string | null;
   created_at: string;
   updated_at: string;

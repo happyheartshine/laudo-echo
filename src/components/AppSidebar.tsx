@@ -1,4 +1,4 @@
-import { FileText, Home, History, Settings, User, LogOut, Building2 } from "lucide-react";
+import { FileText, Home, History, Settings, User, LogOut, Users } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import logoVitaecor from "@/assets/logo-vitaecor.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,14 +55,23 @@ export function AppSidebar() {
           );
         })}
 
-        {/* Configurações da Clínica - only for Gestor */}
+        {/* Configurações */}
+        <NavLink
+          to="/configuracoes"
+          className={`sidebar-link ${location.pathname === '/configuracoes' ? 'active' : ''}`}
+        >
+          <Settings className="w-5 h-5" />
+          <span>Configurações</span>
+        </NavLink>
+
+        {/* Minha Equipe - only for Gestor */}
         {isGestor && (
           <NavLink
-            to="/configuracoes-clinica"
-            className={`sidebar-link ${location.pathname === '/configuracoes-clinica' ? 'active' : ''}`}
+            to="/minha-equipe"
+            className={`sidebar-link ${location.pathname === '/minha-equipe' ? 'active' : ''}`}
           >
-            <Building2 className="w-5 h-5" />
-            <span>Config. Clínica</span>
+            <Users className="w-5 h-5" />
+            <span>Minha Equipe</span>
           </NavLink>
         )}
       </nav>

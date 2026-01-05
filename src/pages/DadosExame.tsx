@@ -471,10 +471,38 @@ export default function DadosExame() {
       }
     }
 
-    // Footer on last page
+    // Footer with vet signature and page numbers
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
+      
+      // Signature area at the bottom
+      const footerY = pageHeight - 25;
+      
+      // Draw a line for signature
+      pdf.setDrawColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setLineWidth(0.3);
+      pdf.line(pageWidth / 2 - 40, footerY, pageWidth / 2 + 40, footerY);
+      
+      // Vet name and CRMV
+      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(profile?.nome || "Veterinário Responsável", pageWidth / 2, footerY + 5, { align: "center" });
+      
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      const crmvText = profile?.crmv && profile?.uf_crmv 
+        ? `CRMV ${profile.uf_crmv} ${profile.crmv}` 
+        : "";
+      if (crmvText) {
+        pdf.text(crmvText, pageWidth / 2, footerY + 9, { align: "center" });
+      }
+      if (profile?.especialidade) {
+        pdf.text(profile.especialidade, pageWidth / 2, footerY + 13, { align: "center" });
+      }
+      
+      // Page number
       pdf.setFontSize(8);
       pdf.setTextColor(120, 120, 120);
       pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: "center" });
