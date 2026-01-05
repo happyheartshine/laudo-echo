@@ -1,23 +1,56 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { FileText, Clock, TrendingUp, Activity } from "lucide-react";
+import { FileText, Clock, TrendingUp, Activity, Stethoscope } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface ExamData {
+  id: string;
+  patient_name: string;
+  species: string | null;
+  exam_date: string;
+}
 
 export default function Index() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [recentExams, setRecentExams] = useState<ExamData[]>([]);
+  const [examCount, setExamCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const stats = [
-    { label: "Exames este mês", value: "24", icon: FileText, trend: "+12%" },
-    { label: "Tempo médio por laudo", value: "8 min", icon: Clock, trend: "-15%" },
-    { label: "Taxa de conclusão", value: "98%", icon: TrendingUp, trend: "+3%" },
-  ];
+  useEffect(() => {
+    if (user) {
+      fetchRecentExams();
+    }
+  }, [user]);
 
-  const recentExams = [
-    { patient: "Rex", species: "Canino", date: "03/01/2026", status: "Concluído" },
-    { patient: "Mia", species: "Felino", date: "02/01/2026", status: "Concluído" },
-    { patient: "Thor", species: "Canino", date: "02/01/2026", status: "Rascunho" },
-    { patient: "Luna", species: "Felino", date: "01/01/2026", status: "Concluído" },
-  ];
+  const fetchRecentExams = async () => {
+    try {
+      setLoading(true);
+      
+      // Buscar últimos 5 exames
+      const { data, error, count } = await supabase
+        .from("exams")
+        .select("id, patient_name, species, exam_date", { count: "exact" })
+        .order("exam_date", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      
+      setRecentExams(data || []);
+      setExamCount(count || 0);
+    } catch (error) {
+      console.error("Erro ao carregar exames:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("pt-BR");
+  };
 
   return (
     <Layout>
@@ -56,24 +89,41 @@ export default function Index() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <div 
-              key={stat.label} 
-              className="card-vitaecor animate-fade-in"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-3xl font-bold text-foreground">{stat.value}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-secondary">
-                  <stat.icon className="w-6 h-6 text-primary" />
-                </div>
+          <div className="card-vitaecor animate-fade-in">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Total de Exames</p>
+                <p className="text-3xl font-bold text-foreground">{loading ? "..." : examCount}</p>
               </div>
-              <p className="mt-3 text-sm text-success font-medium">{stat.trend} vs. mês anterior</p>
+              <div className="p-3 rounded-lg bg-secondary">
+                <FileText className="w-6 h-6 text-primary" />
+              </div>
             </div>
-          ))}
+          </div>
+          
+          <div className="card-vitaecor animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Exames Recentes</p>
+                <p className="text-3xl font-bold text-foreground">{loading ? "..." : recentExams.length}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-secondary">
+                <Clock className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="card-vitaecor animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Sistema</p>
+                <p className="text-3xl font-bold text-foreground">Ativo</p>
+              </div>
+              <div className="p-3 rounded-lg bg-secondary">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Recent Exams */}
@@ -83,44 +133,50 @@ export default function Index() {
               <Activity className="w-5 h-5 text-accent" />
               Exames Recentes
             </h2>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => navigate('/historico')}>
               Ver todos
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Paciente</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Espécie</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Data</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentExams.map((exam, index) => (
-                  <tr 
-                    key={index} 
-                    className="border-b border-border/50 hover:bg-secondary/50 transition-colors cursor-pointer"
-                  >
-                    <td className="py-3 px-4 font-medium text-foreground">{exam.patient}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{exam.species}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{exam.date}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        exam.status === 'Concluído' 
-                          ? 'bg-success/10 text-success' 
-                          : 'bg-warning/10 text-warning'
-                      }`}>
-                        {exam.status}
-                      </span>
-                    </td>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : recentExams.length === 0 ? (
+            <div className="text-center py-12">
+              <Stethoscope className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground mb-4">Nenhum exame registrado ainda.</p>
+              <Button onClick={() => navigate('/novo-exame')} className="btn-cta">
+                <FileText className="w-4 h-4 mr-2" />
+                Criar Primeiro Exame
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Paciente</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Espécie</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Data</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentExams.map((exam) => (
+                    <tr 
+                      key={exam.id} 
+                      className="border-b border-border/50 hover:bg-secondary/50 transition-colors cursor-pointer"
+                      onClick={() => navigate('/historico')}
+                    >
+                      <td className="py-3 px-4 font-medium text-foreground">{exam.patient_name}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{exam.species || "-"}</td>
+                      <td className="py-3 px-4 text-muted-foreground">{formatDate(exam.exam_date)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </Layout>
