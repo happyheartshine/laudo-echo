@@ -12,6 +12,7 @@ export interface Profile {
   uf_crmv: string | null;
   telefone: string | null;
   especialidade: string | null;
+  signature_url: string | null;
   created_at: string;
   updated_at: string;
 }

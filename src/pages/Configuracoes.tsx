@@ -36,6 +36,10 @@ export default function Configuracoes() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [savingClinic, setSavingClinic] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  
+  // Signature state
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
 
   // Initialize profile state when data loads
   useEffect(() => {
@@ -45,6 +49,7 @@ export default function Configuracoes() {
       setUfCrmv(profile.uf_crmv || "");
       setTelefone(profile.telefone || "");
       setEspecialidade(profile.especialidade || "");
+      setSignaturePreview(profile.signature_url || null);
     }
   }, [profile]);
 
@@ -98,6 +103,51 @@ export default function Configuracoes() {
       });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setUploadingSignature(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `signature-${profile.user_id}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('clinic-logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('clinic-logos')
+        .getPublicUrl(fileName);
+
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+      setSignaturePreview(urlWithCacheBuster);
+
+      // Save URL to profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ signature_url: publicUrl })
+        .eq("user_id", profile.user_id);
+
+      if (updateError) throw updateError;
+      
+      toast({
+        title: "Assinatura atualizada",
+        description: "Sua assinatura digital foi enviada com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar assinatura",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingSignature(false);
     }
   };
 
@@ -269,6 +319,51 @@ export default function Configuracoes() {
                       onChange={(e) => setTelefone(e.target.value)}
                       placeholder="(11) 99999-9999"
                     />
+                  </div>
+                </div>
+
+                {/* Signature Upload */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label>Assinatura Digital</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Faça upload de uma imagem da sua assinatura para aparecer no laudo PDF.
+                  </p>
+                  <div className="flex items-start gap-6">
+                    <div className="w-48 h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/50 overflow-hidden">
+                      {signaturePreview ? (
+                        <img
+                          src={signaturePreview}
+                          alt="Assinatura digital"
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Sem assinatura</span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="signature-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
+                      >
+                        {uploadingSignature ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {uploadingSignature ? "Enviando..." : "Enviar Assinatura"}
+                      </Label>
+                      <input
+                        id="signature-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleSignatureUpload}
+                        disabled={uploadingSignature}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        PNG transparente recomendado. Tamanho: ~4cm de largura.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
