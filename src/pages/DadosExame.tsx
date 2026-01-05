@@ -15,6 +15,13 @@ import { loadExamImages } from "@/lib/imageStorage";
 import { useProfile } from "@/hooks/useProfile";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
+const formatNumber = (value: string | number): string => {
+  if (value === "-" || value === "" || value === null || value === undefined) return "-";
+  const str = typeof value === "number" ? value.toString() : value;
+  return str.replace(".", ",");
+};
+
 
 interface StoredImageData {
   name: string;
@@ -216,14 +223,25 @@ export default function DadosExame() {
       pdf.text("Cardiologia Veterinária", 15, 18);
     }
     
+    // Informações profissionais à direita (pilha vertical)
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(14);
+    pdf.setFontSize(12);
     pdf.setFont("helvetica", "bold");
-    pdf.text("Ecodopplercardiograma", pageWidth - 15, 12, { align: "right" });
-    pdf.setFontSize(8);
+    pdf.text("Ecodopplercardiograma", pageWidth - 15, 8, { align: "right" });
+    
+    pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    pdf.text(profile?.nome || "Veterinário Responsável", pageWidth - 15, 17, { align: "right" });
-    pdf.text(clinic?.endereco || "", pageWidth - 15, 21, { align: "right" });
+    pdf.text(profile?.nome || "Veterinário Responsável", pageWidth - 15, 13, { align: "right" });
+    
+    const crmvLine = profile?.crmv ? `CRMV-${profile?.uf_crmv || ""}  ${profile.crmv}` : "";
+    if (crmvLine) {
+      pdf.text(crmvLine, pageWidth - 15, 17, { align: "right" });
+    }
+    
+    const telefoneLine = profile?.telefone || "";
+    if (telefoneLine) {
+      pdf.text(telefoneLine, pageWidth - 15, 21, { align: "right" });
+    }
   };
 
   const generatePdfDocument = useCallback(async (): Promise<jsPDF> => {
@@ -233,7 +251,7 @@ export default function DadosExame() {
     const margin = 15;
     const headerHeight = 25; // Height of the header area
     const contentStartY = headerHeight + 10; // Content starts below header with padding
-    const SAFE_PAGE_START_Y = 55; // altura logo abaixo do cabeçalho
+    const SAFE_PAGE_START_Y = 45; // altura reduzida para menos espaço em branco
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
@@ -319,26 +337,26 @@ export default function DadosExame() {
         }
       }
 
-      // Name
+      // Name - fonte maior (12)
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setFontSize(9);
+      pdf.setFontSize(12);
       pdf.setFont("helvetica", "bold");
       pdf.text(name, pageWidth / 2, yPosition, { align: "center" });
 
-      pdf.setFontSize(8);
+      pdf.setFontSize(11);
       pdf.setFont("helvetica", "normal");
 
       if (crmvText) {
-        yPosition += 4;
+        yPosition += 5;
         pdf.text(crmvText, pageWidth / 2, yPosition, { align: "center" });
       }
 
       if (specialtyText) {
-        yPosition += 4;
+        yPosition += 5;
         pdf.text(specialtyText, pageWidth / 2, yPosition, { align: "center" });
       }
 
-      yPosition += 4;
+      yPosition += 5;
     };
 
     // Page 1 Header
@@ -377,7 +395,7 @@ export default function DadosExame() {
 
     addCompactRow("Paciente:", patientData.nome || '-', "Espécie:", patientData.especie || '-');
     addCompactRow("Raça:", patientData.raca || '-', "Sexo:", patientData.sexo || '-');
-    addCompactRow("Idade:", patientData.idade || '-', "Peso:", patientData.peso ? `${patientData.peso} kg` : '-');
+    addCompactRow("Idade:", patientData.idade || '-', "Peso:", patientData.peso ? `${formatNumber(patientData.peso)} kg` : '-');
     addCompactRow("Tutor(a):", patientData.responsavel || '-', "Data:", examInfo.data || '-');
     addCompactRow("Solicitante:", examInfo.solicitante || '-', "Clínica/Hospital:", examInfo.clinica || '-');
     yPosition += 6;
@@ -394,13 +412,13 @@ export default function DadosExame() {
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '-';
 
-    addTableRow("Septo interventricular em diástole", `${measurementsData.septoIVd || '-'} cm`);
-    addTableRow("Ventrículo esquerdo em diástole", `${measurementsData.dvedDiastole || '-'} cm`);
-    addTableRow("Parede livre do VE em diástole", `${measurementsData.paredeLVd || '-'} cm`);
-    addTableRow("Ventrículo esquerdo em sístole", `${measurementsData.dvedSistole || '-'} cm`);
-    addTableRow("VE em diástole NORMALIZADO", dvedNorm);
-    addTableRow("Fração de Encurtamento", `${calculatedValues.fracaoEncurtamento}%`);
-    addTableRow("Fração de Ejeção (Teicholz)", `${calculatedValues.fracaoEjecao}%`);
+    addTableRow("Septo interventricular em diástole", `${formatNumber(measurementsData.septoIVd || '-')} cm`);
+    addTableRow("Ventrículo esquerdo em diástole", `${formatNumber(measurementsData.dvedDiastole || '-')} cm`);
+    addTableRow("Parede livre do VE em diástole", `${formatNumber(measurementsData.paredeLVd || '-')} cm`);
+    addTableRow("Ventrículo esquerdo em sístole", `${formatNumber(measurementsData.dvedSistole || '-')} cm`);
+    addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm));
+    addTableRow("Fração de Encurtamento", `${formatNumber(calculatedValues.fracaoEncurtamento)}%`);
+    addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecao)}%`);
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -408,29 +426,29 @@ export default function DadosExame() {
     const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
       ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
       : '-';
-    addTableRow("Aorta", `${measurementsData.aorta || '-'} cm`);
-    addTableRow("Átrio esquerdo", `${measurementsData.atrioEsquerdo || '-'} cm`);
-    addTableRow("Relação Átrio esquerdo/Aorta", aeAo);
+    addTableRow("Aorta", `${formatNumber(measurementsData.aorta || '-')} cm`);
+    addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo || '-')} cm`);
+    addTableRow("Relação Átrio esquerdo/Aorta", formatNumber(aeAo));
     yPosition += 3;
 
     // Função Diastólica
     await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
-    addTableRow("Velocidade da onda E", `${funcaoDiastolica.ondaE || '-'} cm/s`);
-    addTableRow("Velocidade da onda A", `${funcaoDiastolica.ondaA || '-'} cm/s`);
-    addTableRow("Relação onda E/A", calculatedValues.relacaoEA);
-    addTableRow("Tempo de desaceleração da onda E", `${funcaoDiastolica.tempoDesaceleracao || '-'} ms`);
-    addTableRow("TRIV", `${funcaoDiastolica.triv || '-'} ms`);
-    addTableRow("E/TRIV", calculatedValues.eTRIV);
+    addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE || '-')} cm/s`);
+    addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA || '-')} cm/s`);
+    addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
+    addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao || '-')} ms`);
+    addTableRow("TRIV", `${formatNumber(funcaoDiastolica.triv || '-')} ms`);
+    addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
     
     // TDI em linha única
-    const tdiLine = `TDI Parede lateral: s': ${funcaoDiastolica.tdiParedeLateral || '-'} cm/s | e': ${funcaoDiastolica.ePrime || '-'} cm/s | a': ${funcaoDiastolica.aPrime || '-'} cm/s`;
+    const tdiLine = `TDI Parede lateral: s': ${formatNumber(funcaoDiastolica.tdiParedeLateral || '-')} cm/s | e': ${formatNumber(funcaoDiastolica.ePrime || '-')} cm/s | a': ${formatNumber(funcaoDiastolica.aPrime || '-')} cm/s`;
     pdf.setTextColor(60, 60, 60);
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.text(tdiLine, margin, yPosition);
     yPosition += 5;
     
-    addTableRow("Relação E/e'", calculatedValues.relacaoEePrime);
+    addTableRow("Relação E/e'", formatNumber(calculatedValues.relacaoEePrime));
     
     // Padrão Diastólico (texto longo com quebra de linha)
     if (funcaoDiastolica.padraoDiastolico) {
@@ -470,15 +488,15 @@ export default function DadosExame() {
 
     // Valva Mitral
     await addValveBlock("VALVA MITRAL", [
-      { label: "Velocidade máxima do fluxo retrógrado da IM", value: `${valvasDoppler.mitralVelocidade || '-'} cm/s` },
-      { label: "Gradiente", value: `${valvasDoppler.mitralGradiente || '-'} mmHg` },
-      { label: "+dP/dT", value: `${valvasDoppler.mitralDpDt || '-'} mmHg/s` },
+      { label: "Velocidade máxima do fluxo retrógrado da IM", value: `${formatNumber(valvasDoppler.mitralVelocidade || '-')} cm/s` },
+      { label: "Gradiente", value: `${formatNumber(valvasDoppler.mitralGradiente || '-')} mmHg` },
+      { label: "+dP/dT", value: `${formatNumber(valvasDoppler.mitralDpDt || '-')} mmHg/s` },
     ]);
 
     // Valva Tricúspide
     await addValveBlock("VALVA TRICÚSPIDE", [
-      { label: "Velocidade máxima do fluxo retrógrado da IT", value: `${valvasDoppler.tricuspideVelocidade || '-'} cm/s` },
-      { label: "Gradiente", value: `${valvasDoppler.tricuspideGradiente || '-'} mmHg` },
+      { label: "Velocidade máxima do fluxo retrógrado da IT", value: `${formatNumber(valvasDoppler.tricuspideVelocidade || '-')} cm/s` },
+      { label: "Gradiente", value: `${formatNumber(valvasDoppler.tricuspideGradiente || '-')} mmHg` },
     ]);
 
     // Valva Pulmonar (quebra de página + altura segura abaixo da logo)
@@ -494,8 +512,8 @@ export default function DadosExame() {
     }
 
     await addValveBlock("VALVA PULMONAR", [
-      { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.pulmonarVelocidade || '-'} cm/s` },
-      { label: "Gradiente", value: `${valvasDoppler.pulmonarGradiente || '-'} mmHg` },
+      { label: "Velocidade máxima do fluxo transvalvar", value: `${formatNumber(valvasDoppler.pulmonarVelocidade || '-')} cm/s` },
+      { label: "Gradiente", value: `${formatNumber(valvasDoppler.pulmonarGradiente || '-')} mmHg` },
     ]);
 
     // Valva Aórtica (mesma regra de quebra de página + altura segura)
@@ -510,8 +528,8 @@ export default function DadosExame() {
     }
 
     await addValveBlock("VALVA AÓRTICA", [
-      { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.aorticaVelocidade || '-'} cm/s` },
-      { label: "Gradiente", value: `${valvasDoppler.aorticaGradiente || '-'} mmHg` },
+      { label: "Velocidade máxima do fluxo transvalvar", value: `${formatNumber(valvasDoppler.aorticaVelocidade || '-')} cm/s` },
+      { label: "Gradiente", value: `${formatNumber(valvasDoppler.aorticaGradiente || '-')} mmHg` },
     ]);
 
     // Outros
