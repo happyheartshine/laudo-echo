@@ -195,6 +195,7 @@ export default function DadosExame() {
     const margin = 15;
     const headerHeight = 25; // Height of the header area
     const contentStartY = headerHeight + 10; // Content starts below header with padding
+    const HEADER_HEIGHT = 60; // altura segura para começar abaixo da logo (exigência)
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
@@ -430,7 +431,18 @@ export default function DadosExame() {
       { label: "Gradiente", value: `${valvasDoppler.tricuspideGradiente || '-'} mmHg` },
     ]);
 
-    // Valva Pulmonar
+    // Valva Pulmonar (garante que nunca comece sobre o cabeçalho)
+    if (yPosition > 240) {
+      pdf.addPage();
+      await addHeader(pdf, pageWidth);
+      yPosition = HEADER_HEIGHT;
+    }
+
+    // Se já está no começo da página (página anterior acabou), força começar abaixo do cabeçalho
+    if (yPosition <= contentStartY + 1) {
+      yPosition = HEADER_HEIGHT;
+    }
+
     await addValveBlock("VALVA PULMONAR", [
       { label: "Velocidade máxima do fluxo transvalvar", value: `${valvasDoppler.pulmonarVelocidade || '-'} cm/s` },
       { label: "Gradiente", value: `${valvasDoppler.pulmonarGradiente || '-'} mmHg` },
@@ -552,14 +564,22 @@ export default function DadosExame() {
       const pdf = await generatePdfDocument();
       const blob = pdf.output("blob");
       const url = URL.createObjectURL(blob);
-      
-      // Open PDF in new tab for reliable viewing
-      window.open(url, "_blank");
-      
+
+      const win = window.open(url, "_blank");
+      if (!win) {
+        URL.revokeObjectURL(url);
+        toast({
+          title: "Pop-up bloqueado",
+          description:
+            "Seu navegador bloqueou a pré-visualização. Use o botão “Baixar PDF”.",
+        });
+        return;
+      }
+
       // Revoke URL after a delay to allow the new tab to load
       setTimeout(() => {
         URL.revokeObjectURL(url);
-      }, 5000);
+      }, 10000);
     } catch (error) {
       console.error("Error generating PDF preview:", error);
       toast({
@@ -615,11 +635,11 @@ export default function DadosExame() {
             </Button>
             <Button variant="outline" onClick={handlePreviewPDF}>
               <Eye className="w-4 h-4 mr-2" />
-              Preview
+              Pré-visualizar
             </Button>
-            <Button className="btn-cta" onClick={handleDownloadPDF}>
+            <Button variant="outline" onClick={handleDownloadPDF}>
               <FileDown className="w-4 h-4 mr-2" />
-              Gerar PDF
+              Baixar PDF
             </Button>
           </div>
         </div>
@@ -853,11 +873,11 @@ export default function DadosExame() {
           </Button>
           <Button variant="outline" size="lg" onClick={handlePreviewPDF}>
             <Eye className="w-4 h-4 mr-2" />
-            Preview PDF
+            Pré-visualizar
           </Button>
-          <Button className="btn-cta" size="lg" onClick={handleDownloadPDF}>
+          <Button variant="outline" size="lg" onClick={handleDownloadPDF}>
             <FileDown className="w-4 h-4 mr-2" />
-            Gerar PDF do Laudo
+            Baixar PDF
           </Button>
         </div>
 
