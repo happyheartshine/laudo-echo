@@ -138,7 +138,7 @@ export default function Auth() {
             <CardContent>
               <TabsContent value="login" className="mt-0">
                 <CardTitle className="mb-2 text-center">Bem-Vindo</CardTitle>
-                <CardDescription className="mb-4">
+                <CardDescription className="mb-4 text-center">
                   Entre com suas credenciais para acessar o sistema.
                 </CardDescription>
                 
