@@ -345,8 +345,41 @@ export default function Historico() {
       }
     }
 
-    // Signature
+    // Signature block with image
     yPosition += 10;
+    
+    // Check page break for signature
+    const signatureBlockHeight = profile?.signature_url ? 30 : 20;
+    if (yPosition + signatureBlockHeight > pageHeight - 15) {
+      pdf.addPage();
+      await addHeader();
+      yPosition = 45;
+    }
+    
+    // Add signature image if available
+    if (profile?.signature_url) {
+      try {
+        const sigImg = new Image();
+        sigImg.crossOrigin = "anonymous";
+        await new Promise<void>((resolve, reject) => {
+          sigImg.onload = () => resolve();
+          sigImg.onerror = () => reject();
+          sigImg.src = profile.signature_url!;
+        });
+        
+        // Calculate proportional dimensions (width ~4cm = 40mm)
+        const targetWidth = 40;
+        const ratio = sigImg.height / sigImg.width;
+        const targetHeight = targetWidth * ratio;
+        
+        const imgX = pageWidth / 2 - targetWidth / 2;
+        pdf.addImage(sigImg, 'PNG', imgX, yPosition, targetWidth, Math.min(targetHeight, 15));
+        yPosition += Math.min(targetHeight, 15) + 2;
+      } catch (e) {
+        console.error('Error loading signature image:', e);
+      }
+    }
+    
     pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
