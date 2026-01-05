@@ -278,12 +278,39 @@ export default function DadosExame() {
       yPosition += 8;
     };
 
-    const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string) => {
-      pdf.setTextColor(60, 60, 60);
+    // Função para verificar se valor está fora da referência
+    const isValueAbnormal = (value: string, min: number, max: number): boolean => {
+      if (value === "-" || value === "--" || !value) return false;
+      const num = parseFloat(value.replace(",", "."));
+      return !isNaN(num) && (num < min || num > max);
+    };
+
+    // Vermelho para valores anormais (RGB)
+    const abnormalRed = [200, 30, 30];
+    const normalGray = [60, 60, 60];
+
+    const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string, isAbnormal?: boolean, isCol2Abnormal?: boolean) => {
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
+      
+      // Primeira coluna
+      if (isAbnormal) {
+        pdf.setTextColor(abnormalRed[0], abnormalRed[1], abnormalRed[2]);
+        pdf.setFont("helvetica", "bold");
+      } else {
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      }
       pdf.text(`${label}: ${value}`, margin, yPosition);
+      
+      // Segunda coluna (se existir)
       if (col2Label && col2Value) {
+        if (isCol2Abnormal) {
+          pdf.setTextColor(abnormalRed[0], abnormalRed[1], abnormalRed[2]);
+          pdf.setFont("helvetica", "bold");
+        } else {
+          pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+          pdf.setFont("helvetica", "normal");
+        }
         pdf.text(`${col2Label}: ${col2Value}`, pageWidth / 2, yPosition);
       }
       yPosition += 5;
@@ -416,9 +443,15 @@ export default function DadosExame() {
     addTableRow("Ventrículo esquerdo em diástole", `${formatNumber(measurementsData.dvedDiastole || '-')} cm`);
     addTableRow("Parede livre do VE em diástole", `${formatNumber(measurementsData.paredeLVd || '-')} cm`);
     addTableRow("Ventrículo esquerdo em sístole", `${formatNumber(measurementsData.dvedSistole || '-')} cm`);
-    addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm));
-    addTableRow("Fração de Encurtamento", `${formatNumber(calculatedValues.fracaoEncurtamento)}%`);
-    addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecao)}%`);
+    
+    // DVED Normalizado: referência 1.27-1.85
+    addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm), undefined, undefined, isValueAbnormal(dvedNorm, 1.27, 1.85));
+    
+    // Fração de Encurtamento: referência 25-45%
+    addTableRow("Fração de Encurtamento", `${formatNumber(calculatedValues.fracaoEncurtamento)}%`, undefined, undefined, isValueAbnormal(calculatedValues.fracaoEncurtamento, 25, 45));
+    
+    // Fração de Ejeção (Teicholz): referência 50-75%
+    addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecao)}%`, undefined, undefined, isValueAbnormal(calculatedValues.fracaoEjecao, 50, 75));
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -428,17 +461,24 @@ export default function DadosExame() {
       : '-';
     addTableRow("Aorta", `${formatNumber(measurementsData.aorta || '-')} cm`);
     addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo || '-')} cm`);
-    addTableRow("Relação Átrio esquerdo/Aorta", formatNumber(aeAo));
+    
+    // Relação AE/Ao: referência 0 - 1.6
+    addTableRow("Relação Átrio esquerdo/Aorta", formatNumber(aeAo), undefined, undefined, isValueAbnormal(aeAo, 0, 1.6));
     yPosition += 3;
 
     // Função Diastólica
     await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
     addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE || '-')} cm/s`);
     addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA || '-')} cm/s`);
-    addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
+    
+    // Relação E/A: referência 1.0-2.0 (varia conforme espécie/idade, usando range amplo)
+    addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA), undefined, undefined, isValueAbnormal(calculatedValues.relacaoEA, 1.0, 2.0));
+    
     addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao || '-')} ms`);
     addTableRow("TRIV", `${formatNumber(funcaoDiastolica.triv || '-')} ms`);
-    addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
+    
+    // E/TRIV: referência 1.0-2.5
+    addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV), undefined, undefined, isValueAbnormal(calculatedValues.eTRIV, 1.0, 2.5));
     
     // TDI em linha única
     const tdiLine = `TDI Parede lateral: s': ${formatNumber(funcaoDiastolica.tdiParedeLateral || '-')} cm/s | e': ${formatNumber(funcaoDiastolica.ePrime || '-')} cm/s | a': ${formatNumber(funcaoDiastolica.aPrime || '-')} cm/s`;
@@ -448,7 +488,8 @@ export default function DadosExame() {
     pdf.text(tdiLine, margin, yPosition);
     yPosition += 5;
     
-    addTableRow("Relação E/e'", formatNumber(calculatedValues.relacaoEePrime));
+    // E/e': referência < 15 (acima sugere pressão de enchimento elevada)
+    addTableRow("Relação E/e'", formatNumber(calculatedValues.relacaoEePrime), undefined, undefined, isValueAbnormal(calculatedValues.relacaoEePrime, 0, 15));
     
     // Padrão Diastólico (texto longo com quebra de linha)
     if (funcaoDiastolica.padraoDiastolico) {
