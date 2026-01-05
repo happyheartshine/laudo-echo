@@ -101,7 +101,7 @@ export default function DadosExame() {
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -549,9 +549,9 @@ export default function DadosExame() {
   const handlePreviewPDF = async () => {
     try {
       const pdf = await generatePdfDocument();
-      const blob = pdf.output('blob');
-      const url = URL.createObjectURL(blob);
-      setPdfBlobUrl(url);
+      // Use base64 data URL instead of blob URL to avoid Chrome blocking
+      const dataUrl = pdf.output('datauristring');
+      setPdfDataUrl(dataUrl);
       setPreviewOpen(true);
     } catch (error) {
       console.error('Error generating PDF preview:', error);
@@ -569,10 +569,7 @@ export default function DadosExame() {
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
       setPreviewOpen(false);
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-        setPdfBlobUrl(null);
-      }
+      setPdfDataUrl(null);
       toast({
         title: "PDF gerado!",
         description: "O laudo foi exportado em formato PDF.",
@@ -862,12 +859,11 @@ export default function DadosExame() {
           open={previewOpen}
           onOpenChange={(open) => {
             setPreviewOpen(open);
-            if (!open && pdfBlobUrl) {
-              URL.revokeObjectURL(pdfBlobUrl);
-              setPdfBlobUrl(null);
+            if (!open) {
+              setPdfDataUrl(null);
             }
           }}
-          pdfBlobUrl={pdfBlobUrl}
+          pdfDataUrl={pdfDataUrl}
           onDownload={handleDownloadPDF}
           patientName={patientData.nome || 'Paciente'}
         />

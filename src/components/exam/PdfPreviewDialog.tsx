@@ -1,6 +1,7 @@
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -11,7 +12,7 @@ import { FileDown, X } from "lucide-react";
 interface PdfPreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  pdfBlobUrl: string | null;
+  pdfDataUrl: string | null;
   onDownload: () => void;
   patientName: string;
 }
@@ -19,7 +20,7 @@ interface PdfPreviewDialogProps {
 export function PdfPreviewDialog({
   open,
   onOpenChange,
-  pdfBlobUrl,
+  pdfDataUrl,
   onDownload,
   patientName,
 }: PdfPreviewDialogProps) {
@@ -28,15 +29,28 @@ export function PdfPreviewDialog({
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Preview do Laudo - {patientName}</DialogTitle>
+          <DialogDescription>
+            Visualize o documento antes de baixar
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 min-h-0">
-          {pdfBlobUrl ? (
-            <iframe
-              src={pdfBlobUrl}
+          {pdfDataUrl ? (
+            <object
+              data={pdfDataUrl}
+              type="application/pdf"
               className="w-full h-full rounded-lg border"
-              title="PDF Preview"
-            />
+            >
+              <div className="w-full h-full flex flex-col items-center justify-center bg-muted rounded-lg p-4">
+                <p className="text-muted-foreground text-center mb-4">
+                  Seu navegador não suporta visualização de PDF embutida.
+                </p>
+                <Button onClick={onDownload}>
+                  <FileDown className="w-4 h-4 mr-2" />
+                  Baixar PDF
+                </Button>
+              </div>
+            </object>
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted rounded-lg">
               <p className="text-muted-foreground">Gerando preview...</p>
