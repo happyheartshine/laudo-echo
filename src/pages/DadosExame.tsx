@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
-import { FileDown, Save, ArrowLeft, Calendar } from "lucide-react";
+import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { loadExamImages } from "@/lib/imageStorage";
 import { useProfile } from "@/hooks/useProfile";
+import { PdfPreviewDialog } from "@/components/exam/PdfPreviewDialog";
 
 interface StoredImageData {
   name: string;
@@ -99,6 +100,8 @@ export default function DadosExame() {
   const [conclusoes, setConclusoes] = useState("");
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -186,7 +189,7 @@ export default function DadosExame() {
     pdf.text(clinic?.endereco || "", pageWidth - 15, 21, { align: "right" });
   };
 
-  const handleGeneratePDF = async () => {
+  const generatePdfDocument = useCallback(async (): Promise<jsPDF> => {
     const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -540,13 +543,48 @@ export default function DadosExame() {
       pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: "center" });
     }
 
-    const today = new Date().toLocaleDateString('pt-BR');
-    pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
+    return pdf;
+  }, [patientData, examInfo, measurementsData, funcaoDiastolica, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader]);
 
-    toast({
-      title: "PDF gerado!",
-      description: "O laudo foi exportado em formato PDF.",
-    });
+  const handlePreviewPDF = async () => {
+    try {
+      const pdf = await generatePdfDocument();
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPdfBlobUrl(url);
+      setPreviewOpen(true);
+    } catch (error) {
+      console.error('Error generating PDF preview:', error);
+      toast({
+        title: "Erro ao gerar preview",
+        description: "Não foi possível gerar o preview do PDF.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      const pdf = await generatePdfDocument();
+      const today = new Date().toLocaleDateString('pt-BR');
+      pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
+      setPreviewOpen(false);
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(null);
+      }
+      toast({
+        title: "PDF gerado!",
+        description: "O laudo foi exportado em formato PDF.",
+      });
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o PDF.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -572,7 +610,11 @@ export default function DadosExame() {
               <Save className="w-4 h-4 mr-2" />
               Salvar Rascunho
             </Button>
-            <Button className="btn-cta" onClick={handleGeneratePDF}>
+            <Button variant="outline" onClick={handlePreviewPDF}>
+              <Eye className="w-4 h-4 mr-2" />
+              Preview
+            </Button>
+            <Button className="btn-cta" onClick={handleDownloadPDF}>
               <FileDown className="w-4 h-4 mr-2" />
               Gerar PDF
             </Button>
@@ -806,11 +848,29 @@ export default function DadosExame() {
             <Save className="w-4 h-4 mr-2" />
             Salvar Rascunho
           </Button>
-          <Button className="btn-cta" size="lg" onClick={handleGeneratePDF}>
+          <Button variant="outline" size="lg" onClick={handlePreviewPDF}>
+            <Eye className="w-4 h-4 mr-2" />
+            Preview PDF
+          </Button>
+          <Button className="btn-cta" size="lg" onClick={handleDownloadPDF}>
             <FileDown className="w-4 h-4 mr-2" />
             Gerar PDF do Laudo
           </Button>
         </div>
+
+        <PdfPreviewDialog
+          open={previewOpen}
+          onOpenChange={(open) => {
+            setPreviewOpen(open);
+            if (!open && pdfBlobUrl) {
+              URL.revokeObjectURL(pdfBlobUrl);
+              setPdfBlobUrl(null);
+            }
+          }}
+          pdfBlobUrl={pdfBlobUrl}
+          onDownload={handleDownloadPDF}
+          patientName={patientData.nome || 'Paciente'}
+        />
       </div>
     </Layout>
   );
