@@ -187,16 +187,17 @@ export default function DadosExame() {
   };
 
   const handleGeneratePDF = async () => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 15;
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
+    const bottomSafeArea = 20; // keeps space for footer page numbers
 
     const checkPageBreak = async (neededHeight: number) => {
-      if (yPosition + neededHeight > pageHeight - 20) {
+      if (yPosition + neededHeight > pageHeight - bottomSafeArea) {
         pdf.addPage();
         await addHeader(pdf, pageWidth);
         yPosition = 35;
@@ -208,7 +209,7 @@ export default function DadosExame() {
     const addSectionHeader = async (title: string) => {
       await checkPageBreak(15);
       pdf.setFillColor(240, 240, 240);
-      pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, 'F');
+      pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, "F");
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
@@ -225,6 +226,54 @@ export default function DadosExame() {
         pdf.text(`${col2Label}: ${col2Value}`, pageWidth / 2, yPosition);
       }
       yPosition += 5;
+    };
+
+    const addSignatureBlock = async () => {
+      const name = profile?.nome || "Veterinário Responsável";
+      const crmvText = profile?.crmv
+        ? `CRMV ${profile?.uf_crmv ? `${profile.uf_crmv} ` : ""}${profile.crmv}`
+        : "";
+      const specialtyText = profile?.especialidade || "";
+
+      // Approximate block height; if it doesn't fit, start a new page just for the signature.
+      const lineCount = 1 + (crmvText ? 1 : 0) + (specialtyText ? 1 : 0);
+      const blockHeight = 8 /* gap */ + 1 /* line */ + 5 /* gap */ + lineCount * 4 + 4;
+      const footerReserved = 12;
+
+      if (yPosition + blockHeight > pageHeight - footerReserved) {
+        pdf.addPage();
+        await addHeader(pdf, pageWidth);
+        yPosition = 35;
+      }
+
+      yPosition += 8;
+
+      const lineY = yPosition;
+      pdf.setDrawColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setLineWidth(0.3);
+      pdf.line(pageWidth / 2 - 40, lineY, pageWidth / 2 + 40, lineY);
+
+      yPosition += 5;
+
+      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(name, pageWidth / 2, yPosition, { align: "center" });
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+
+      if (crmvText) {
+        yPosition += 4;
+        pdf.text(crmvText, pageWidth / 2, yPosition, { align: "center" });
+      }
+
+      if (specialtyText) {
+        yPosition += 4;
+        pdf.text(specialtyText, pageWidth / 2, yPosition, { align: "center" });
+      }
+
+      yPosition += 4;
     };
 
     // Page 1 Header
@@ -417,6 +466,9 @@ export default function DadosExame() {
       }
     }
 
+    // Assinatura (uma única vez, ao final da parte descritiva)
+    await addSignatureBlock();
+
     // Images - 8 per page (2 columns x 4 rows for better visibility)
     const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
     if (selectedImageData.length > 0) {
@@ -471,38 +523,10 @@ export default function DadosExame() {
       }
     }
 
-    // Footer with vet signature and page numbers
+    // Footer: only page numbers (no repeated signature)
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
-      
-      // Signature area at the bottom
-      const footerY = pageHeight - 25;
-      
-      // Draw a line for signature
-      pdf.setDrawColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setLineWidth(0.3);
-      pdf.line(pageWidth / 2 - 40, footerY, pageWidth / 2 + 40, footerY);
-      
-      // Vet name and CRMV
-      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(profile?.nome || "Veterinário Responsável", pageWidth / 2, footerY + 5, { align: "center" });
-      
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "normal");
-      const crmvText = profile?.crmv && profile?.uf_crmv 
-        ? `CRMV ${profile.uf_crmv} ${profile.crmv}` 
-        : "";
-      if (crmvText) {
-        pdf.text(crmvText, pageWidth / 2, footerY + 9, { align: "center" });
-      }
-      if (profile?.especialidade) {
-        pdf.text(profile.especialidade, pageWidth / 2, footerY + 13, { align: "center" });
-      }
-      
-      // Page number
       pdf.setFontSize(8);
       pdf.setTextColor(120, 120, 120);
       pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: "center" });

@@ -59,11 +59,18 @@ export default function Configuracoes() {
   }, [clinic]);
 
   const handleSaveProfile = async () => {
-    if (!profile) return;
-    
+    if (!profile) {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível carregar seu perfil. Recarregue a página e tente novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSavingProfile(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("profiles")
         .update({
           nome,
@@ -72,18 +79,21 @@ export default function Configuracoes() {
           telefone,
           especialidade,
         })
-        .eq("id", profile.id);
+        .eq("user_id", profile.user_id)
+        .select("*")
+        .maybeSingle();
 
       if (error) throw error;
-      
+      if (!data) throw new Error("Perfil não encontrado para atualização.");
+
       toast({
-        title: "Perfil atualizado",
-        description: "Seus dados foram salvos com sucesso.",
+        title: "Dados salvos com sucesso!",
+        description: "As informações do veterinário foram atualizadas.",
       });
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
-        description: error.message,
+        description: error?.message ?? "Ocorreu um erro inesperado.",
         variant: "destructive",
       });
     } finally {
@@ -263,7 +273,7 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <Button onClick={handleSaveProfile} disabled={savingProfile}>
+                  <Button type="button" onClick={handleSaveProfile} disabled={savingProfile}>
                     {savingProfile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                     Salvar
                   </Button>
