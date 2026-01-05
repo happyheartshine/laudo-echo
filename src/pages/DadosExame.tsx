@@ -101,7 +101,7 @@ export default function DadosExame() {
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -549,12 +549,15 @@ export default function DadosExame() {
   const handlePreviewPDF = async () => {
     try {
       const pdf = await generatePdfDocument();
-      // Use base64 data URL instead of blob URL to avoid Chrome blocking
-      const dataUrl = pdf.output('datauristring');
-      setPdfDataUrl(dataUrl);
+      const blob = pdf.output("blob");
+      const url = URL.createObjectURL(blob);
+      setPdfBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
       setPreviewOpen(true);
     } catch (error) {
-      console.error('Error generating PDF preview:', error);
+      console.error("Error generating PDF preview:", error);
       toast({
         title: "Erro ao gerar preview",
         description: "Não foi possível gerar o preview do PDF.",
@@ -568,8 +571,13 @@ export default function DadosExame() {
       const pdf = await generatePdfDocument();
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
+
       setPreviewOpen(false);
-      setPdfDataUrl(null);
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(null);
+      }
+
       toast({
         title: "PDF gerado!",
         description: "O laudo foi exportado em formato PDF.",
@@ -859,11 +867,12 @@ export default function DadosExame() {
           open={previewOpen}
           onOpenChange={(open) => {
             setPreviewOpen(open);
-            if (!open) {
-              setPdfDataUrl(null);
+            if (!open && pdfBlobUrl) {
+              URL.revokeObjectURL(pdfBlobUrl);
+              setPdfBlobUrl(null);
             }
           }}
-          pdfDataUrl={pdfDataUrl}
+          pdfBlobUrl={pdfBlobUrl}
           onDownload={handleDownloadPDF}
           patientName={patientData.nome || 'Paciente'}
         />
