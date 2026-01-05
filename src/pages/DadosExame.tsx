@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { loadExamImages } from "@/lib/imageStorage";
 import { useProfile } from "@/hooks/useProfile";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 interface StoredImageData {
@@ -68,6 +69,7 @@ export default function DadosExame() {
     ePrime: "",
     aPrime: "",
     relacaoEePrime: "",
+    padraoDiastolico: "",
   });
 
   // Campos das valvas com velocidades e gradientes
@@ -195,7 +197,7 @@ export default function DadosExame() {
     const margin = 15;
     const headerHeight = 25; // Height of the header area
     const contentStartY = headerHeight + 10; // Content starts below header with padding
-    const SAFE_PAGE_START_Y = 80; // exigência: garantir conteúdo abaixo da logo após quebra de página
+    const SAFE_PAGE_START_Y = 55; // altura logo abaixo do cabeçalho
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
@@ -396,6 +398,20 @@ export default function DadosExame() {
     yPosition += 5;
     
     addTableRow("Relação E/e'", funcaoDiastolica.relacaoEePrime || '-');
+    
+    // Padrão Diastólico (texto longo com quebra de linha)
+    if (funcaoDiastolica.padraoDiastolico) {
+      yPosition += 2;
+      pdf.setTextColor(60, 60, 60);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      const diastolicLines = pdf.splitTextToSize(funcaoDiastolica.padraoDiastolico, pageWidth - 2 * margin);
+      for (const line of diastolicLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
     yPosition += 3;
 
     // Avaliação Hemodinâmica - Valvas
@@ -573,12 +589,25 @@ export default function DadosExame() {
   const handlePreviewPDF = async () => {
     try {
       const pdf = await generatePdfDocument();
-      pdf.save("preview_laudo.pdf");
+      const blob = pdf.output("blob");
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      
+      if (!win) {
+        URL.revokeObjectURL(url);
+        toast({
+          title: "Pop-up bloqueado",
+          description: "Use o botão 'Baixar PDF' para ver o arquivo.",
+        });
+        return;
+      }
+      
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error("Error generating PDF preview:", error);
       toast({
         title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o arquivo para download.",
+        description: "Não foi possível gerar o preview.",
         variant: "destructive",
       });
     }
@@ -747,6 +776,33 @@ export default function DadosExame() {
                 <Label className="label-vitaecor">E/e'</Label>
                 <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.relacaoEePrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, relacaoEePrime: e.target.value})} />
               </div>
+            </div>
+            
+            {/* Padrão Diastólico */}
+            <div className="mt-4">
+              <Label className="label-vitaecor">Padrão Diastólico</Label>
+              <Select 
+                value={funcaoDiastolica.padraoDiastolico} 
+                onValueChange={(value) => setFuncaoDiastolica({...funcaoDiastolica, padraoDiastolico: value})}
+              >
+                <SelectTrigger className="input-vitaecor">
+                  <SelectValue placeholder="Selecione o padrão diastólico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular normal.">
+                    Padrão normal
+                  </SelectItem>
+                  <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular tipo E < A, compatível com distúrbio no relaxamento ventricular. Padrão diastólico tipo I. Esse achado pode ser considerado normal em cães com idade superior a 10 anos.">
+                    Tipo I (E &lt; A) - Distúrbio relaxamento
+                  </SelectItem>
+                  <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular pseudonormalizado ou tipo II.">
+                    Tipo II - Pseudonormalizado
+                  </SelectItem>
+                  <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular restritivo ou tipo III.">
+                    Tipo III - Restritivo
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
