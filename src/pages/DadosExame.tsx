@@ -61,16 +61,52 @@ export default function DadosExame() {
   const [funcaoDiastolica, setFuncaoDiastolica] = useState({
     ondaE: "",
     ondaA: "",
-    relacaoEA: "",
     tempoDesaceleracao: "",
     triv: "",
-    eTRIV: "",
     tdiParedeLateral: "",
     ePrime: "",
     aPrime: "",
-    relacaoEePrime: "",
     padraoDiastolico: "",
   });
+
+  // Cálculos automáticos
+  const calculatedValues = {
+    // E/A
+    relacaoEA: (() => {
+      const e = parseFloat(funcaoDiastolica.ondaE);
+      const a = parseFloat(funcaoDiastolica.ondaA);
+      return e && a ? (e / a).toFixed(2) : "-";
+    })(),
+    // E/TRIV
+    eTRIV: (() => {
+      const e = parseFloat(funcaoDiastolica.ondaE);
+      const triv = parseFloat(funcaoDiastolica.triv);
+      return e && triv ? (e / triv).toFixed(2) : "-";
+    })(),
+    // E/e'
+    relacaoEePrime: (() => {
+      const e = parseFloat(funcaoDiastolica.ondaE);
+      const ePrime = parseFloat(funcaoDiastolica.ePrime);
+      return e && ePrime ? (e / ePrime).toFixed(2) : "-";
+    })(),
+    // Fração de Encurtamento (FE%)
+    fracaoEncurtamento: (() => {
+      const dved = parseFloat(measurementsData.dvedDiastole);
+      const dves = parseFloat(measurementsData.dvedSistole);
+      return dved && dves ? (((dved - dves) / dved) * 100).toFixed(1) : "-";
+    })(),
+    // Fração de Ejeção (Teicholz): FE = (VDF - VSF) / VDF * 100
+    // VDF = 7 * DVED³ / (2.4 + DVED) e VSF = 7 * DVES³ / (2.4 + DVES)
+    fracaoEjecao: (() => {
+      const dved = parseFloat(measurementsData.dvedDiastole);
+      const dves = parseFloat(measurementsData.dvedSistole);
+      if (!dved || !dves) return "-";
+      const vdf = (7 * Math.pow(dved, 3)) / (2.4 + dved);
+      const vsf = (7 * Math.pow(dves, 3)) / (2.4 + dves);
+      const fe = ((vdf - vsf) / vdf) * 100;
+      return fe.toFixed(1);
+    })(),
+  };
 
   // Campos das valvas com velocidades e gradientes
   const [valvasDoppler, setValvasDoppler] = useState({
@@ -356,18 +392,15 @@ export default function DadosExame() {
     
     const pesoNum = parseFloat(patientData.peso);
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
-    const dvesNum = parseFloat(measurementsData.dvedSistole);
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '-';
-    const feEnc = dvedNum && dvesNum ? (((dvedNum - dvesNum) / dvedNum) * 100).toFixed(1) : '-';
-    const feEj = dvedNum && dvesNum ? (66.2).toFixed(1) : '-'; // Placeholder Teicholz
 
     addTableRow("Septo interventricular em diástole", `${measurementsData.septoIVd || '-'} cm`);
     addTableRow("Ventrículo esquerdo em diástole", `${measurementsData.dvedDiastole || '-'} cm`);
     addTableRow("Parede livre do VE em diástole", `${measurementsData.paredeLVd || '-'} cm`);
     addTableRow("Ventrículo esquerdo em sístole", `${measurementsData.dvedSistole || '-'} cm`);
     addTableRow("VE em diástole NORMALIZADO", dvedNorm);
-    addTableRow("Fração de Encurtamento", `${feEnc}%`);
-    addTableRow("Fração de Ejeção (Teicholz)", `${feEj}%`);
+    addTableRow("Fração de Encurtamento", `${calculatedValues.fracaoEncurtamento}%`);
+    addTableRow("Fração de Ejeção (Teicholz)", `${calculatedValues.fracaoEjecao}%`);
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -384,10 +417,10 @@ export default function DadosExame() {
     await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
     addTableRow("Velocidade da onda E", `${funcaoDiastolica.ondaE || '-'} cm/s`);
     addTableRow("Velocidade da onda A", `${funcaoDiastolica.ondaA || '-'} cm/s`);
-    addTableRow("Relação onda E/A", funcaoDiastolica.relacaoEA || '-');
+    addTableRow("Relação onda E/A", calculatedValues.relacaoEA);
     addTableRow("Tempo de desaceleração da onda E", `${funcaoDiastolica.tempoDesaceleracao || '-'} ms`);
     addTableRow("TRIV", `${funcaoDiastolica.triv || '-'} ms`);
-    addTableRow("E/TRIV", funcaoDiastolica.eTRIV || '-');
+    addTableRow("E/TRIV", calculatedValues.eTRIV);
     
     // TDI em linha única
     const tdiLine = `TDI Parede lateral: s': ${funcaoDiastolica.tdiParedeLateral || '-'} cm/s | e': ${funcaoDiastolica.ePrime || '-'} cm/s | a': ${funcaoDiastolica.aPrime || '-'} cm/s`;
@@ -397,7 +430,7 @@ export default function DadosExame() {
     pdf.text(tdiLine, margin, yPosition);
     yPosition += 5;
     
-    addTableRow("Relação E/e'", funcaoDiastolica.relacaoEePrime || '-');
+    addTableRow("Relação E/e'", calculatedValues.relacaoEePrime);
     
     // Padrão Diastólico (texto longo com quebra de linha)
     if (funcaoDiastolica.padraoDiastolico) {
@@ -584,7 +617,7 @@ export default function DadosExame() {
     }
 
     return pdf;
-  }, [patientData, examInfo, measurementsData, funcaoDiastolica, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader]);
+  }, [patientData, examInfo, measurementsData, funcaoDiastolica, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
 
   const handlePreviewPDF = async () => {
     try {
@@ -746,7 +779,7 @@ export default function DadosExame() {
               </div>
               <div>
                 <Label className="label-vitaecor">Relação E/A</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.relacaoEA} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, relacaoEA: e.target.value})} />
+                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEA} />
               </div>
               <div>
                 <Label className="label-vitaecor">Tempo Desac. E (ms)</Label>
@@ -758,7 +791,7 @@ export default function DadosExame() {
               </div>
               <div>
                 <Label className="label-vitaecor">E/TRIV</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.eTRIV} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, eTRIV: e.target.value})} />
+                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.eTRIV} />
               </div>
               <div>
                 <Label className="label-vitaecor">TDI s' (cm/s)</Label>
@@ -774,7 +807,7 @@ export default function DadosExame() {
               </div>
               <div>
                 <Label className="label-vitaecor">E/e'</Label>
-                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.relacaoEePrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, relacaoEePrime: e.target.value})} />
+                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrime} />
               </div>
             </div>
             
