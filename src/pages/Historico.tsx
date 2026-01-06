@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail } from "lucide-react";
+import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -17,7 +17,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { deleteExamImages } from "@/lib/examImageUpload";
+
 interface Exam {
   id: string;
   patient_name: string;
@@ -47,6 +59,9 @@ export default function Historico() {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [selectedExamForEmail, setSelectedExamForEmail] = useState<Exam | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -491,6 +506,49 @@ export default function Historico() {
     setSelectedExamForEmail(null);
   };
 
+  const handleOpenDeleteDialog = (exam: Exam) => {
+    setExamToDelete(exam);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteExam = async () => {
+    if (!examToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      
+      // Deletar imagens do Storage primeiro
+      await deleteExamImages(examToDelete.id);
+      
+      // Deletar exame do banco
+      const { error } = await supabase
+        .from("exams")
+        .delete()
+        .eq("id", examToDelete.id);
+
+      if (error) throw error;
+
+      // Atualizar lista local
+      setExams(exams.filter(e => e.id !== examToDelete.id));
+      
+      toast({
+        title: "Exame excluído!",
+        description: "O exame foi removido com sucesso.",
+      });
+    } catch (error) {
+      console.error("Erro ao excluir exame:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o exame.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setExamToDelete(null);
+    }
+  };
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto">
@@ -578,6 +636,15 @@ export default function Historico() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => handleOpenDeleteDialog(exam)}
+                            title="Excluir exame"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleReprint(exam)}
                             className="gap-2"
                           >
@@ -633,6 +700,31 @@ export default function Historico() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Exame</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o exame do paciente{" "}
+                <strong>{examToDelete?.patient_name}</strong>?
+                <br />
+                Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteExam}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Excluindo..." : "Excluir"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

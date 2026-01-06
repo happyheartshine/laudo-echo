@@ -17,6 +17,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { uploadAllExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -26,11 +27,7 @@ const formatNumber = (value: string | number): string => {
 };
 
 
-interface StoredImageData {
-  name: string;
-  type: string;
-  dataUrl: string;
-}
+// StoredImageData is now imported from examImageUpload
 
 export default function DadosExame() {
   const navigate = useNavigate();
@@ -189,6 +186,8 @@ export default function DadosExame() {
         valvesData?: typeof valvesData;
         achados?: string;
         conclusoes?: string;
+        storedImages?: StoredImageData[];
+        selectedImages?: number[];
       };
 
       if (content.patientData) setPatientData(content.patientData);
@@ -200,6 +199,12 @@ export default function DadosExame() {
       if (content.valvesData) setValvesData(content.valvesData);
       if (content.achados) setAchados(content.achados);
       if (content.conclusoes) setConclusoes(content.conclusoes);
+      
+      // Carregar imagens salvas no Storage
+      if (content.storedImages && content.storedImages.length > 0) {
+        setStoredImages(content.storedImages);
+        setSelectedImages(content.selectedImages || content.storedImages.map((_, i) => i));
+      }
 
     } catch (error) {
       console.error("Erro ao carregar exame:", error);
@@ -726,10 +731,15 @@ export default function DadosExame() {
         const y = startY + row * (imgHeight + imgMargin);
 
         const img = selectedImageData[imageIndex];
-        if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image')) {
+        if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image') || img.dataUrl.startsWith('http')) {
           try {
-            const format = img.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            pdf.addImage(img.dataUrl, format as any, x, y, imgWidth, imgHeight);
+            // Converter URL remota para base64 se necessário
+            let imageData = img.dataUrl;
+            if (img.dataUrl.startsWith('http')) {
+              imageData = await imageUrlToBase64(img.dataUrl);
+            }
+            const format = imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            pdf.addImage(imageData, format as any, x, y, imgWidth, imgHeight);
           } catch (e) {
             console.error('Error adding image to PDF:', e);
           }
@@ -808,6 +818,22 @@ export default function DadosExame() {
         ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
         : new Date().toISOString().split('T')[0];
 
+      // Gerar um ID temporário se for novo exame
+      const tempExamId = examId || crypto.randomUUID();
+
+      // Upload das imagens selecionadas para o Storage
+      let uploadedImages: StoredImageData[] = [];
+      const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
+      
+      if (selectedImageData.length > 0) {
+        toast({
+          title: "Fazendo upload das imagens...",
+          description: `Enviando ${selectedImageData.length} imagem(ns)...`,
+        });
+        
+        uploadedImages = await uploadAllExamImages(selectedImageData, tempExamId);
+      }
+
       const examContent = {
         patientData,
         examInfo,
@@ -819,6 +845,8 @@ export default function DadosExame() {
         achados,
         conclusoes,
         calculatedValues,
+        storedImages: uploadedImages,
+        selectedImages: uploadedImages.map((_, i) => i),
       };
 
       const examData = {
@@ -840,8 +868,9 @@ export default function DadosExame() {
           .eq("id", examId);
         error = result.error;
       } else {
-        // INSERT new exam
+        // INSERT new exam with the generated ID
         const result = await supabase.from("exams").insert([{
+          id: tempExamId,
           ...examData,
           user_id: user.id,
           clinic_id: profile?.clinic_id || null,
