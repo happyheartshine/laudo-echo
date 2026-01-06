@@ -41,6 +41,8 @@ export default function DadosExame() {
   const reportRef = useRef<HTMLDivElement>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // Track current exam ID to avoid duplicates (INSERT once, then UPDATE)
+  const [currentExamId, setCurrentExamId] = useState<string | null>(examId || null);
 
   const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
@@ -247,11 +249,8 @@ export default function DadosExame() {
     loadData();
   }, [navigate, isEditMode, examId, loadExamData]);
 
-  const handleSave = () => {
-    toast({
-      title: "Laudo salvo!",
-      description: "O laudo foi salvo com sucesso no sistema.",
-    });
+  const handleSave = async () => {
+    await saveExam();
   };
 
   const addHeader = async (pdf: jsPDF, pageWidth: number) => {
@@ -818,8 +817,8 @@ export default function DadosExame() {
         ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` 
         : new Date().toISOString().split('T')[0];
 
-      // Gerar um ID temporário se for novo exame
-      const tempExamId = examId || crypto.randomUUID();
+      // Use currentExamId if we already saved once, otherwise generate new
+      const targetExamId = currentExamId || crypto.randomUUID();
 
       // Upload das imagens selecionadas para o Storage
       let uploadedImages: StoredImageData[] = [];
@@ -831,7 +830,11 @@ export default function DadosExame() {
           description: `Enviando ${selectedImageData.length} imagem(ns)...`,
         });
         
-        uploadedImages = await uploadAllExamImages(selectedImageData, tempExamId);
+        uploadedImages = await uploadAllExamImages(selectedImageData, targetExamId);
+        
+        // Atualizar storedImages com URLs permanentes
+        setStoredImages(uploadedImages);
+        setSelectedImages(uploadedImages.map((_, i) => i));
       }
 
       const examContent = {
@@ -859,30 +862,36 @@ export default function DadosExame() {
       };
 
       let error;
+      const isUpdate = !!currentExamId;
 
-      if (isEditMode && examId) {
-        // UPDATE existing exam
+      if (isUpdate) {
+        // UPDATE existing exam (either edit mode or already saved in this session)
         const result = await supabase
           .from("exams")
           .update(examData)
-          .eq("id", examId);
+          .eq("id", currentExamId);
         error = result.error;
       } else {
         // INSERT new exam with the generated ID
         const result = await supabase.from("exams").insert([{
-          id: tempExamId,
+          id: targetExamId,
           ...examData,
           user_id: user.id,
           clinic_id: profile?.clinic_id || null,
         }]);
         error = result.error;
+        
+        // Save the ID for future updates
+        if (!error) {
+          setCurrentExamId(targetExamId);
+        }
       }
 
       if (error) throw error;
 
       toast({
-        title: isEditMode ? "Exame atualizado!" : "Exame salvo!",
-        description: isEditMode 
+        title: isUpdate ? "Exame atualizado!" : "Exame salvo!",
+        description: isUpdate 
           ? "O exame foi atualizado com sucesso."
           : "O exame foi salvo no histórico com sucesso.",
       });
@@ -955,9 +964,9 @@ export default function DadosExame() {
           </div>
           
           <div className="flex gap-3">
-            <Button variant="outline" onClick={handleSave}>
+            <Button variant="outline" onClick={handleSave} disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
-              Salvar Rascunho
+              {isSaving ? "Salvando..." : "Salvar"}
             </Button>
             <Button variant="outline" onClick={handlePreviewPDF}>
               <Eye className="w-4 h-4 mr-2" />
@@ -1220,9 +1229,9 @@ export default function DadosExame() {
 
         {/* Bottom Actions */}
         <div className="mt-8 flex justify-end gap-3 pb-8">
-          <Button variant="outline" size="lg" onClick={handleSave}>
+          <Button variant="outline" size="lg" onClick={handleSave} disabled={isSaving}>
             <Save className="w-4 h-4 mr-2" />
-            Salvar Rascunho
+            {isSaving ? "Salvando..." : "Salvar"}
           </Button>
           <Button variant="outline" size="lg" onClick={handlePreviewPDF}>
             <Eye className="w-4 h-4 mr-2" />

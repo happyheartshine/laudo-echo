@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { deleteExamImages } from "@/lib/examImageUpload";
+import { deleteExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 
 interface Exam {
   id: string;
@@ -111,6 +111,8 @@ export default function Historico() {
       valvesData?: { mitral?: string; tricuspide?: string; aortica?: string; pulmonar?: string };
       achados?: string;
       conclusoes?: string;
+      storedImages?: StoredImageData[];
+      selectedImages?: number[];
     };
 
     const patientData = content.patientData || {};
@@ -421,6 +423,70 @@ export default function Historico() {
     if (profile?.especialidade) {
       yPosition += 4;
       pdf.text(profile.especialidade, pageWidth / 2, yPosition, { align: "center" });
+    }
+
+    // ANEXOS / IMAGENS DO EXAME
+    const storedImages = content.storedImages || [];
+    const selectedImagesIndexes = content.selectedImages || storedImages.map((_, i) => i);
+    const selectedImageData = storedImages.filter((_, index) => selectedImagesIndexes.includes(index));
+    
+    if (selectedImageData.length > 0) {
+      pdf.addPage();
+      await addHeader();
+      
+      // Add section title
+      pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, { align: "center" });
+
+      const imagesPerPage = 8;
+      const cols = 2;
+      const rows = 4;
+      const imgMargin = 6;
+      const startY = 42;
+      const availableWidth = pageWidth - 2 * margin;
+      const availableHeight = pageHeight - startY - 15;
+      const imgWidth = (availableWidth - (cols - 1) * imgMargin) / cols;
+      const imgHeight = (availableHeight - (rows - 1) * imgMargin) / rows;
+
+      let imageIndex = 0;
+      
+      while (imageIndex < selectedImageData.length) {
+        if (imageIndex > 0 && imageIndex % imagesPerPage === 0) {
+          pdf.addPage();
+          await addHeader();
+          pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+          pdf.setFontSize(12);
+          pdf.setFont("helvetica", "bold");
+          pdf.text("ANEXOS / IMAGENS DO EXAME (continuação)", pageWidth / 2, 35, { align: "center" });
+        }
+
+        const pageImageIndex = imageIndex % imagesPerPage;
+        const row = Math.floor(pageImageIndex / cols);
+        const col = pageImageIndex % cols;
+
+        const x = margin + col * (imgWidth + imgMargin);
+        const y = startY + row * (imgHeight + imgMargin);
+
+        const img = selectedImageData[imageIndex];
+        const imgUrl = img.storageUrl || img.dataUrl;
+        
+        if (imgUrl && (img.type?.startsWith('image/') || imgUrl.startsWith('data:image') || imgUrl.startsWith('http'))) {
+          try {
+            // Converter URL remota para base64 (evita CORS no jspdf)
+            let imageData = imgUrl;
+            if (imgUrl.startsWith('http')) {
+              imageData = await imageUrlToBase64(imgUrl);
+            }
+            const format = imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            pdf.addImage(imageData, format as any, x, y, imgWidth, imgHeight);
+          } catch (e) {
+            console.error('Error adding image to PDF:', e);
+          }
+        }
+        imageIndex++;
+      }
     }
 
     // Page numbers
