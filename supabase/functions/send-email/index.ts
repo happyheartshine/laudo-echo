@@ -12,45 +12,31 @@ const corsHeaders = {
 interface SendEmailRequest {
   email: string;
   patientName: string;
-  pdfBase64: string;
+  pdfUrl: string; // Changed from pdfBase64 to pdfUrl
   senderName?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { email, patientName, pdfBase64, senderName }: SendEmailRequest = await req.json();
+    const { email, patientName, pdfUrl, senderName }: SendEmailRequest = await req.json();
 
     console.log("=== SEND EMAIL REQUEST ===");
     console.log("To:", email);
     console.log("Patient:", patientName);
-    console.log("PDF Base64 length:", pdfBase64?.length || 0);
+    console.log("PDF URL:", pdfUrl);
     console.log("Sender:", senderName);
 
-    if (!email || !patientName || !pdfBase64) {
+    if (!email || !patientName || !pdfUrl) {
       console.error("Missing required fields");
       return new Response(
-        JSON.stringify({ error: "Missing required fields: email, patientName, pdfBase64" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        JSON.stringify({ error: "Missing required fields: email, patientName, pdfUrl" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-
-    // Sanitize patient name for filename
-    const safePatientName = patientName
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9]/g, "_")
-      .toLowerCase();
-
-    // Convert base64 to Buffer for attachment
-    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
 
     const emailResponse = await resend.emails.send({
       from: "VitaeCor <onboarding@resend.dev>",
@@ -58,22 +44,25 @@ const handler = async (req: Request): Promise<Response> => {
       subject: `Laudo Veterinário - ${patientName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Laudo Ecocardiográfico</h2>
+          <h2 style="color: #1a2a52;">Laudo Ecocardiográfico</h2>
           <p>Olá,</p>
-          <p>Segue em anexo o laudo ecocardiográfico do paciente <strong>${patientName}</strong>.</p>
-          <p>Atenciosamente,<br><strong>${senderName || "Equipe Veterinária"}</strong></p>
+          <p>Segue o laudo ecocardiográfico do paciente <strong>${patientName}</strong>.</p>
+          <p style="margin: 24px 0;">
+            <a href="${pdfUrl}" 
+               style="background-color: #1a2a52; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              📄 Baixar Laudo em PDF
+            </a>
+          </p>
+          <p style="font-size: 12px; color: #666;">
+            O link acima é válido por 7 dias. Após esse período, solicite um novo envio.
+          </p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #999;">
+          <p>Atenciosamente,<br><strong>${senderName || "Equipe Veterinária"}</strong></p>
+          <p style="font-size: 11px; color: #999;">
             Este email foi enviado automaticamente pelo sistema VitaeCor.
           </p>
         </div>
       `,
-      attachments: [
-        {
-          filename: `laudo_${safePatientName}.pdf`,
-          content: pdfBuffer,
-        },
-      ],
     });
 
     console.log("Email sent successfully:", emailResponse);
@@ -86,10 +75,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("Error in send-email function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 };
