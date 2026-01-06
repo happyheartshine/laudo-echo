@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2 } from "lucide-react";
+import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -537,6 +537,8 @@ export default function Historico() {
     setEmailDialogOpen(true);
   };
 
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   const handleSendEmail = async () => {
     if (!selectedExamForEmail || !emailAddress) {
       toast({
@@ -547,29 +549,64 @@ export default function Historico() {
       return;
     }
 
-    // Simulate sending email (console.log for now)
-    console.log("=== SIMULAÇÃO DE ENVIO DE EMAIL ===");
-    console.log("Para:", emailAddress);
-    console.log("Assunto:", `Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
-    console.log("Corpo: Segue em anexo o laudo ecocardiográfico do paciente", selectedExamForEmail.patient_name);
-    console.log("Exame ID:", selectedExamForEmail.id);
-    console.log("===================================");
+    try {
+      setIsSendingEmail(true);
 
-    // Fallback: open mailto link
-    const subject = encodeURIComponent(`Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
-    const body = encodeURIComponent(
-      `Prezado(a),\n\nSegue em anexo o laudo ecocardiográfico do paciente ${selectedExamForEmail.patient_name}.\n\nAtenciosamente,\n${profile?.nome || "Equipe Veterinária"}`
-    );
-    
-    window.open(`mailto:${emailAddress}?subject=${subject}&body=${body}`, "_blank");
+      // Generate PDF in base64 format
+      const pdfDoc = await generatePdfFromExam(selectedExamForEmail);
+      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]; // Remove data:application/pdf;base64, prefix
 
-    toast({
-      title: "Email preparado!",
-      description: "O cliente de email foi aberto. Anexe o PDF manualmente.",
-    });
+      console.log("=== ENVIANDO EMAIL VIA EDGE FUNCTION ===");
+      console.log("Para:", emailAddress);
+      console.log("Paciente:", selectedExamForEmail.patient_name);
+      console.log("PDF Base64 length:", pdfBase64.length);
 
-    setEmailDialogOpen(false);
-    setSelectedExamForEmail(null);
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          email: emailAddress,
+          patientName: selectedExamForEmail.patient_name,
+          pdfBase64: pdfBase64,
+          senderName: profile?.nome || "Equipe Veterinária",
+        },
+      });
+
+      if (error) {
+        console.error("Erro ao enviar email:", error);
+        throw error;
+      }
+
+      console.log("Email enviado com sucesso:", data);
+      
+      toast({
+        title: "Email enviado!",
+        description: `O laudo foi enviado para ${emailAddress} com sucesso.`,
+      });
+
+      setEmailDialogOpen(false);
+      setSelectedExamForEmail(null);
+      setEmailAddress("");
+    } catch (error: any) {
+      console.error("Erro ao enviar email:", error);
+      
+      // Fallback: open mailto link
+      const subject = encodeURIComponent(`Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
+      const body = encodeURIComponent(
+        `Prezado(a),\n\nSegue em anexo o laudo ecocardiográfico do paciente ${selectedExamForEmail.patient_name}.\n\nAtenciosamente,\n${profile?.nome || "Equipe Veterinária"}`
+      );
+      
+      window.open(`mailto:${emailAddress}?subject=${subject}&body=${body}`, "_blank");
+
+      toast({
+        title: "Falha no envio automático",
+        description: "O cliente de email foi aberto. Anexe o PDF manualmente.",
+        variant: "destructive",
+      });
+
+      setEmailDialogOpen(false);
+      setSelectedExamForEmail(null);
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleOpenDeleteDialog = (exam: Exam) => {
@@ -756,12 +793,16 @@ export default function Historico() {
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setEmailDialogOpen(false)} disabled={isSendingEmail}>
                 Cancelar
               </Button>
-              <Button onClick={handleSendEmail}>
-                <Mail className="w-4 h-4 mr-2" />
-                Enviar
+              <Button onClick={handleSendEmail} disabled={isSendingEmail || !emailAddress}>
+                {isSendingEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 mr-2" />
+                )}
+                {isSendingEmail ? "Enviando..." : "Enviar"}
               </Button>
             </DialogFooter>
           </DialogContent>
