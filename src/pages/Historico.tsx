@@ -552,20 +552,51 @@ export default function Historico() {
     try {
       setIsSendingEmail(true);
 
-      // Generate PDF in base64 format
+      // Generate PDF as Blob
       const pdfDoc = await generatePdfFromExam(selectedExamForEmail);
-      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]; // Remove data:application/pdf;base64, prefix
+      const pdfBlob = pdfDoc.output('blob');
+
+      // Sanitize patient name for filename
+      const safePatientName = selectedExamForEmail.patient_name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "_")
+        .toLowerCase();
+      
+      const fileName = `laudo_${safePatientName}_${Date.now()}.pdf`;
 
       console.log("=== ENVIANDO EMAIL VIA EDGE FUNCTION ===");
       console.log("Para:", emailAddress);
       console.log("Paciente:", selectedExamForEmail.patient_name);
-      console.log("PDF Base64 length:", pdfBase64.length);
+      console.log("Arquivo:", fileName);
 
+      // Upload PDF to Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('email-pdfs')
+        .upload(fileName, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Erro ao fazer upload do PDF:", uploadError);
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('email-pdfs')
+        .getPublicUrl(fileName);
+
+      const pdfUrl = urlData.publicUrl;
+      console.log("PDF URL:", pdfUrl);
+
+      // Send email via Edge Function
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
           email: emailAddress,
           patientName: selectedExamForEmail.patient_name,
-          pdfBase64: pdfBase64,
+          pdfUrl: pdfUrl,
           senderName: profile?.nome || "Equipe Veterinária",
         },
       });
