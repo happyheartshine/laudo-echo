@@ -57,6 +57,7 @@ export function MeasurementsSection({ data, peso, onChange }: MeasurementsSectio
     return fe.toFixed(1);
   }, [data.dvedDiastole, data.dvedSistole]);
 
+  // Ajustado: referência DVED Normalizado até 1.70 (era 1.27-1.85)
   const isAbnormal = (value: string | null, min: number, max: number) => {
     if (!value) return false;
     const num = parseFloat(value);
@@ -194,7 +195,7 @@ export function MeasurementsSection({ data, peso, onChange }: MeasurementsSectio
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-border">
                 <span className="text-sm text-muted-foreground">DVED Normalizado:</span>
-                <span className={`font-semibold ${isAbnormal(dvedNormalizado, 1.27, 1.85) ? 'value-abnormal' : 'text-foreground'}`}>
+                <span className={`font-semibold ${isAbnormal(dvedNormalizado, 0, 1.70) ? 'value-abnormal' : 'text-foreground'}`}>
                   {dvedNormalizado ? `${dvedNormalizado}` : '--'}
                 </span>
               </div>
@@ -220,7 +221,7 @@ export function MeasurementsSection({ data, peso, onChange }: MeasurementsSectio
       {/* Legenda */}
       <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="inline-block w-3 h-3 rounded bg-accent"></span>
-        <span>Valores em vermelho indicam valores fora da normalidade</span>
+        <span>Valores em vermelho indicam valores fora da normalidade (LVIDdN normal até 1,70)</span>
       </div>
     </div>
   );

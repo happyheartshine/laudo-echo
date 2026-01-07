@@ -79,10 +79,29 @@ export default function DadosExame() {
     ondaA: "",
     tempoDesaceleracao: "",
     triv: "",
-    tdiParedeLateral: "",
-    ePrime: "",
-    aPrime: "",
     padraoDiastolico: "",
+  });
+
+  // Função Sistólica - Novos campos
+  const [funcaoSistolica, setFuncaoSistolica] = useState({
+    simpson: "",
+    mapse: "",
+    epss: "",
+    statusFuncao: "",
+    tipoDisfuncao: "",
+  });
+
+  // TDI - Dois grupos: Parede Livre e Parede Septal
+  const [tdiLivre, setTdiLivre] = useState({
+    s: "",
+    e: "",
+    a: "",
+  });
+  
+  const [tdiSeptal, setTdiSeptal] = useState({
+    s: "",
+    e: "",
+    a: "",
   });
 
   // Cálculos automáticos
@@ -99,11 +118,33 @@ export default function DadosExame() {
       const triv = parseFloat(funcaoDiastolica.triv);
       return e && triv ? (e / triv).toFixed(2) : "-";
     })(),
-    // E/e'
-    relacaoEePrime: (() => {
+    // E/e' Parede Livre
+    relacaoEePrimeLivre: (() => {
       const e = parseFloat(funcaoDiastolica.ondaE);
-      const ePrime = parseFloat(funcaoDiastolica.ePrime);
+      const ePrime = parseFloat(tdiLivre.e);
       return e && ePrime ? (e / ePrime).toFixed(2) : "-";
+    })(),
+    // E/e' Parede Septal
+    relacaoEePrimeSeptal: (() => {
+      const e = parseFloat(funcaoDiastolica.ondaE);
+      const ePrime = parseFloat(tdiSeptal.e);
+      return e && ePrime ? (e / ePrime).toFixed(2) : "-";
+    })(),
+    // Média E/e'
+    mediaEePrime: (() => {
+      const e = parseFloat(funcaoDiastolica.ondaE);
+      const ePrimeLivre = parseFloat(tdiLivre.e);
+      const ePrimeSeptal = parseFloat(tdiSeptal.e);
+      if (!e) return "-";
+      if (ePrimeLivre && ePrimeSeptal) {
+        const mediaEPrime = (ePrimeLivre + ePrimeSeptal) / 2;
+        return (e / mediaEPrime).toFixed(2);
+      } else if (ePrimeLivre) {
+        return (e / ePrimeLivre).toFixed(2);
+      } else if (ePrimeSeptal) {
+        return (e / ePrimeSeptal).toFixed(2);
+      }
+      return "-";
     })(),
     // Fração de Encurtamento (FE%)
     fracaoEncurtamento: (() => {
@@ -113,7 +154,7 @@ export default function DadosExame() {
     })(),
     // Fração de Ejeção (Teicholz): FE = (VDF - VSF) / VDF * 100
     // VDF = 7 * DVED³ / (2.4 + DVED) e VSF = 7 * DVES³ / (2.4 + DVES)
-    fracaoEjecao: (() => {
+    fracaoEjecaoTeicholz: (() => {
       const dved = parseFloat(measurementsData.dvedDiastole);
       const dves = parseFloat(measurementsData.dvedSistole);
       if (!dved || !dves) return "-";
@@ -183,6 +224,9 @@ export default function DadosExame() {
         examInfo?: typeof examInfo;
         measurementsData?: typeof measurementsData;
         funcaoDiastolica?: typeof funcaoDiastolica;
+        funcaoSistolica?: typeof funcaoSistolica;
+        tdiLivre?: typeof tdiLivre;
+        tdiSeptal?: typeof tdiSeptal;
         valvasDoppler?: typeof valvasDoppler;
         outros?: typeof outros;
         valvesData?: typeof valvesData;
@@ -196,6 +240,9 @@ export default function DadosExame() {
       if (content.examInfo) setExamInfo(content.examInfo);
       if (content.measurementsData) setMeasurementsData(content.measurementsData);
       if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
+      if (content.funcaoSistolica) setFuncaoSistolica(content.funcaoSistolica);
+      if (content.tdiLivre) setTdiLivre(content.tdiLivre);
+      if (content.tdiSeptal) setTdiSeptal(content.tdiSeptal);
       if (content.valvasDoppler) setValvasDoppler(content.valvasDoppler);
       if (content.outros) setOutros(content.outros);
       if (content.valvesData) setValvesData(content.valvesData);
@@ -520,14 +567,35 @@ export default function DadosExame() {
     addTableRow("Parede livre do VE em diástole", `${formatNumber(measurementsData.paredeLVd || '-')} cm`);
     addTableRow("Ventrículo esquerdo em sístole", `${formatNumber(measurementsData.dvedSistole || '-')} cm`);
     
-    // DVED Normalizado: referência 1.27-1.85
-    addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm), undefined, undefined, isValueAbnormal(dvedNorm, 1.27, 1.85));
+    // DVED Normalizado: referência até 1.70
+    addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm), undefined, undefined, isValueAbnormal(dvedNorm, 0, 1.70));
     
     // Fração de Encurtamento: referência 25-45%
     addTableRow("Fração de Encurtamento", `${formatNumber(calculatedValues.fracaoEncurtamento)}%`, undefined, undefined, isValueAbnormal(calculatedValues.fracaoEncurtamento, 25, 45));
     
     // Fração de Ejeção (Teicholz): referência 50-75%
-    addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecao)}%`, undefined, undefined, isValueAbnormal(calculatedValues.fracaoEjecao, 50, 75));
+    addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecaoTeicholz)}%`, undefined, undefined, isValueAbnormal(calculatedValues.fracaoEjecaoTeicholz, 50, 75));
+    
+    // Fração de Ejeção (Simpson)
+    if (funcaoSistolica.simpson) {
+      addTableRow("Fração de Ejeção (Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`);
+    }
+    yPosition += 3;
+
+    // Função Sistólica
+    await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
+    if (funcaoSistolica.mapse) {
+      addTableRow("MAPSE", `${formatNumber(funcaoSistolica.mapse)} cm`);
+    }
+    if (funcaoSistolica.epss) {
+      addTableRow("EPSS", `${formatNumber(funcaoSistolica.epss)} cm`);
+    }
+    if (funcaoSistolica.statusFuncao) {
+      addTableRow("Status da Função", funcaoSistolica.statusFuncao);
+    }
+    if (funcaoSistolica.tipoDisfuncao) {
+      addTableRow("Tipo de Disfunção", funcaoSistolica.tipoDisfuncao);
+    }
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -555,17 +623,49 @@ export default function DadosExame() {
     
     // E/TRIV: referência 1.0-2.5
     addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV), undefined, undefined, isValueAbnormal(calculatedValues.eTRIV, 1.0, 2.5));
+    yPosition += 3;
     
-    // TDI em linha única
-    const tdiLine = `TDI Parede lateral: s': ${formatNumber(funcaoDiastolica.tdiParedeLateral || '-')} cm/s | e': ${formatNumber(funcaoDiastolica.ePrime || '-')} cm/s | a': ${formatNumber(funcaoDiastolica.aPrime || '-')} cm/s`;
-    pdf.setTextColor(60, 60, 60);
+    // TDI - Duas colunas: Parede Livre e Parede Septal
+    await addSectionHeader("DOPPLER TECIDUAL (TDI)");
+    
+    // TDI Parede Livre
+    pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9);
+    pdf.setTextColor(60, 60, 60);
+    pdf.text("Parede Livre:", margin, yPosition);
     pdf.setFont("helvetica", "normal");
-    pdf.text(tdiLine, margin, yPosition);
+    pdf.text(`s': ${formatNumber(tdiLivre.s || '-')} cm/s | e': ${formatNumber(tdiLivre.e || '-')} cm/s | a': ${formatNumber(tdiLivre.a || '-')} cm/s`, margin + 25, yPosition);
     yPosition += 5;
     
-    // E/e': referência < 15 (acima sugere pressão de enchimento elevada)
-    addTableRow("Relação E/e'", formatNumber(calculatedValues.relacaoEePrime), undefined, undefined, isValueAbnormal(calculatedValues.relacaoEePrime, 0, 15));
+    // E/e' Parede Livre
+    addTableRow("E/e' Parede Livre", formatNumber(calculatedValues.relacaoEePrimeLivre), undefined, undefined, isValueAbnormal(calculatedValues.relacaoEePrimeLivre, 0, 15));
+    
+    // TDI Parede Septal
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    pdf.setTextColor(60, 60, 60);
+    pdf.text("Parede Septal:", margin, yPosition);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`s': ${formatNumber(tdiSeptal.s || '-')} cm/s | e': ${formatNumber(tdiSeptal.e || '-')} cm/s | a': ${formatNumber(tdiSeptal.a || '-')} cm/s`, margin + 25, yPosition);
+    yPosition += 5;
+    
+    // E/e' Parede Septal
+    addTableRow("E/e' Parede Septal", formatNumber(calculatedValues.relacaoEePrimeSeptal), undefined, undefined, isValueAbnormal(calculatedValues.relacaoEePrimeSeptal, 0, 15));
+    
+    // Média E/e' em destaque
+    yPosition += 2;
+    pdf.setFillColor(240, 240, 240);
+    pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, "F");
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(9);
+    const mediaEePrimeAbnormal = isValueAbnormal(calculatedValues.mediaEePrime, 0, 15);
+    if (mediaEePrimeAbnormal) {
+      pdf.setTextColor(abnormalRed[0], abnormalRed[1], abnormalRed[2]);
+    } else {
+      pdf.setTextColor(60, 60, 60);
+    }
+    pdf.text(`MÉDIA E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin + 2, yPosition);
+    yPosition += 8;
     
     // Padrão Diastólico (texto longo com quebra de linha)
     if (funcaoDiastolica.padraoDiastolico) {
@@ -757,7 +857,7 @@ export default function DadosExame() {
     }
 
     return pdf;
-  }, [patientData, examInfo, measurementsData, funcaoDiastolica, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
+  }, [patientData, examInfo, measurementsData, funcaoDiastolica, funcaoSistolica, tdiLivre, tdiSeptal, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
 
   const handlePreviewPDF = async () => {
     try {
@@ -842,6 +942,9 @@ export default function DadosExame() {
         examInfo,
         measurementsData,
         funcaoDiastolica,
+        funcaoSistolica,
+        tdiLivre,
+        tdiSeptal,
         valvasDoppler,
         outros,
         valvesData,
@@ -1044,10 +1147,61 @@ export default function DadosExame() {
             onChange={setMeasurementsData} 
           />
 
+          {/* Função Sistólica */}
+          <div className="card-vitaecor animate-fade-in">
+            <h2 className="section-title">Avaliação da Função Sistólica</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div>
+                <Label className="label-vitaecor">FE Teicholz (%)</Label>
+                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.fracaoEjecaoTeicholz} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">FE Simpson (%)</Label>
+                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoSistolica.simpson} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, simpson: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">MAPSE (cm)</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoSistolica.mapse} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, mapse: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">EPSS (cm)</Label>
+                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoSistolica.epss} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, epss: e.target.value})} />
+              </div>
+              <div>
+                <Label className="label-vitaecor">Fração Encurt. (%)</Label>
+                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.fracaoEncurtamento} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <Label className="label-vitaecor">Status da Função</Label>
+                <Select 
+                  value={funcaoSistolica.statusFuncao} 
+                  onValueChange={(value) => setFuncaoSistolica({...funcaoSistolica, statusFuncao: value})}
+                >
+                  <SelectTrigger className="input-vitaecor">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Preservada">Preservada</SelectItem>
+                    <SelectItem value="Reduzida">Reduzida</SelectItem>
+                    <SelectItem value="Moderadamente reduzida">Moderadamente reduzida</SelectItem>
+                    <SelectItem value="Gravemente reduzida">Gravemente reduzida</SelectItem>
+                    <SelectItem value="Hiperdinâmica">Hiperdinâmica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="label-vitaecor">Tipo de Disfunção</Label>
+                <Input className="input-vitaecor" placeholder="Ex: Global, Segmentar..." value={funcaoSistolica.tipoDisfuncao} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, tipoDisfuncao: e.target.value})} />
+              </div>
+            </div>
+          </div>
+
           {/* Função Diastólica */}
           <div className="card-vitaecor animate-fade-in">
             <h2 className="section-title">Função Diastólica do Ventrículo Esquerdo</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <Label className="label-vitaecor">Onda E (cm/s)</Label>
                 <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.ondaE} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaE: e.target.value})} />
@@ -1071,22 +1225,6 @@ export default function DadosExame() {
               <div>
                 <Label className="label-vitaecor">E/TRIV</Label>
                 <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.eTRIV} />
-              </div>
-              <div>
-                <Label className="label-vitaecor">TDI s' (cm/s)</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.tdiParedeLateral} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, tdiParedeLateral: e.target.value})} />
-              </div>
-              <div>
-                <Label className="label-vitaecor">e' (cm/s)</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.ePrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ePrime: e.target.value})} />
-              </div>
-              <div>
-                <Label className="label-vitaecor">a' (cm/s)</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoDiastolica.aPrime} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, aPrime: e.target.value})} />
-              </div>
-              <div>
-                <Label className="label-vitaecor">E/e'</Label>
-                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrime} />
               </div>
             </div>
             
@@ -1115,6 +1253,66 @@ export default function DadosExame() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* TDI - Doppler Tecidual */}
+          <div className="card-vitaecor animate-fade-in">
+            <h2 className="section-title">Doppler Tecidual (TDI)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* TDI Parede Livre */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Parede Livre</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="label-vitaecor">s' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.s} onChange={(e) => setTdiLivre({...tdiLivre, s: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">e' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.e} onChange={(e) => setTdiLivre({...tdiLivre, e: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">a' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.a} onChange={(e) => setTdiLivre({...tdiLivre, a: e.target.value})} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label className="label-vitaecor">E/e' Parede Livre</Label>
+                  <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrimeLivre} />
+                </div>
+              </div>
+
+              {/* TDI Parede Septal */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h3 className="font-semibold mb-3">Parede Septal</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="label-vitaecor">s' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.s} onChange={(e) => setTdiSeptal({...tdiSeptal, s: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">e' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.e} onChange={(e) => setTdiSeptal({...tdiSeptal, e: e.target.value})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">a' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.a} onChange={(e) => setTdiSeptal({...tdiSeptal, a: e.target.value})} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label className="label-vitaecor">E/e' Parede Septal</Label>
+                  <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrimeSeptal} />
+                </div>
+              </div>
+            </div>
+            
+            {/* Média E/e' em destaque */}
+            <div className="mt-4 p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-foreground">Média E/e':</span>
+                <span className="text-xl font-bold text-primary">{calculatedValues.mediaEePrime}</span>
+              </div>
             </div>
           </div>
 
