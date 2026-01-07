@@ -658,7 +658,11 @@ export default function DadosExame() {
       
       // Média E/e' (sem destaque)
       if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
-        addTableRow("Média E/e'", formatNumber(calculatedValues.mediaEePrime));
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
+        yPosition += 5;
       }
       
       // Padrão Diastólico (texto longo com quebra de linha)
