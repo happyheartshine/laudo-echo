@@ -414,9 +414,16 @@ export default function DadosExame() {
       return isNaN(num) ? "-" : num.toFixed(1).replace(".", ",");
     };
 
-    // Verifica se um valor está vazio ou é "-"
+    // Verifica se um valor está vazio ou é "-" ou "0"
     const isEmpty = (value: string | undefined): boolean => {
-      return !value || value === "-" || value === "--" || value.trim() === "" || value === "- cm" || value === "- cm/s" || value === "- ms" || value === "- mmHg" || value === "- mmHg/s" || value === "- bpm" || value === "-%" || value === "- kg";
+      if (!value) return true;
+      const trimmed = value.trim();
+      if (trimmed === "" || trimmed === "-" || trimmed === "--" || trimmed === "0") return true;
+      // Verifica padrões como "- cm", "- cm/s", etc.
+      if (/^-\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
+      // Verifica valores que são apenas "0" com unidade
+      if (/^0\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
+      return false;
     };
 
     const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string) => {
@@ -632,8 +639,13 @@ export default function DadosExame() {
         pdf.text(livreValues.join(" | "), margin + 25, yPosition);
         yPosition += 5;
         
-        if (calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
-          addTableRow("E/e' Parede Livre", formatNumber(calculatedValues.relacaoEePrimeLivre));
+        // E/e' Parede Livre - só imprime se tdiLivre.e tiver valor
+        if (tdiLivre.e && calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+          pdf.text(`E/e' (Livre): ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`, margin, yPosition);
+          yPosition += 5;
         }
       }
       
@@ -651,13 +663,18 @@ export default function DadosExame() {
         pdf.text(septalValues.join(" | "), margin + 25, yPosition);
         yPosition += 5;
         
-        if (calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
-          addTableRow("E/e' Parede Septal", formatNumber(calculatedValues.relacaoEePrimeSeptal));
+        // E/e' Parede Septal - só imprime se tdiSeptal.e tiver valor
+        if (tdiSeptal.e && calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+          pdf.text(`E/e' (Septal): ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`, margin, yPosition);
+          yPosition += 5;
         }
       }
       
-      // Média E/e' (sem destaque)
-      if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+      // Média E/e' - SOMENTE se ambos (Livre e Septal) estiverem preenchidos
+      if (tdiLivre.e && tdiSeptal.e && calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
         pdf.setFontSize(9);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
@@ -740,15 +757,13 @@ export default function DadosExame() {
         ]);
       }
 
-      // Valva Pulmonar
+      // Valva Pulmonar - verificação de quebra de página antes do título
       if (valvasDoppler.pulmonarVelocidade || valvasDoppler.pulmonarGradiente) {
-        if (yPosition > 220) {
+        // Verificar se há espaço suficiente para título + conteúdo (40mm)
+        if (yPosition + 40 > pageHeight - bottomSafeArea) {
           pdf.addPage();
           await addHeader(pdf, pageWidth);
-          yPosition = SAFE_PAGE_START_Y;
-        }
-        if (yPosition < SAFE_PAGE_START_Y) {
-          yPosition = SAFE_PAGE_START_Y;
+          yPosition = contentStartY;
         }
         await addValveBlock("VALVA PULMONAR", [
           { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
@@ -756,15 +771,13 @@ export default function DadosExame() {
         ]);
       }
 
-      // Valva Aórtica
+      // Valva Aórtica - verificação de quebra de página antes do título
       if (valvasDoppler.aorticaVelocidade || valvasDoppler.aorticaGradiente) {
-        if (yPosition > 220) {
+        // Verificar se há espaço suficiente para título + conteúdo (40mm)
+        if (yPosition + 40 > pageHeight - bottomSafeArea) {
           pdf.addPage();
           await addHeader(pdf, pageWidth);
-          yPosition = SAFE_PAGE_START_Y;
-        }
-        if (yPosition < SAFE_PAGE_START_Y) {
-          yPosition = SAFE_PAGE_START_Y;
+          yPosition = contentStartY;
         }
         await addValveBlock("VALVA AÓRTICA", [
           { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.aorticaVelocidade ? `${formatNumber(valvasDoppler.aorticaVelocidade)} cm/s` : "" },
