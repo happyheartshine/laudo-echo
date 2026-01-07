@@ -1,6 +1,7 @@
 import { Activity, Calculator } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMemo } from "react";
 
 interface MeasurementsData {
@@ -17,10 +18,12 @@ interface MeasurementsData {
 interface MeasurementsSectionProps {
   data: MeasurementsData;
   peso: string;
+  modoMedicao: "M" | "B";
+  onModoChange: (modo: "M" | "B") => void;
   onChange: (data: MeasurementsData) => void;
 }
 
-export function MeasurementsSection({ data, peso, onChange }: MeasurementsSectionProps) {
+export function MeasurementsSection({ data, peso, modoMedicao, onModoChange, onChange }: MeasurementsSectionProps) {
   const handleChange = (field: keyof MeasurementsData, value: string) => {
     onChange({ ...data, [field]: value });
   };
@@ -66,10 +69,26 @@ export function MeasurementsSection({ data, peso, onChange }: MeasurementsSectio
 
   return (
     <div className="card-vitaecor animate-fade-in" style={{ animationDelay: '0.1s' }}>
-      <h2 className="section-title">
-        <Activity className="w-5 h-5 text-accent" />
-        Medidas Ecocardiográficas (Modo M)
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="section-title mb-0">
+          <Activity className="w-5 h-5 text-accent" />
+          Medidas Ecocardiográficas (Modo {modoMedicao})
+        </h2>
+        <RadioGroup
+          value={modoMedicao}
+          onValueChange={(val) => onModoChange(val as "M" | "B")}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="M" id="modo-m" />
+            <Label htmlFor="modo-m" className="cursor-pointer">Modo M</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="B" id="modo-b" />
+            <Label htmlFor="modo-b" className="cursor-pointer">Modo B</Label>
+          </div>
+        </RadioGroup>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Medidas do Ventrículo Esquerdo */}
