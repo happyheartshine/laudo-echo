@@ -656,16 +656,9 @@ export default function DadosExame() {
         }
       }
       
-      // Média E/e' em destaque (sem cor de alerta)
+      // Média E/e' (sem destaque)
       if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
-        yPosition += 2;
-        pdf.setFillColor(240, 240, 240);
-        pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, "F");
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9);
-        pdf.setTextColor(60, 60, 60);
-        pdf.text(`MÉDIA E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin + 2, yPosition);
-        yPosition += 8;
+        addTableRow("Média E/e'", formatNumber(calculatedValues.mediaEePrime));
       }
       
       // Padrão Diastólico (texto longo com quebra de linha)
