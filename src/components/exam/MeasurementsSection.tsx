@@ -2,8 +2,9 @@ import { Activity, Calculator } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMemo, useState, useCallback, memo, useEffect } from "react";
+import { useMemo, useState, useCallback, memo, useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 export interface MeasurementsData {
@@ -19,6 +20,15 @@ export interface MeasurementsData {
   fracaoEjecaoTeicholz: string;
 }
 
+export interface ReferencesData {
+  septoIVd: string;
+  dvedDiastole: string;
+  paredeLVd: string;
+  dvedSistole: string;
+  septoIVs: string;
+  paredeLVs: string;
+}
+
 export interface ClassificationsData {
   septoIVd: string;
   dvedDiastole: string;
@@ -28,6 +38,8 @@ export interface ClassificationsData {
   fracaoEncurtamento: string;
   fracaoEjecaoTeicholz: string;
   fracaoEjecaoSimpson: string;
+  septoIVs: string;
+  paredeLVs: string;
 }
 
 interface MeasurementsSectionProps {
@@ -38,11 +50,51 @@ interface MeasurementsSectionProps {
   onChange: (data: MeasurementsData) => void;
   classifications?: ClassificationsData;
   onClassificationsChange?: (classifications: ClassificationsData) => void;
+  references?: ReferencesData;
+  onReferencesChange?: (references: ReferencesData) => void;
   simpsonValue?: string;
   onSimpsonChange?: (value: string) => void;
+  useCornellReferences?: boolean;
+  onCornellToggle?: (enabled: boolean) => void;
 }
 
 type ClassificationKey = keyof ClassificationsData;
+type ReferenceKey = keyof ReferencesData;
+
+// Fórmulas Cornell 2004 para referências baseadas no peso
+const CORNELL_FORMULAS: Record<ReferenceKey, { minCoef: number; minExp: number; maxCoef: number; maxExp: number }> = {
+  septoIVd: { minCoef: 0.29, minExp: 0.241, maxCoef: 0.59, maxExp: 0.241 },
+  dvedDiastole: { minCoef: 1.27, minExp: 0.294, maxCoef: 1.85, maxExp: 0.294 },
+  paredeLVd: { minCoef: 0.29, minExp: 0.232, maxCoef: 0.60, maxExp: 0.232 },
+  dvedSistole: { minCoef: 0.71, minExp: 0.315, maxCoef: 1.26, maxExp: 0.315 },
+  septoIVs: { minCoef: 0.43, minExp: 0.240, maxCoef: 0.79, maxExp: 0.240 },
+  paredeLVs: { minCoef: 0.48, minExp: 0.222, maxCoef: 0.87, maxExp: 0.222 },
+};
+
+// Calcula referência Cornell baseada no peso
+const calculateCornellReference = (peso: number, field: ReferenceKey): { min: number; max: number; formatted: string } | null => {
+  if (!peso || peso <= 0 || isNaN(peso)) return null;
+  
+  const formula = CORNELL_FORMULAS[field];
+  if (!formula) return null;
+  
+  const min = formula.minCoef * Math.pow(peso, formula.minExp);
+  const max = formula.maxCoef * Math.pow(peso, formula.maxExp);
+  
+  return {
+    min,
+    max,
+    formatted: `${min.toFixed(2).replace('.', ',')} - ${max.toFixed(2).replace('.', ',')}`,
+  };
+};
+
+// Classifica valor baseado no intervalo de referência
+const classifyValue = (value: number, min: number, max: number): string => {
+  if (isNaN(value)) return "";
+  if (value < min) return "diminuido";
+  if (value > max) return "aumentado";
+  return "normal";
+};
 
 const CLASSIFICATION_OPTIONS = [
   { value: "", label: "Selecione" },
@@ -102,6 +154,8 @@ const MeasurementRow = memo(function MeasurementRow({
   onInputChange,
   unit,
   reference,
+  referenceEditable = false,
+  onReferenceChange,
   classificationValue,
   onClassificationChange,
   calculatedValue,
@@ -114,6 +168,8 @@ const MeasurementRow = memo(function MeasurementRow({
   onInputChange?: (value: string) => void;
   unit?: string;
   reference: string;
+  referenceEditable?: boolean;
+  onReferenceChange?: (value: string) => void;
   classificationValue: string;
   onClassificationChange: (value: string) => void;
   calculatedValue?: string | null;
@@ -140,9 +196,18 @@ const MeasurementRow = memo(function MeasurementRow({
         </div>
       )}
       
-      <div className="text-xs text-muted-foreground text-center">
-        {reference}
-      </div>
+      {referenceEditable ? (
+        <Input
+          className="input-vitaecor h-8 text-xs text-center"
+          placeholder="Ref: ..."
+          value={reference}
+          onChange={(e) => onReferenceChange?.(e.target.value)}
+        />
+      ) : (
+        <div className="text-xs text-muted-foreground text-center">
+          {reference}
+        </div>
+      )}
       
       <Select 
         value={classificationValue} 
@@ -178,8 +243,21 @@ export function MeasurementsSection({
     fracaoEncurtamento: "",
     fracaoEjecaoTeicholz: "",
     fracaoEjecaoSimpson: "",
+    septoIVs: "",
+    paredeLVs: "",
   },
   onClassificationsChange,
+  references = {
+    septoIVd: "",
+    dvedDiastole: "",
+    paredeLVd: "",
+    dvedSistole: "",
+    septoIVs: "",
+    paredeLVs: "",
+  },
+  onReferencesChange,
+  useCornellReferences = true,
+  onCornellToggle,
   simpsonValue = "",
   onSimpsonChange,
 }: MeasurementsSectionProps) {
@@ -193,6 +271,96 @@ export function MeasurementsSection({
       onClassificationsChange({ ...classifications, [field]: value });
     }
   }, [classifications, onClassificationsChange]);
+
+  const handleReferenceChange = useCallback((field: ReferenceKey, value: string) => {
+    if (onReferencesChange) {
+      onReferencesChange({ ...references, [field]: value });
+    }
+  }, [references, onReferencesChange]);
+
+  // Referência para controlar se é a primeira renderização
+  const isFirstRender = useRef(true);
+  const previousPeso = useRef(peso);
+
+  // Efeito para calcular referências Cornell automaticamente quando peso muda
+  useEffect(() => {
+    if (!useCornellReferences || !onReferencesChange || !onClassificationsChange) return;
+    
+    const pesoNum = parseDecimal(peso);
+    
+    // Só atualiza se o peso mudou e não é a primeira renderização
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      previousPeso.current = peso;
+      
+      // Na primeira renderização, calcula referências se tiver peso
+      if (pesoNum && pesoNum > 0) {
+        const newReferences = { ...references };
+        (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
+          const ref = calculateCornellReference(pesoNum, field);
+          if (ref) {
+            newReferences[field] = ref.formatted;
+          }
+        });
+        onReferencesChange(newReferences);
+      }
+      return;
+    }
+    
+    // Se peso não mudou, não faz nada
+    if (previousPeso.current === peso) return;
+    previousPeso.current = peso;
+    
+    if (!pesoNum || pesoNum <= 0) return;
+    
+    // Calcula e atualiza todas as referências
+    const newReferences = { ...references };
+    (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
+      const ref = calculateCornellReference(pesoNum, field);
+      if (ref) {
+        newReferences[field] = ref.formatted;
+      }
+    });
+    onReferencesChange(newReferences);
+  }, [peso, useCornellReferences]);
+
+  // Efeito para classificar automaticamente valores quando medidas mudam
+  useEffect(() => {
+    if (!useCornellReferences || !onClassificationsChange) return;
+    
+    const pesoNum = parseDecimal(peso);
+    if (!pesoNum || pesoNum <= 0) return;
+    
+    const fieldMappings: { dataField: keyof MeasurementsData; classField: ClassificationKey; refField: ReferenceKey }[] = [
+      { dataField: 'septoIVd', classField: 'septoIVd', refField: 'septoIVd' },
+      { dataField: 'dvedDiastole', classField: 'dvedDiastole', refField: 'dvedDiastole' },
+      { dataField: 'paredeLVd', classField: 'paredeLVd', refField: 'paredeLVd' },
+      { dataField: 'dvedSistole', classField: 'dvedSistole', refField: 'dvedSistole' },
+      { dataField: 'septoIVs', classField: 'septoIVs', refField: 'septoIVs' },
+      { dataField: 'paredeLVs', classField: 'paredeLVs', refField: 'paredeLVs' },
+    ];
+    
+    const newClassifications = { ...classifications };
+    let hasChanges = false;
+    
+    fieldMappings.forEach(({ dataField, classField, refField }) => {
+      const value = parseDecimal(data[dataField]);
+      if (!value || isNaN(value)) return;
+      
+      const ref = calculateCornellReference(pesoNum, refField);
+      if (!ref) return;
+      
+      const classification = classifyValue(value, ref.min, ref.max);
+      if (newClassifications[classField] !== classification) {
+        newClassifications[classField] = classification;
+        hasChanges = true;
+      }
+    });
+    
+    if (hasChanges) {
+      onClassificationsChange(newClassifications);
+    }
+  }, [data.septoIVd, data.dvedDiastole, data.paredeLVd, data.dvedSistole, data.septoIVs, data.paredeLVs, peso, useCornellReferences]);
 
   // Cálculo do DVED Normalizado (Fórmula Alométrica)
   const dvedNormalizado = useMemo(() => {
@@ -288,9 +456,21 @@ export function MeasurementsSection({
       <div className="space-y-8">
         {/* Medidas do Ventrículo Esquerdo */}
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Ventrículo Esquerdo
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Ventrículo Esquerdo
+            </h3>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="cornell-toggle"
+                checked={useCornellReferences}
+                onCheckedChange={(checked) => onCornellToggle?.(checked)}
+              />
+              <Label htmlFor="cornell-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                Usar Referências Automáticas (Cornell 2004)
+              </Label>
+            </div>
+          </div>
           
           {/* Header das colunas */}
           <div className="grid grid-cols-[1fr_100px_120px_140px] gap-3 items-center pb-2 border-b border-border text-xs font-medium text-muted-foreground">
@@ -305,7 +485,9 @@ export function MeasurementsSection({
             inputValue={data.septoIVd}
             onInputChange={(val) => handleChange('septoIVd', val)}
             unit="cm"
-            reference="Ref: ..."
+            reference={references.septoIVd || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('septoIVd', val)}
             classificationValue={classifications.septoIVd}
             onClassificationChange={(val) => handleClassificationChange('septoIVd', val)}
           />
@@ -315,7 +497,9 @@ export function MeasurementsSection({
             inputValue={data.dvedDiastole}
             onInputChange={(val) => handleChange('dvedDiastole', val)}
             unit="cm"
-            reference="Ref: ..."
+            reference={references.dvedDiastole || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('dvedDiastole', val)}
             classificationValue={classifications.dvedDiastole}
             onClassificationChange={(val) => handleClassificationChange('dvedDiastole', val)}
           />
@@ -325,7 +509,9 @@ export function MeasurementsSection({
             inputValue={data.paredeLVd}
             onInputChange={(val) => handleChange('paredeLVd', val)}
             unit="cm"
-            reference="Ref: ..."
+            reference={references.paredeLVd || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('paredeLVd', val)}
             classificationValue={classifications.paredeLVd}
             onClassificationChange={(val) => handleClassificationChange('paredeLVd', val)}
           />
@@ -335,9 +521,35 @@ export function MeasurementsSection({
             inputValue={data.dvedSistole}
             onInputChange={(val) => handleChange('dvedSistole', val)}
             unit="cm"
-            reference="Ref: ..."
+            reference={references.dvedSistole || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('dvedSistole', val)}
             classificationValue={classifications.dvedSistole}
             onClassificationChange={(val) => handleClassificationChange('dvedSistole', val)}
+          />
+          
+          <MeasurementRow
+            label="Septo interventricular em sístole (SIVs)"
+            inputValue={data.septoIVs}
+            onInputChange={(val) => handleChange('septoIVs', val)}
+            unit="cm"
+            reference={references.septoIVs || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('septoIVs', val)}
+            classificationValue={classifications.septoIVs}
+            onClassificationChange={(val) => handleClassificationChange('septoIVs', val)}
+          />
+          
+          <MeasurementRow
+            label="Parede livre do VE em sístole (PLVEs)"
+            inputValue={data.paredeLVs}
+            onInputChange={(val) => handleChange('paredeLVs', val)}
+            unit="cm"
+            reference={references.paredeLVs || "Ref: ..."}
+            referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('paredeLVs', val)}
+            classificationValue={classifications.paredeLVs}
+            onClassificationChange={(val) => handleClassificationChange('paredeLVs', val)}
           />
           
           <MeasurementRow
