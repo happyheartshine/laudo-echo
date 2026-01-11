@@ -144,6 +144,13 @@ export default function Index() {
     });
   };
 
+  const getGreetingPrefix = () => {
+    if (profile?.sexo === "feminino") {
+      return "Dra.";
+    }
+    return "Dr.";
+  };
+
   const getUserDisplayName = () => {
     // 1. Tenta usar o nome do perfil
     if (profile?.nome) {
@@ -165,7 +172,7 @@ export default function Index() {
     }
     
     // 4. Fallback final
-    return "Doutor(a)";
+    return "";
   };
 
   return (
@@ -174,7 +181,7 @@ export default function Index() {
         {/* Header de Boas-vindas */}
         <div className="animate-fade-in">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Olá, Dr(a). {getUserDisplayName()}
+            Olá, {getGreetingPrefix()} {getUserDisplayName() || "Doutor(a)"}
           </h1>
           <p className="text-muted-foreground mt-1 capitalize">
             {formatFullDate()}

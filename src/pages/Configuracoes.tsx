@@ -27,6 +27,7 @@ export default function Configuracoes() {
   const [ufCrmv, setUfCrmv] = useState("");
   const [telefone, setTelefone] = useState("");
   const [especialidade, setEspecialidade] = useState("");
+  const [sexo, setSexo] = useState<"masculino" | "feminino">("masculino");
   const [savingProfile, setSavingProfile] = useState(false);
   
   // Clinic state
@@ -49,6 +50,7 @@ export default function Configuracoes() {
       setUfCrmv(profile.uf_crmv || "");
       setTelefone(profile.telefone || "");
       setEspecialidade(profile.especialidade || "");
+      setSexo(profile.sexo || "masculino");
       setSignaturePreview(profile.signature_url || null);
     }
   }, [profile]);
@@ -81,6 +83,7 @@ export default function Configuracoes() {
         uf_crmv: ufCrmv,
         telefone,
         especialidade,
+        sexo,
       });
 
       if (error) throw error;
@@ -259,16 +262,31 @@ export default function Configuracoes() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="nome">Nome Completo</Label>
                     <Input
                       id="nome"
                       value={nome}
                       onChange={(e) => setNome(e.target.value)}
-                      placeholder="Dr. João Silva"
+                      placeholder="João Silva"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sexo">Sexo *</Label>
+                    <Select value={sexo} onValueChange={(value: "masculino" | "feminino") => setSexo(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="especialidade">Especialidade</Label>
                     <Input

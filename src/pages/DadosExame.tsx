@@ -447,7 +447,10 @@ export default function DadosExame() {
     };
 
     const addSignatureBlock = async () => {
-      const name = profile?.nome || "Veterinário Responsável";
+      const titlePrefix = profile?.sexo === "feminino" ? "Dra." : "Dr.";
+      const name = profile?.nome 
+        ? `${titlePrefix} ${profile.nome}`
+        : "Veterinário Responsável";
       const crmvText = profile?.crmv
         ? `CRMV ${profile?.uf_crmv ? `${profile.uf_crmv} ` : ""}${profile.crmv}`
         : "";
