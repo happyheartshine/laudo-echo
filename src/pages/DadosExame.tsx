@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadAllExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
+import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -121,56 +122,58 @@ export default function DadosExame() {
   const calculatedValues = {
     // E/A
     relacaoEA: (() => {
-      const e = parseFloat(funcaoDiastolica.ondaE);
-      const a = parseFloat(funcaoDiastolica.ondaA);
-      return e && a ? (e / a).toFixed(2) : "-";
+      const e = parseDecimal(funcaoDiastolica.ondaE);
+      const a = parseDecimal(funcaoDiastolica.ondaA);
+      return e && a && !isNaN(e) && !isNaN(a) ? (e / a).toFixed(2) : "-";
     })(),
     // E/TRIV
     eTRIV: (() => {
-      const e = parseFloat(funcaoDiastolica.ondaE);
-      const triv = parseFloat(funcaoDiastolica.triv);
-      return e && triv ? (e / triv).toFixed(2) : "-";
+      const e = parseDecimal(funcaoDiastolica.ondaE);
+      const triv = parseDecimal(funcaoDiastolica.triv);
+      return e && triv && !isNaN(e) && !isNaN(triv) ? (e / triv).toFixed(2) : "-";
     })(),
     // E/e' Parede Livre
     relacaoEePrimeLivre: (() => {
-      const e = parseFloat(funcaoDiastolica.ondaE);
-      const ePrime = parseFloat(tdiLivre.e);
-      return e && ePrime ? (e / ePrime).toFixed(2) : "-";
+      const e = parseDecimal(funcaoDiastolica.ondaE);
+      const ePrime = parseDecimal(tdiLivre.e);
+      return e && ePrime && !isNaN(e) && !isNaN(ePrime) ? (e / ePrime).toFixed(2) : "-";
     })(),
     // E/e' Parede Septal
     relacaoEePrimeSeptal: (() => {
-      const e = parseFloat(funcaoDiastolica.ondaE);
-      const ePrime = parseFloat(tdiSeptal.e);
-      return e && ePrime ? (e / ePrime).toFixed(2) : "-";
+      const e = parseDecimal(funcaoDiastolica.ondaE);
+      const ePrime = parseDecimal(tdiSeptal.e);
+      return e && ePrime && !isNaN(e) && !isNaN(ePrime) ? (e / ePrime).toFixed(2) : "-";
     })(),
     // Média E/e'
     mediaEePrime: (() => {
-      const e = parseFloat(funcaoDiastolica.ondaE);
-      const ePrimeLivre = parseFloat(tdiLivre.e);
-      const ePrimeSeptal = parseFloat(tdiSeptal.e);
-      if (!e) return "-";
-      if (ePrimeLivre && ePrimeSeptal) {
+      const e = parseDecimal(funcaoDiastolica.ondaE);
+      const ePrimeLivre = parseDecimal(tdiLivre.e);
+      const ePrimeSeptal = parseDecimal(tdiSeptal.e);
+      if (!e || isNaN(e)) return "-";
+      const hasLivre = ePrimeLivre && !isNaN(ePrimeLivre);
+      const hasSeptal = ePrimeSeptal && !isNaN(ePrimeSeptal);
+      if (hasLivre && hasSeptal) {
         const mediaEPrime = (ePrimeLivre + ePrimeSeptal) / 2;
         return (e / mediaEPrime).toFixed(2);
-      } else if (ePrimeLivre) {
+      } else if (hasLivre) {
         return (e / ePrimeLivre).toFixed(2);
-      } else if (ePrimeSeptal) {
+      } else if (hasSeptal) {
         return (e / ePrimeSeptal).toFixed(2);
       }
       return "-";
     })(),
     // Fração de Encurtamento (FE%)
     fracaoEncurtamento: (() => {
-      const dved = parseFloat(measurementsData.dvedDiastole);
-      const dves = parseFloat(measurementsData.dvedSistole);
-      return dved && dves ? (((dved - dves) / dved) * 100).toFixed(1) : "-";
+      const dved = parseDecimal(measurementsData.dvedDiastole);
+      const dves = parseDecimal(measurementsData.dvedSistole);
+      return dved && dves && !isNaN(dved) && !isNaN(dves) ? (((dved - dves) / dved) * 100).toFixed(1) : "-";
     })(),
     // Fração de Ejeção (Teicholz): FE = (VDF - VSF) / VDF * 100
     // VDF = 7 * DVED³ / (2.4 + DVED) e VSF = 7 * DVES³ / (2.4 + DVES)
     fracaoEjecaoTeicholz: (() => {
-      const dved = parseFloat(measurementsData.dvedDiastole);
-      const dves = parseFloat(measurementsData.dvedSistole);
-      if (!dved || !dves) return "-";
+      const dved = parseDecimal(measurementsData.dvedDiastole);
+      const dves = parseDecimal(measurementsData.dvedSistole);
+      if (!dved || !dves || isNaN(dved) || isNaN(dves)) return "-";
       const vdf = (7 * Math.pow(dved, 3)) / (2.4 + dved);
       const vsf = (7 * Math.pow(dves, 3)) / (2.4 + dves);
       const fe = ((vdf - vsf) / vdf) * 100;
@@ -1224,23 +1227,23 @@ export default function DadosExame() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <div>
                 <Label className="label-vitaecor">FE Teicholz (%)</Label>
-                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.fracaoEjecaoTeicholz} />
+                <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.fracaoEjecaoTeicholz)} />
               </div>
               <div>
                 <Label className="label-vitaecor">FE Simpson (%)</Label>
-                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoSistolica.simpson} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, simpson: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoSistolica.simpson)} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, simpson: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">MAPSE (cm)</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoSistolica.mapse} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, mapse: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoSistolica.mapse)} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, mapse: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">EPSS (cm)</Label>
-                <Input className="input-vitaecor" type="number" step="0.01" value={funcaoSistolica.epss} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, epss: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoSistolica.epss)} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, epss: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">Fração Encurt. (%)</Label>
-                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.fracaoEncurtamento} />
+                <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.fracaoEncurtamento)} />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -1275,27 +1278,27 @@ export default function DadosExame() {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <Label className="label-vitaecor">Onda E (cm/s)</Label>
-                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.ondaE} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaE: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoDiastolica.ondaE)} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaE: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">Onda A (cm/s)</Label>
-                <Input className="input-vitaecor" type="number" step="0.1" value={funcaoDiastolica.ondaA} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaA: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoDiastolica.ondaA)} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, ondaA: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">Relação E/A</Label>
-                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEA} />
+                <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEA)} />
               </div>
               <div>
                 <Label className="label-vitaecor">Tempo Desac. E (ms)</Label>
-                <Input className="input-vitaecor" type="number" value={funcaoDiastolica.tempoDesaceleracao} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, tempoDesaceleracao: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoDiastolica.tempoDesaceleracao)} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, tempoDesaceleracao: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">TRIV (ms)</Label>
-                <Input className="input-vitaecor" type="number" value={funcaoDiastolica.triv} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, triv: e.target.value})} />
+                <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(funcaoDiastolica.triv)} onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, triv: sanitizeDecimalInput(e.target.value)})} />
               </div>
               <div>
                 <Label className="label-vitaecor">E/TRIV</Label>
-                <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.eTRIV} />
+                <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.eTRIV)} />
               </div>
             </div>
             
@@ -1337,20 +1340,20 @@ export default function DadosExame() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label className="label-vitaecor">s' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.s} onChange={(e) => setTdiLivre({...tdiLivre, s: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.s)} onChange={(e) => setTdiLivre({...tdiLivre, s: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">e' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.e} onChange={(e) => setTdiLivre({...tdiLivre, e: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.e)} onChange={(e) => setTdiLivre({...tdiLivre, e: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">a' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiLivre.a} onChange={(e) => setTdiLivre({...tdiLivre, a: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.a)} onChange={(e) => setTdiLivre({...tdiLivre, a: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
                 <div className="mt-3">
                   <Label className="label-vitaecor">E/e' Parede Livre</Label>
-                  <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrimeLivre} />
+                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeLivre)} />
                 </div>
               </div>
 
@@ -1360,20 +1363,20 @@ export default function DadosExame() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label className="label-vitaecor">s' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.s} onChange={(e) => setTdiSeptal({...tdiSeptal, s: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.s)} onChange={(e) => setTdiSeptal({...tdiSeptal, s: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">e' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.e} onChange={(e) => setTdiSeptal({...tdiSeptal, e: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.e)} onChange={(e) => setTdiSeptal({...tdiSeptal, e: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">a' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={tdiSeptal.a} onChange={(e) => setTdiSeptal({...tdiSeptal, a: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.a)} onChange={(e) => setTdiSeptal({...tdiSeptal, a: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
                 <div className="mt-3">
                   <Label className="label-vitaecor">E/e' Parede Septal</Label>
-                  <Input className="input-vitaecor bg-muted" readOnly value={calculatedValues.relacaoEePrimeSeptal} />
+                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeSeptal)} />
                 </div>
               </div>
             </div>
@@ -1398,15 +1401,15 @@ export default function DadosExame() {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IM (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.mitralVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralVelocidade: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralVelocidade: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.mitralGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralGradiente: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralGradiente: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">+dP/dT (mmHg/s)</Label>
-                    <Input className="input-vitaecor" type="number" value={valvasDoppler.mitralDpDt} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralDpDt: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralDpDt)} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralDpDt: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
               </div>
@@ -1417,11 +1420,11 @@ export default function DadosExame() {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IT (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.tricuspideVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideVelocidade: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.tricuspideVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideVelocidade: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.tricuspideGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideGradiente: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.tricuspideGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideGradiente: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
               </div>
@@ -1432,11 +1435,11 @@ export default function DadosExame() {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.pulmonarVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarVelocidade: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.pulmonarVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarVelocidade: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.pulmonarGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarGradiente: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.pulmonarGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarGradiente: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
               </div>
@@ -1447,11 +1450,11 @@ export default function DadosExame() {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.1" value={valvasDoppler.aorticaVelocidade} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaVelocidade: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.aorticaVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaVelocidade: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
-                    <Input className="input-vitaecor" type="number" step="0.01" value={valvasDoppler.aorticaGradiente} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaGradiente: e.target.value})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.aorticaGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaGradiente: sanitizeDecimalInput(e.target.value)})} />
                   </div>
                 </div>
               </div>

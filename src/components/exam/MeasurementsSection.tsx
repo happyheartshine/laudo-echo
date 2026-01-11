@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 export interface MeasurementsData {
   dvedDiastole: string;
@@ -68,8 +69,10 @@ export function MeasurementsSection({
   simpsonValue = "",
   onSimpsonChange,
 }: MeasurementsSectionProps) {
+  // Handler que aceita vírgula e converte para ponto internamente
   const handleChange = (field: keyof MeasurementsData, value: string) => {
-    onChange({ ...data, [field]: value });
+    const sanitized = sanitizeDecimalInput(value);
+    onChange({ ...data, [field]: sanitized });
   };
 
   const handleClassificationChange = (field: ClassificationKey, value: string) => {
@@ -80,10 +83,10 @@ export function MeasurementsSection({
 
   // Cálculo do DVED Normalizado (Fórmula Alométrica)
   const dvedNormalizado = useMemo(() => {
-    const pesoNum = parseFloat(peso);
-    const dvedNum = parseFloat(data.dvedDiastole);
+    const pesoNum = parseDecimal(peso);
+    const dvedNum = parseDecimal(data.dvedDiastole);
     
-    if (!pesoNum || !dvedNum || pesoNum <= 0) return null;
+    if (!pesoNum || !dvedNum || pesoNum <= 0 || isNaN(pesoNum) || isNaN(dvedNum)) return null;
     
     const result = dvedNum / Math.pow(pesoNum, 0.294);
     return result.toFixed(2);
@@ -91,20 +94,20 @@ export function MeasurementsSection({
 
   // Relação AE/Ao
   const relacaoAEAo = useMemo(() => {
-    const ae = parseFloat(data.atrioEsquerdo);
-    const ao = parseFloat(data.aorta);
+    const ae = parseDecimal(data.atrioEsquerdo);
+    const ao = parseDecimal(data.aorta);
     
-    if (!ae || !ao || ao <= 0) return null;
+    if (!ae || !ao || ao <= 0 || isNaN(ae) || isNaN(ao)) return null;
     
     return (ae / ao).toFixed(2);
   }, [data.atrioEsquerdo, data.aorta]);
 
   // Fração de Encurtamento
   const fracaoEncurtamento = useMemo(() => {
-    const dved = parseFloat(data.dvedDiastole);
-    const dves = parseFloat(data.dvedSistole);
+    const dved = parseDecimal(data.dvedDiastole);
+    const dves = parseDecimal(data.dvedSistole);
     
-    if (!dved || !dves || dved <= 0) return null;
+    if (!dved || !dves || dved <= 0 || isNaN(dved) || isNaN(dves)) return null;
     
     const fe = ((dved - dves) / dved) * 100;
     return fe.toFixed(1);
@@ -112,10 +115,10 @@ export function MeasurementsSection({
 
   // Fração de Ejeção (Teicholz)
   const fracaoEjecaoTeicholz = useMemo(() => {
-    const dved = parseFloat(data.dvedDiastole);
-    const dves = parseFloat(data.dvedSistole);
+    const dved = parseDecimal(data.dvedDiastole);
+    const dves = parseDecimal(data.dvedSistole);
     
-    if (!dved || !dves) return null;
+    if (!dved || !dves || isNaN(dved) || isNaN(dves)) return null;
     
     const vdf = (7 * Math.pow(dved, 3)) / (2.4 + dved);
     const vsf = (7 * Math.pow(dves, 3)) / (2.4 + dves);
@@ -167,10 +170,10 @@ export function MeasurementsSection({
         <div className="flex items-center gap-1">
           <Input
             className="input-vitaecor h-8 text-center"
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            value={inputValue}
+            type="text"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={formatDecimalForDisplay(inputValue || '')}
             onChange={(e) => inputField && handleChange(inputField, e.target.value)}
           />
           {unit && <span className="text-xs text-muted-foreground whitespace-nowrap">{unit}</span>}
@@ -305,11 +308,11 @@ export function MeasurementsSection({
             <div className="flex items-center gap-1">
               <Input
                 className="input-vitaecor h-8 text-center"
-                type="number"
-                step="0.1"
-                placeholder="0.0"
-                value={simpsonValue}
-                onChange={(e) => onSimpsonChange?.(e.target.value)}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,0"
+                value={formatDecimalForDisplay(simpsonValue)}
+                onChange={(e) => onSimpsonChange?.(sanitizeDecimalInput(e.target.value))}
               />
               <span className="text-xs text-muted-foreground whitespace-nowrap">%</span>
             </div>
@@ -345,10 +348,10 @@ export function MeasurementsSection({
               <Label className="label-vitaecor">Aorta (Ao) - cm</Label>
               <Input
                 className="input-vitaecor"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={data.aorta}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={formatDecimalForDisplay(data.aorta)}
                 onChange={(e) => handleChange('aorta', e.target.value)}
               />
             </div>
@@ -356,10 +359,10 @@ export function MeasurementsSection({
               <Label className="label-vitaecor">Átrio Esquerdo (AE) - cm</Label>
               <Input
                 className="input-vitaecor"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={data.atrioEsquerdo}
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={formatDecimalForDisplay(data.atrioEsquerdo)}
                 onChange={(e) => handleChange('atrioEsquerdo', e.target.value)}
               />
             </div>
