@@ -73,6 +73,8 @@ export default function DadosExame() {
     paredeLVs: "",
     aorta: "",
     atrioEsquerdo: "",
+    fracaoEncurtamento: "",
+    fracaoEjecaoTeicholz: "",
   });
 
   // Classificações do Ventrículo Esquerdo
@@ -255,7 +257,7 @@ export default function DadosExame() {
 
       if (content.patientData) setPatientData(content.patientData);
       if (content.examInfo) setExamInfo(content.examInfo);
-      if (content.measurementsData) setMeasurementsData(content.measurementsData);
+      if (content.measurementsData) setMeasurementsData((prev) => ({ ...prev, ...content.measurementsData }));
       if (content.classificationsData) setClassificationsData(content.classificationsData);
       if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
       if (content.funcaoSistolica) setFuncaoSistolica(content.funcaoSistolica);
@@ -615,13 +617,21 @@ export default function DadosExame() {
       return "";
     };
 
+    const fsValue = measurementsData.fracaoEncurtamento?.trim()
+      ? measurementsData.fracaoEncurtamento
+      : calculatedValues.fracaoEncurtamento;
+
+    const feTeicholzValue = measurementsData.fracaoEjecaoTeicholz?.trim()
+      ? measurementsData.fracaoEjecaoTeicholz
+      : calculatedValues.fracaoEjecaoTeicholz;
+
     if (measurementsData.septoIVd) addTableRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm${formatClassification('septoIVd')}`);
     if (measurementsData.dvedDiastole) addTableRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm${formatClassification('dvedDiastole')}`);
     if (measurementsData.paredeLVd) addTableRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm${formatClassification('paredeLVd')}`);
     if (measurementsData.dvedSistole) addTableRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm${formatClassification('dvedSistole')}`);
     if (dvedNorm && dvedNorm !== '-') addTableRow("VE em diástole NORMALIZADO (DVEdN)", `${formatNumber(dvedNorm)}${formatClassification('dvedNormalizado')}`);
-    if (calculatedValues.fracaoEncurtamento && calculatedValues.fracaoEncurtamento !== '-') addTableRow("Fração de Encurtamento (FS)", `${formatNumber(calculatedValues.fracaoEncurtamento)}%${formatClassification('fracaoEncurtamento')}`);
-    if (calculatedValues.fracaoEjecaoTeicholz && calculatedValues.fracaoEjecaoTeicholz !== '-') addTableRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(calculatedValues.fracaoEjecaoTeicholz)}%${formatClassification('fracaoEjecaoTeicholz')}`);
+    if (fsValue && fsValue !== '-') addTableRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%${formatClassification('fracaoEncurtamento')}`);
+    if (feTeicholzValue && feTeicholzValue !== '-') addTableRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%${formatClassification('fracaoEjecaoTeicholz')}`);
     if (funcaoSistolica.simpson) addTableRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%${formatClassification('fracaoEjecaoSimpson')}`);
     yPosition += 3;
 
