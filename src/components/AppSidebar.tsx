@@ -62,7 +62,7 @@ export function AppSidebar() {
         {/* Minha Equipe - only for Gestor */}
         {isGestor && <NavLink to="/minha-equipe" className={`sidebar-link ${location.pathname === '/minha-equipe' ? 'active' : ''}`}>
             <Users className="w-5 h-5" />
-            <span>Minha Equipe</span>
+            <span>Equipe</span>
           </NavLink>}
       </nav>
 
