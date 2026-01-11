@@ -414,21 +414,21 @@ export function MeasurementsSection({
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="label-vitaecor">Aorta (Ao) - cm</Label>
-              <StableDecimalInput
-                className="input-vitaecor"
-                placeholder="0,00"
-                value={data.aorta}
-                onChange={(val) => handleChange('aorta', val)}
-              />
-            </div>
-            <div>
               <Label className="label-vitaecor">Átrio Esquerdo (AE) - cm</Label>
               <StableDecimalInput
                 className="input-vitaecor"
                 placeholder="0,00"
                 value={data.atrioEsquerdo}
                 onChange={(val) => handleChange('atrioEsquerdo', val)}
+              />
+            </div>
+            <div>
+              <Label className="label-vitaecor">Aorta (Ao) - cm</Label>
+              <StableDecimalInput
+                className="input-vitaecor"
+                placeholder="0,00"
+                value={data.aorta}
+                onChange={(val) => handleChange('aorta', val)}
               />
             </div>
           </div>
