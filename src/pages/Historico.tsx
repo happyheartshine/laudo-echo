@@ -9,27 +9,10 @@ import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { deleteExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
-
 interface Exam {
   id: string;
   patient_name: string;
@@ -47,11 +30,17 @@ const formatNumber = (value: string | number): string => {
   const str = typeof value === "number" ? value.toString() : value;
   return str.replace(".", ",");
 };
-
 export default function Historico() {
-  const { user } = useAuth();
-  const { profile, clinic } = useProfile();
-  const { toast } = useToast();
+  const {
+    user
+  } = useAuth();
+  const {
+    profile,
+    clinic
+  } = useProfile();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,21 +51,20 @@ export default function Historico() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
   useEffect(() => {
     if (user) {
       fetchExams();
     }
   }, [user]);
-
   const fetchExams = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("exams")
-        .select("*")
-        .order("exam_date", { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from("exams").select("*").order("exam_date", {
+        ascending: false
+      });
       if (error) throw error;
       setExams(data || []);
     } catch (error) {
@@ -84,43 +72,91 @@ export default function Historico() {
       toast({
         title: "Erro",
         description: "Não foi possível carregar os exames.",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
-  const filteredExams = exams.filter((exam) =>
-    exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
+  const filteredExams = exams.filter(exam => exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) || exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()));
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
-
   const generatePdfFromExam = useCallback(async (exam: Exam) => {
     const content = exam.content as {
-      patientData?: { nome?: string; responsavel?: string; especie?: string; raca?: string; sexo?: string; idade?: string; peso?: string };
-      examInfo?: { data?: string; solicitante?: string; clinica?: string; ritmo?: string; frequenciaCardiaca?: string };
-      measurementsData?: { dvedDiastole?: string; dvedSistole?: string; septoIVd?: string; septoIVs?: string; paredeLVd?: string; paredeLVs?: string; aorta?: string; atrioEsquerdo?: string };
-      funcaoDiastolica?: { ondaE?: string; ondaA?: string; tempoDesaceleracao?: string; triv?: string; tdiParedeLateral?: string; ePrime?: string; aPrime?: string; padraoDiastolico?: string };
-      valvasDoppler?: { mitralVelocidade?: string; mitralGradiente?: string; mitralDpDt?: string; tricuspideVelocidade?: string; tricuspideGradiente?: string; pulmonarVelocidade?: string; pulmonarGradiente?: string; aorticaVelocidade?: string; aorticaGradiente?: string };
-      outros?: { camarasDireitas?: string; septos?: string; pericardio?: string };
-      valvesData?: { mitral?: string; tricuspide?: string; aortica?: string; pulmonar?: string };
+      patientData?: {
+        nome?: string;
+        responsavel?: string;
+        especie?: string;
+        raca?: string;
+        sexo?: string;
+        idade?: string;
+        peso?: string;
+      };
+      examInfo?: {
+        data?: string;
+        solicitante?: string;
+        clinica?: string;
+        ritmo?: string;
+        frequenciaCardiaca?: string;
+      };
+      measurementsData?: {
+        dvedDiastole?: string;
+        dvedSistole?: string;
+        septoIVd?: string;
+        septoIVs?: string;
+        paredeLVd?: string;
+        paredeLVs?: string;
+        aorta?: string;
+        atrioEsquerdo?: string;
+      };
+      funcaoDiastolica?: {
+        ondaE?: string;
+        ondaA?: string;
+        tempoDesaceleracao?: string;
+        triv?: string;
+        tdiParedeLateral?: string;
+        ePrime?: string;
+        aPrime?: string;
+        padraoDiastolico?: string;
+      };
+      valvasDoppler?: {
+        mitralVelocidade?: string;
+        mitralGradiente?: string;
+        mitralDpDt?: string;
+        tricuspideVelocidade?: string;
+        tricuspideGradiente?: string;
+        pulmonarVelocidade?: string;
+        pulmonarGradiente?: string;
+        aorticaVelocidade?: string;
+        aorticaGradiente?: string;
+      };
+      outros?: {
+        camarasDireitas?: string;
+        septos?: string;
+        pericardio?: string;
+      };
+      valvesData?: {
+        mitral?: string;
+        tricuspide?: string;
+        aortica?: string;
+        pulmonar?: string;
+      };
       achados?: string;
       conclusoes?: string;
       storedImages?: StoredImageData[];
       selectedImages?: number[];
     };
-
     const patientData = content.patientData || {};
     const examInfo = content.examInfo || {};
     const measurementsData = content.measurementsData || {};
     const funcaoDiastolica = content.funcaoDiastolica || {};
     const valvasDoppler = content.valvasDoppler || {};
-    const outros = content.outros || { camarasDireitas: "normais", septos: "interventricular e interatrial íntegros", pericardio: "normal, sem derrame" };
+    const outros = content.outros || {
+      camarasDireitas: "normais",
+      septos: "interventricular e interatrial íntegros",
+      pericardio: "normal, sem derrame"
+    };
     const achados = content.achados || "";
     const conclusoes = content.conclusoes || "";
 
@@ -144,19 +180,18 @@ export default function Historico() {
       fracaoEncurtamento: (() => {
         const dved = parseFloat(measurementsData.dvedDiastole || "");
         const dves = parseFloat(measurementsData.dvedSistole || "");
-        return dved && dves ? (((dved - dves) / dved) * 100).toFixed(1) : "-";
+        return dved && dves ? ((dved - dves) / dved * 100).toFixed(1) : "-";
       })(),
       fracaoEjecao: (() => {
         const dved = parseFloat(measurementsData.dvedDiastole || "");
         const dves = parseFloat(measurementsData.dvedSistole || "");
         if (!dved || !dves) return "-";
-        const vdf = (7 * Math.pow(dved, 3)) / (2.4 + dved);
-        const vsf = (7 * Math.pow(dves, 3)) / (2.4 + dves);
-        const fe = ((vdf - vsf) / vdf) * 100;
+        const vdf = 7 * Math.pow(dved, 3) / (2.4 + dved);
+        const vsf = 7 * Math.pow(dves, 3) / (2.4 + dves);
+        const fe = (vdf - vsf) / vdf * 100;
         return fe.toFixed(1);
-      })(),
+      })()
     };
-
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -168,7 +203,6 @@ export default function Historico() {
     const addHeader = async () => {
       pdf.setFillColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.rect(0, 0, pageWidth, 25, 'F');
-
       if (clinic?.logo_url) {
         try {
           const img = new Image();
@@ -193,15 +227,21 @@ export default function Historico() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(11);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Ecodopplercardiograma", rightX, 8, { align: "right" });
-      
+      pdf.text("Ecodopplercardiograma", rightX, 8, {
+        align: "right"
+      });
       pdf.setFontSize(8);
       pdf.setFont("helvetica", "normal");
-      if (profile?.nome) pdf.text(profile.nome, rightX, 13, { align: "right" });
-      if (profile?.crmv) pdf.text(`CRMV ${profile.uf_crmv || ""} ${profile.crmv}`, rightX, 17, { align: "right" });
-      if (profile?.telefone) pdf.text(profile.telefone, rightX, 21, { align: "right" });
+      if (profile?.nome) pdf.text(profile.nome, rightX, 13, {
+        align: "right"
+      });
+      if (profile?.crmv) pdf.text(`CRMV ${profile.uf_crmv || ""} ${profile.crmv}`, rightX, 17, {
+        align: "right"
+      });
+      if (profile?.telefone) pdf.text(profile.telefone, rightX, 21, {
+        align: "right"
+      });
     };
-
     await addHeader();
     yPosition = 35;
 
@@ -209,7 +249,9 @@ export default function Historico() {
     pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
     pdf.setFontSize(14);
     pdf.setFont("helvetica", "bold");
-    pdf.text("RELATÓRIO DE ESTUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, { align: "center" });
+    pdf.text("RELATÓRIO DE ESTUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, {
+      align: "center"
+    });
     yPosition += 12;
 
     // Patient Info
@@ -218,14 +260,12 @@ export default function Historico() {
     const col1 = margin;
     const col2 = pageWidth / 2;
     const labelOffset = 2;
-
     const addCompactRow = (label1: string, value1: string, label2: string, value2: string) => {
       pdf.setFont("helvetica", "bold");
       pdf.text(label1, col1, yPosition);
       pdf.setFont("helvetica", "normal");
       const label1Width = pdf.getTextWidth(label1);
       pdf.text(value1, col1 + label1Width + labelOffset, yPosition);
-      
       pdf.setFont("helvetica", "bold");
       pdf.text(label2, col2, yPosition);
       pdf.setFont("helvetica", "normal");
@@ -233,7 +273,6 @@ export default function Historico() {
       pdf.text(value2, col2 + label2Width + labelOffset, yPosition);
       yPosition += 4.5;
     };
-
     addCompactRow("Paciente:", patientData.nome || '-', "Espécie:", patientData.especie || '-');
     addCompactRow("Raça:", patientData.raca || '-', "Sexo:", patientData.sexo || '-');
     addCompactRow("Idade:", patientData.idade || '-', "Peso:", patientData.peso ? `${formatNumber(patientData.peso)} kg` : '-');
@@ -251,7 +290,6 @@ export default function Historico() {
       pdf.text(title, margin + 2, yPosition);
       yPosition += 8;
     };
-
     const addTableRow = (label: string, value: string) => {
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
@@ -271,7 +309,6 @@ export default function Historico() {
     const pesoNum = parseFloat(patientData.peso || "");
     const dvedNum = parseFloat(measurementsData.dvedDiastole || "");
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '-';
-
     addTableRow("Septo interventricular em diástole", `${formatNumber(measurementsData.septoIVd || '-')} cm`);
     addTableRow("Ventrículo esquerdo em diástole", `${formatNumber(measurementsData.dvedDiastole || '-')} cm`);
     addTableRow("Parede livre do VE em diástole", `${formatNumber(measurementsData.paredeLVd || '-')} cm`);
@@ -283,9 +320,7 @@ export default function Historico() {
 
     // Átrio e Aorta
     addSectionHeader("ÁTRIO ESQUERDO E AORTA (MODO B)");
-    const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
-      ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
-      : '-';
+    const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) : '-';
     addTableRow("Aorta", `${formatNumber(measurementsData.aorta || '-')} cm`);
     addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo || '-')} cm`);
     addTableRow("Relação Átrio esquerdo/Aorta", formatNumber(aeAo));
@@ -312,7 +347,6 @@ export default function Historico() {
     addTableRow("Gradiente", `${formatNumber(valvasDoppler.mitralGradiente || '-')} mmHg`);
     addTableRow("+dP/dT", `${formatNumber(valvasDoppler.mitralDpDt || '-')} mmHg/s`);
     yPosition += 3;
-
     pdf.setFont("helvetica", "bold");
     pdf.text("VALVA TRICÚSPIDE", margin, yPosition);
     yPosition += 5;
@@ -326,14 +360,12 @@ export default function Historico() {
       await addHeader();
       yPosition = 45;
     }
-
     pdf.setFont("helvetica", "bold");
     pdf.text("VALVA PULMONAR", margin, yPosition);
     yPosition += 5;
     addTableRow("Velocidade máxima do fluxo transvalvar", `${formatNumber(valvasDoppler.pulmonarVelocidade || '-')} cm/s`);
     addTableRow("Gradiente", `${formatNumber(valvasDoppler.pulmonarGradiente || '-')} mmHg`);
     yPosition += 3;
-
     pdf.setFont("helvetica", "bold");
     pdf.text("VALVA AÓRTICA", margin, yPosition);
     yPosition += 5;
@@ -377,7 +409,7 @@ export default function Historico() {
 
     // Signature block with image
     yPosition += 10;
-    
+
     // Check page break for signature
     const signatureBlockHeight = profile?.signature_url ? 30 : 20;
     if (yPosition + signatureBlockHeight > pageHeight - 15) {
@@ -385,7 +417,7 @@ export default function Historico() {
       await addHeader();
       yPosition = 45;
     }
-    
+
     // Add signature image if available
     if (profile?.signature_url) {
       try {
@@ -396,12 +428,11 @@ export default function Historico() {
           sigImg.onerror = () => reject();
           sigImg.src = profile.signature_url!;
         });
-        
+
         // Calculate proportional dimensions (width ~4cm = 40mm)
         const targetWidth = 40;
         const ratio = sigImg.height / sigImg.width;
         const targetHeight = targetWidth * ratio;
-        
         const imgX = pageWidth / 2 - targetWidth / 2;
         pdf.addImage(sigImg, 'PNG', imgX, yPosition, targetWidth, Math.min(targetHeight, 15));
         yPosition += Math.min(targetHeight, 15) + 2;
@@ -409,37 +440,42 @@ export default function Historico() {
         console.error('Error loading signature image:', e);
       }
     }
-    
     pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
-    pdf.text(profile?.nome || "Veterinário Responsável", pageWidth / 2, yPosition, { align: "center" });
+    pdf.text(profile?.nome || "Veterinário Responsável", pageWidth / 2, yPosition, {
+      align: "center"
+    });
     if (profile?.crmv) {
       yPosition += 4;
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
-      pdf.text(`CRMV ${profile.uf_crmv || ""} ${profile.crmv}`, pageWidth / 2, yPosition, { align: "center" });
+      pdf.text(`CRMV ${profile.uf_crmv || ""} ${profile.crmv}`, pageWidth / 2, yPosition, {
+        align: "center"
+      });
     }
     if (profile?.especialidade) {
       yPosition += 4;
-      pdf.text(profile.especialidade, pageWidth / 2, yPosition, { align: "center" });
+      pdf.text(profile.especialidade, pageWidth / 2, yPosition, {
+        align: "center"
+      });
     }
 
     // ANEXOS / IMAGENS DO EXAME
     const storedImages = content.storedImages || [];
     const selectedImagesIndexes = content.selectedImages || storedImages.map((_, i) => i);
     const selectedImageData = storedImages.filter((_, index) => selectedImagesIndexes.includes(index));
-    
     if (selectedImageData.length > 0) {
       pdf.addPage();
       await addHeader();
-      
+
       // Add section title
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "bold");
-      pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, { align: "center" });
-
+      pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, {
+        align: "center"
+      });
       const imagesPerPage = 8;
       const cols = 2;
       const rows = 4;
@@ -449,9 +485,7 @@ export default function Historico() {
       const availableHeight = pageHeight - startY - 15;
       const imgWidth = (availableWidth - (cols - 1) * imgMargin) / cols;
       const imgHeight = (availableHeight - (rows - 1) * imgMargin) / rows;
-
       let imageIndex = 0;
-      
       while (imageIndex < selectedImageData.length) {
         if (imageIndex > 0 && imageIndex % imagesPerPage === 0) {
           pdf.addPage();
@@ -459,19 +493,17 @@ export default function Historico() {
           pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
           pdf.setFontSize(12);
           pdf.setFont("helvetica", "bold");
-          pdf.text("ANEXOS / IMAGENS DO EXAME (continuação)", pageWidth / 2, 35, { align: "center" });
+          pdf.text("ANEXOS / IMAGENS DO EXAME (continuação)", pageWidth / 2, 35, {
+            align: "center"
+          });
         }
-
         const pageImageIndex = imageIndex % imagesPerPage;
         const row = Math.floor(pageImageIndex / cols);
         const col = pageImageIndex % cols;
-
         const x = margin + col * (imgWidth + imgMargin);
         const y = startY + row * (imgHeight + imgMargin);
-
         const img = selectedImageData[imageIndex];
         const imgUrl = img.storageUrl || img.dataUrl;
-        
         if (imgUrl && (img.type?.startsWith('image/') || imgUrl.startsWith('data:image') || imgUrl.startsWith('http'))) {
           try {
             // Converter URL remota para base64 (evita CORS no jspdf)
@@ -495,60 +527,53 @@ export default function Historico() {
       pdf.setPage(i);
       pdf.setFontSize(8);
       pdf.setTextColor(120, 120, 120);
-      pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: "center" });
+      pdf.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 5, {
+        align: "center"
+      });
     }
-
     return pdf;
   }, [clinic, profile]);
-
   const handleReprint = async (exam: Exam) => {
     try {
       toast({
         title: "Gerando PDF...",
-        description: "Aguarde enquanto o laudo é gerado.",
+        description: "Aguarde enquanto o laudo é gerado."
       });
-
       const pdf = await generatePdfFromExam(exam);
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${exam.patient_name}-${today.replace(/\//g, '-')}.pdf`);
-
       toast({
         title: "PDF gerado!",
-        description: "O laudo foi baixado com sucesso.",
+        description: "O laudo foi baixado com sucesso."
       });
     } catch (error) {
       console.error("Erro ao gerar PDF:", error);
       toast({
         title: "Erro",
         description: "Não foi possível gerar o PDF.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleEdit = (exam: Exam) => {
     // Navigate to edit page with exam ID
     navigate(`/novo-exame/dados-exame?id=${exam.id}`);
   };
-
   const handleOpenEmailDialog = (exam: Exam) => {
     setSelectedExamForEmail(exam);
     setEmailAddress("");
     setEmailDialogOpen(true);
   };
-
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-
   const handleSendEmail = async () => {
     if (!selectedExamForEmail || !emailAddress) {
       toast({
         title: "Erro",
         description: "Por favor, insira um endereço de email válido.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     try {
       setIsSendingEmail(true);
 
@@ -557,124 +582,105 @@ export default function Historico() {
       const pdfBlob = pdfDoc.output('blob');
 
       // Sanitize patient name for filename
-      const safePatientName = selectedExamForEmail.patient_name
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-zA-Z0-9]/g, "_")
-        .toLowerCase();
-      
+      const safePatientName = selectedExamForEmail.patient_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
       const fileName = `laudo_${safePatientName}_${Date.now()}.pdf`;
-
       console.log("=== ENVIANDO EMAIL VIA EDGE FUNCTION ===");
       console.log("Para:", emailAddress);
       console.log("Paciente:", selectedExamForEmail.patient_name);
       console.log("Arquivo:", fileName);
 
       // Upload PDF to Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('email-pdfs')
-        .upload(fileName, pdfBlob, {
-          contentType: 'application/pdf',
-          upsert: true,
-        });
-
+      const {
+        data: uploadData,
+        error: uploadError
+      } = await supabase.storage.from('email-pdfs').upload(fileName, pdfBlob, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
       if (uploadError) {
         console.error("Erro ao fazer upload do PDF:", uploadError);
         throw uploadError;
       }
 
       // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('email-pdfs')
-        .getPublicUrl(fileName);
-
+      const {
+        data: urlData
+      } = supabase.storage.from('email-pdfs').getPublicUrl(fileName);
       const pdfUrl = urlData.publicUrl;
       console.log("PDF URL:", pdfUrl);
 
       // Send email via Edge Function
-      const { data, error } = await supabase.functions.invoke('send-email', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('send-email', {
         body: {
           email: emailAddress,
           patientName: selectedExamForEmail.patient_name,
           pdfUrl: pdfUrl,
-          senderName: profile?.nome || "Equipe Veterinária",
-        },
+          senderName: profile?.nome || "Equipe Veterinária"
+        }
       });
-
       if (error) {
         console.error("Erro ao enviar email:", error);
         throw error;
       }
-
       console.log("Email enviado com sucesso:", data);
-      
       toast({
         title: "Email enviado!",
-        description: `O laudo foi enviado para ${emailAddress} com sucesso.`,
+        description: `O laudo foi enviado para ${emailAddress} com sucesso.`
       });
-
       setEmailDialogOpen(false);
       setSelectedExamForEmail(null);
       setEmailAddress("");
     } catch (error: any) {
       console.error("Erro ao enviar email:", error);
-      
+
       // Fallback: open mailto link
       const subject = encodeURIComponent(`Laudo Veterinário - ${selectedExamForEmail.patient_name}`);
-      const body = encodeURIComponent(
-        `Prezado(a),\n\nSegue em anexo o laudo ecocardiográfico do paciente ${selectedExamForEmail.patient_name}.\n\nAtenciosamente,\n${profile?.nome || "Equipe Veterinária"}`
-      );
-      
+      const body = encodeURIComponent(`Prezado(a),\n\nSegue em anexo o laudo ecocardiográfico do paciente ${selectedExamForEmail.patient_name}.\n\nAtenciosamente,\n${profile?.nome || "Equipe Veterinária"}`);
       window.open(`mailto:${emailAddress}?subject=${subject}&body=${body}`, "_blank");
-
       toast({
         title: "Falha no envio automático",
         description: "O cliente de email foi aberto. Anexe o PDF manualmente.",
-        variant: "destructive",
+        variant: "destructive"
       });
-
       setEmailDialogOpen(false);
       setSelectedExamForEmail(null);
     } finally {
       setIsSendingEmail(false);
     }
   };
-
   const handleOpenDeleteDialog = (exam: Exam) => {
     setExamToDelete(exam);
     setDeleteDialogOpen(true);
   };
-
   const handleDeleteExam = async () => {
     if (!examToDelete) return;
-
     try {
       setIsDeleting(true);
-      
+
       // Deletar imagens do Storage primeiro
       await deleteExamImages(examToDelete.id);
-      
-      // Deletar exame do banco
-      const { error } = await supabase
-        .from("exams")
-        .delete()
-        .eq("id", examToDelete.id);
 
+      // Deletar exame do banco
+      const {
+        error
+      } = await supabase.from("exams").delete().eq("id", examToDelete.id);
       if (error) throw error;
 
       // Atualizar lista local
       setExams(exams.filter(e => e.id !== examToDelete.id));
-      
       toast({
         title: "Exame excluído!",
-        description: "O exame foi removido com sucesso.",
+        description: "O exame foi removido com sucesso."
       });
     } catch (error) {
       console.error("Erro ao excluir exame:", error);
       toast({
         title: "Erro",
         description: "Não foi possível excluir o exame.",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsDeleting(false);
@@ -682,9 +688,7 @@ export default function Historico() {
       setExamToDelete(null);
     }
   };
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -698,30 +702,20 @@ export default function Historico() {
         <div className="card-vitaecor mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome do paciente ou tutor..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <Input placeholder="Buscar por nome do paciente ou tutor..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
         </div>
 
         {/* Table */}
         <div className="card-vitaecor">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
+          {loading ? <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredExams.length === 0 ? (
-            <div className="text-center py-12">
+            </div> : filteredExams.length === 0 ? <div className="text-center py-12">
               <Stethoscope className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">
                 {searchTerm ? "Nenhum exame encontrado para esta busca." : "Nenhum exame salvo ainda."}
               </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
+            </div> : <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
@@ -735,7 +729,7 @@ export default function Historico() {
                     <th className="text-left py-3 px-4 font-semibold text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <User className="w-4 h-4" />
-                        Tutor
+                        Responsável
                       </div>
                     </th>
                     <th className="text-left py-3 px-4 font-semibold text-muted-foreground">Espécie</th>
@@ -743,64 +737,38 @@ export default function Historico() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredExams.map((exam) => (
-                    <tr key={exam.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  {filteredExams.map(exam => <tr key={exam.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="py-3 px-4 text-foreground">{formatDate(exam.exam_date)}</td>
                       <td className="py-3 px-4 font-medium text-foreground">{exam.patient_name}</td>
                       <td className="py-3 px-4 text-muted-foreground">{exam.owner_name || "-"}</td>
                       <td className="py-3 px-4 text-muted-foreground">{exam.species || "-"}</td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(exam)}
-                            title="Editar exame"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(exam)} title="Editar exame">
                             <Pencil className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenEmailDialog(exam)}
-                            title="Enviar por email"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleOpenEmailDialog(exam)} title="Enviar por email">
                             <Mail className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenDeleteDialog(exam)}
-                            title="Excluir exame"
-                            className="text-destructive hover:text-destructive"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleOpenDeleteDialog(exam)} title="Excluir exame" className="text-destructive hover:text-destructive">
                             <Trash2 className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReprint(exam)}
-                            className="gap-2"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleReprint(exam)} className="gap-2">
                             <FileDown className="w-4 h-4" />
                             PDF
                           </Button>
                         </div>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>)}
                 </tbody>
               </table>
-            </div>
-          )}
+            </div>}
         </div>
 
         {/* Stats */}
-        {!loading && filteredExams.length > 0 && (
-          <div className="mt-4 text-sm text-muted-foreground text-center">
+        {!loading && filteredExams.length > 0 && <div className="mt-4 text-sm text-muted-foreground text-center">
             {filteredExams.length} exame{filteredExams.length !== 1 ? "s" : ""} encontrado{filteredExams.length !== 1 ? "s" : ""}
-          </div>
-        )}
+          </div>}
 
         {/* Email Dialog */}
         <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
@@ -814,25 +782,14 @@ export default function Historico() {
             </DialogHeader>
             <div className="py-4">
               <Label htmlFor="email">Email do destinatário</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="exemplo@email.com"
-                value={emailAddress}
-                onChange={(e) => setEmailAddress(e.target.value)}
-                className="mt-2"
-              />
+              <Input id="email" type="email" placeholder="exemplo@email.com" value={emailAddress} onChange={e => setEmailAddress(e.target.value)} className="mt-2" />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEmailDialogOpen(false)} disabled={isSendingEmail}>
                 Cancelar
               </Button>
               <Button onClick={handleSendEmail} disabled={isSendingEmail || !emailAddress}>
-                {isSendingEmail ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4 mr-2" />
-                )}
+                {isSendingEmail ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
                 {isSendingEmail ? "Enviando..." : "Enviar"}
               </Button>
             </DialogFooter>
@@ -853,17 +810,12 @@ export default function Historico() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteExam}
-                disabled={isDeleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
+              <AlertDialogAction onClick={handleDeleteExam} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 {isDeleting ? "Excluindo..." : "Excluir"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
-    </Layout>
-  );
+    </Layout>;
 }
