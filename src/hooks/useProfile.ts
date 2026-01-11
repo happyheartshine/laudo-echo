@@ -33,7 +33,7 @@ export function useProfile() {
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchProfile = async () => {
     if (!user) {
       setProfile(null);
       setClinic(null);
@@ -41,46 +41,61 @@ export function useProfile() {
       return;
     }
 
-    const fetchProfile = async () => {
-      setLoading(true);
-      
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    setLoading(true);
+    
+    // Fetch profile
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        setLoading(false);
-        return;
-      }
+    if (profileError) {
+      console.error("Error fetching profile:", profileError);
+      setLoading(false);
+      return;
+    }
 
-      if (profileData) {
-        setProfile(profileData as Profile);
+    if (profileData) {
+      setProfile(profileData as Profile);
 
-        // Fetch clinic if profile has clinic_id
-        if (profileData.clinic_id) {
-          const { data: clinicData, error: clinicError } = await supabase
-            .from("clinics")
-            .select("*")
-            .eq("id", profileData.clinic_id)
-            .maybeSingle();
+      // Fetch clinic if profile has clinic_id
+      if (profileData.clinic_id) {
+        const { data: clinicData, error: clinicError } = await supabase
+          .from("clinics")
+          .select("*")
+          .eq("id", profileData.clinic_id)
+          .maybeSingle();
 
-          if (clinicError) {
-            console.error("Error fetching clinic:", clinicError);
-          } else if (clinicData) {
-            setClinic(clinicData as Clinic);
-          }
+        if (clinicError) {
+          console.error("Error fetching clinic:", clinicError);
+        } else if (clinicData) {
+          setClinic(clinicData as Clinic);
         }
       }
+    }
 
-      setLoading(false);
-    };
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchProfile();
   }, [user]);
+
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!profile) return { error: new Error("No profile found") };
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("user_id", profile.user_id);
+
+    if (!error) {
+      setProfile({ ...profile, ...updates });
+    }
+
+    return { error };
+  };
 
   const updateClinic = async (updates: Partial<Clinic>) => {
     if (!clinic) return { error: new Error("No clinic found") };
@@ -99,5 +114,5 @@ export function useProfile() {
 
   const isGestor = profile?.cargo === "gestor" || profile?.cargo === "super_admin";
 
-  return { profile, clinic, loading, updateClinic, isGestor };
+  return { profile, clinic, loading, updateProfile, updateClinic, isGestor, refetch: fetchProfile };
 }
