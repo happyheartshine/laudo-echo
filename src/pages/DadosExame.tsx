@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Json } from "@/integrations/supabase/types";
 import { Layout } from "@/components/Layout";
-import { MeasurementsSection, ClassificationsData } from "@/components/exam/MeasurementsSection";
+import { MeasurementsSection, ClassificationsData, ReferencesData } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
 import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
@@ -87,7 +87,22 @@ export default function DadosExame() {
     fracaoEncurtamento: "",
     fracaoEjecaoTeicholz: "",
     fracaoEjecaoSimpson: "",
+    septoIVs: "",
+    paredeLVs: "",
   });
+
+  // Referências Cornell
+  const [referencesData, setReferencesData] = useState({
+    septoIVd: "",
+    dvedDiastole: "",
+    paredeLVd: "",
+    dvedSistole: "",
+    septoIVs: "",
+    paredeLVs: "",
+  });
+
+  // Toggle para usar referências Cornell automáticas
+  const [useCornellReferences, setUseCornellReferences] = useState(true);
 
   // Novos campos de função diastólica
   const [funcaoDiastolica, setFuncaoDiastolica] = useState({
@@ -1227,6 +1242,10 @@ export default function DadosExame() {
             onChange={setMeasurementsData}
             classifications={classificationsData}
             onClassificationsChange={setClassificationsData}
+            references={referencesData}
+            onReferencesChange={setReferencesData}
+            useCornellReferences={useCornellReferences}
+            onCornellToggle={setUseCornellReferences}
             simpsonValue={funcaoSistolica.simpson}
             onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
           />
