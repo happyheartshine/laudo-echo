@@ -285,7 +285,7 @@ export function MeasurementsSection({
         </RadioGroup>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="space-y-8">
         {/* Medidas do Ventrículo Esquerdo */}
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -406,10 +406,10 @@ export function MeasurementsSection({
           </div>
         </div>
 
-        {/* Aorta e Átrio + Cálculos */}
+        {/* Átrio Esquerdo e Aorta + Cálculos */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Aorta / Átrio Esquerdo
+            ÁTRIO ESQUERDO / AORTA
           </h3>
           
           <div className="grid grid-cols-2 gap-4">

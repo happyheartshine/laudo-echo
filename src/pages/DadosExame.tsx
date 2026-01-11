@@ -637,7 +637,7 @@ export default function DadosExame() {
 
     // Átrio Esquerdo e Aorta
     if (measurementsData.aorta || measurementsData.atrioEsquerdo) {
-      await addSectionHeader("ÁTRIO ESQUERDO E AORTA (MODO B)");
+      await addSectionHeader("ÁTRIO ESQUERDO / AORTA (MODO B)");
       const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta 
         ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2) 
         : '';
