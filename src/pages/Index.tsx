@@ -144,10 +144,28 @@ export default function Index() {
     });
   };
 
-  const getUserFirstName = () => {
-    if (!profile?.nome) return "Doutor(a)";
-    const firstName = profile.nome.split(" ")[0];
-    return firstName;
+  const getUserDisplayName = () => {
+    // 1. Tenta usar o nome do perfil
+    if (profile?.nome) {
+      const firstName = profile.nome.split(" ")[0];
+      return firstName;
+    }
+    
+    // 2. Tenta usar user_metadata do Supabase Auth
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name.split(" ")[0];
+    }
+    if (user?.user_metadata?.name) {
+      return user.user_metadata.name.split(" ")[0];
+    }
+    
+    // 3. Usa o email sem domínio
+    if (user?.email) {
+      return user.email.split("@")[0];
+    }
+    
+    // 4. Fallback final
+    return "Doutor(a)";
   };
 
   return (
@@ -156,7 +174,7 @@ export default function Index() {
         {/* Header de Boas-vindas */}
         <div className="animate-fade-in">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Olá, Dr. {getUserFirstName()}
+            Olá, Dr(a). {getUserDisplayName()}
           </h1>
           <p className="text-muted-foreground mt-1 capitalize">
             {formatFullDate()}
