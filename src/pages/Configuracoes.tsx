@@ -18,7 +18,7 @@ const UF_OPTIONS = [
 ];
 
 export default function Configuracoes() {
-  const { profile, clinic, loading, updateClinic } = useProfile();
+  const { profile, clinic, loading, updateProfile, updateClinic } = useProfile();
   const { toast } = useToast();
   
   // Profile state
@@ -75,21 +75,15 @@ export default function Configuracoes() {
 
     setSavingProfile(true);
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update({
-          nome,
-          crmv,
-          uf_crmv: ufCrmv,
-          telefone,
-          especialidade,
-        })
-        .eq("user_id", profile.user_id)
-        .select("*")
-        .maybeSingle();
+      const { error } = await updateProfile({
+        nome,
+        crmv,
+        uf_crmv: ufCrmv,
+        telefone,
+        especialidade,
+      });
 
       if (error) throw error;
-      if (!data) throw new Error("Perfil não encontrado para atualização.");
 
       toast({
         title: "Dados salvos com sucesso!",
