@@ -2,7 +2,7 @@ import { Activity, Calculator } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback, memo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
@@ -49,6 +49,116 @@ const CLASSIFICATION_OPTIONS = [
   { value: "aumentado", label: "Aumentado" },
 ];
 
+// Componente de Input estável com estado local para evitar perda de foco
+const StableDecimalInput = memo(function StableDecimalInput({
+  value,
+  onChange,
+  placeholder = "0,00",
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [localValue, setLocalValue] = useState(formatDecimalForDisplay(value));
+
+  // Atualiza local quando valor externo muda (e não está sendo editado)
+  useMemo(() => {
+    setLocalValue(formatDecimalForDisplay(value));
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = sanitizeDecimalInput(e.target.value);
+    setLocalValue(sanitized);
+  };
+
+  const handleBlur = () => {
+    // Normaliza para ponto decimal ao perder foco
+    const normalized = localValue.replace(',', '.');
+    onChange(normalized);
+  };
+
+  return (
+    <Input
+      className={className}
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+    />
+  );
+});
+
+// Componente de linha extraído e memoizado para evitar re-renders
+const MeasurementRow = memo(function MeasurementRow({
+  label,
+  inputValue,
+  onInputChange,
+  unit,
+  reference,
+  classificationValue,
+  onClassificationChange,
+  calculatedValue,
+  isCalculated = false,
+  isAbnormal = false,
+}: {
+  label: string;
+  inputValue?: string;
+  onInputChange?: (value: string) => void;
+  unit?: string;
+  reference: string;
+  classificationValue: string;
+  onClassificationChange: (value: string) => void;
+  calculatedValue?: string | null;
+  isCalculated?: boolean;
+  isAbnormal?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[1fr_100px_120px_140px] gap-3 items-center py-2 border-b border-border/50">
+      <Label className="label-vitaecor text-sm">{label}</Label>
+      
+      {isCalculated ? (
+        <div className={`font-semibold text-center ${isAbnormal ? 'value-abnormal' : 'text-foreground'}`}>
+          {calculatedValue ? `${calculatedValue}${unit || ''}` : '--'}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1">
+          <StableDecimalInput
+            className="input-vitaecor h-8 text-center"
+            placeholder="0,00"
+            value={inputValue || ''}
+            onChange={(val) => onInputChange?.(val)}
+          />
+          {unit && <span className="text-xs text-muted-foreground whitespace-nowrap">{unit}</span>}
+        </div>
+      )}
+      
+      <div className="text-xs text-muted-foreground text-center">
+        {reference}
+      </div>
+      
+      <Select 
+        value={classificationValue} 
+        onValueChange={onClassificationChange}
+      >
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder="Classificação" />
+        </SelectTrigger>
+        <SelectContent className="bg-background border shadow-lg z-50">
+          {CLASSIFICATION_OPTIONS.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value || "none"}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+});
+
 export function MeasurementsSection({ 
   data, 
   peso, 
@@ -70,16 +180,15 @@ export function MeasurementsSection({
   onSimpsonChange,
 }: MeasurementsSectionProps) {
   // Handler que aceita vírgula e converte para ponto internamente
-  const handleChange = (field: keyof MeasurementsData, value: string) => {
-    const sanitized = sanitizeDecimalInput(value);
-    onChange({ ...data, [field]: sanitized });
-  };
+  const handleChange = useCallback((field: keyof MeasurementsData, value: string) => {
+    onChange({ ...data, [field]: value });
+  }, [data, onChange]);
 
-  const handleClassificationChange = (field: ClassificationKey, value: string) => {
+  const handleClassificationChange = useCallback((field: ClassificationKey, value: string) => {
     if (onClassificationsChange) {
       onClassificationsChange({ ...classifications, [field]: value });
     }
-  };
+  }, [classifications, onClassificationsChange]);
 
   // Cálculo do DVED Normalizado (Fórmula Alométrica)
   const dvedNormalizado = useMemo(() => {
@@ -126,81 +235,28 @@ export function MeasurementsSection({
     return fe.toFixed(1);
   }, [data.dvedDiastole, data.dvedSistole]);
 
-  // Ajustado: referência DVED Normalizado até 1.70 (era 1.27-1.85)
+  // Helpers para verificar valores anormais
   const isAbnormal = (value: string | null, min: number, max: number) => {
     if (!value) return false;
     const num = parseFloat(value);
     return num < min || num > max;
   };
 
-  // Componente de linha com 4 colunas
-  const MeasurementRow = ({
-    label,
-    inputValue,
-    inputField,
-    unit,
-    reference,
-    classificationField,
-    calculatedValue,
-    isCalculated = false,
-  }: {
-    label: string;
-    inputValue?: string;
-    inputField?: keyof MeasurementsData;
-    unit?: string;
-    reference: string;
-    classificationField: ClassificationKey;
-    calculatedValue?: string | null;
-    isCalculated?: boolean;
-  }) => (
-    <div className="grid grid-cols-[1fr_100px_120px_140px] gap-3 items-center py-2 border-b border-border/50">
-      <Label className="label-vitaecor text-sm">{label}</Label>
-      
-      {isCalculated ? (
-        <div className={`font-semibold text-center ${
-          classificationField === 'dvedNormalizado' && isAbnormal(calculatedValue || null, 0, 1.70) 
-            ? 'value-abnormal' 
-            : classificationField === 'fracaoEncurtamento' && isAbnormal(calculatedValue || null, 25, 45)
-            ? 'value-abnormal'
-            : 'text-foreground'
-        }`}>
-          {calculatedValue ? `${calculatedValue}${unit || ''}` : '--'}
-        </div>
-      ) : (
-        <div className="flex items-center gap-1">
-          <Input
-            className="input-vitaecor h-8 text-center"
-            type="text"
-            inputMode="decimal"
-            placeholder="0,00"
-            value={formatDecimalForDisplay(inputValue || '')}
-            onChange={(e) => inputField && handleChange(inputField, e.target.value)}
-          />
-          {unit && <span className="text-xs text-muted-foreground whitespace-nowrap">{unit}</span>}
-        </div>
-      )}
-      
-      <div className="text-xs text-muted-foreground text-center">
-        {reference}
-      </div>
-      
-      <Select 
-        value={classifications[classificationField]} 
-        onValueChange={(val) => handleClassificationChange(classificationField, val)}
-      >
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue placeholder="Classificação" />
-        </SelectTrigger>
-        <SelectContent className="bg-background border shadow-lg z-50">
-          {CLASSIFICATION_OPTIONS.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value || "none"}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+  // Handlers com estado local para Simpson
+  const [localSimpson, setLocalSimpson] = useState(formatDecimalForDisplay(simpsonValue));
+  
+  useMemo(() => {
+    setLocalSimpson(formatDecimalForDisplay(simpsonValue));
+  }, [simpsonValue]);
+
+  const handleSimpsonChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalSimpson(sanitizeDecimalInput(e.target.value));
+  };
+
+  const handleSimpsonBlur = () => {
+    const normalized = localSimpson.replace(',', '.');
+    onSimpsonChange?.(normalized);
+  };
 
   return (
     <div className="card-vitaecor animate-fade-in" style={{ animationDelay: '0.1s' }}>
@@ -243,45 +299,51 @@ export function MeasurementsSection({
           <MeasurementRow
             label="Septo interventricular em diástole (SIVd)"
             inputValue={data.septoIVd}
-            inputField="septoIVd"
+            onInputChange={(val) => handleChange('septoIVd', val)}
             unit="cm"
             reference="Ref: ..."
-            classificationField="septoIVd"
+            classificationValue={classifications.septoIVd}
+            onClassificationChange={(val) => handleClassificationChange('septoIVd', val)}
           />
           
           <MeasurementRow
             label="Ventrículo esquerdo em diástole (VEd)"
             inputValue={data.dvedDiastole}
-            inputField="dvedDiastole"
+            onInputChange={(val) => handleChange('dvedDiastole', val)}
             unit="cm"
             reference="Ref: ..."
-            classificationField="dvedDiastole"
+            classificationValue={classifications.dvedDiastole}
+            onClassificationChange={(val) => handleClassificationChange('dvedDiastole', val)}
           />
           
           <MeasurementRow
             label="Parede livre do VE em diástole (PLVEd)"
             inputValue={data.paredeLVd}
-            inputField="paredeLVd"
+            onInputChange={(val) => handleChange('paredeLVd', val)}
             unit="cm"
             reference="Ref: ..."
-            classificationField="paredeLVd"
+            classificationValue={classifications.paredeLVd}
+            onClassificationChange={(val) => handleClassificationChange('paredeLVd', val)}
           />
           
           <MeasurementRow
             label="Ventrículo esquerdo em sístole (VEs)"
             inputValue={data.dvedSistole}
-            inputField="dvedSistole"
+            onInputChange={(val) => handleChange('dvedSistole', val)}
             unit="cm"
             reference="Ref: ..."
-            classificationField="dvedSistole"
+            classificationValue={classifications.dvedSistole}
+            onClassificationChange={(val) => handleClassificationChange('dvedSistole', val)}
           />
           
           <MeasurementRow
             label="VE em diástole NORMALIZADO (DVEdN)"
             calculatedValue={dvedNormalizado}
             reference="Ref: ≤ 1,70"
-            classificationField="dvedNormalizado"
+            classificationValue={classifications.dvedNormalizado}
+            onClassificationChange={(val) => handleClassificationChange('dvedNormalizado', val)}
             isCalculated
+            isAbnormal={isAbnormal(dvedNormalizado, 0, 1.70)}
           />
           
           <MeasurementRow
@@ -289,8 +351,10 @@ export function MeasurementsSection({
             calculatedValue={fracaoEncurtamento}
             unit="%"
             reference="Ref: 25-45%"
-            classificationField="fracaoEncurtamento"
+            classificationValue={classifications.fracaoEncurtamento}
+            onClassificationChange={(val) => handleClassificationChange('fracaoEncurtamento', val)}
             isCalculated
+            isAbnormal={isAbnormal(fracaoEncurtamento, 25, 45)}
           />
           
           <MeasurementRow
@@ -298,7 +362,8 @@ export function MeasurementsSection({
             calculatedValue={fracaoEjecaoTeicholz}
             unit="%"
             reference="Ref: ..."
-            classificationField="fracaoEjecaoTeicholz"
+            classificationValue={classifications.fracaoEjecaoTeicholz}
+            onClassificationChange={(val) => handleClassificationChange('fracaoEjecaoTeicholz', val)}
             isCalculated
           />
           
@@ -311,8 +376,9 @@ export function MeasurementsSection({
                 type="text"
                 inputMode="decimal"
                 placeholder="0,0"
-                value={formatDecimalForDisplay(simpsonValue)}
-                onChange={(e) => onSimpsonChange?.(sanitizeDecimalInput(e.target.value))}
+                value={localSimpson}
+                onChange={handleSimpsonChange}
+                onBlur={handleSimpsonBlur}
               />
               <span className="text-xs text-muted-foreground whitespace-nowrap">%</span>
             </div>
@@ -346,24 +412,20 @@ export function MeasurementsSection({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="label-vitaecor">Aorta (Ao) - cm</Label>
-              <Input
+              <StableDecimalInput
                 className="input-vitaecor"
-                type="text"
-                inputMode="decimal"
                 placeholder="0,00"
-                value={formatDecimalForDisplay(data.aorta)}
-                onChange={(e) => handleChange('aorta', e.target.value)}
+                value={data.aorta}
+                onChange={(val) => handleChange('aorta', val)}
               />
             </div>
             <div>
               <Label className="label-vitaecor">Átrio Esquerdo (AE) - cm</Label>
-              <Input
+              <StableDecimalInput
                 className="input-vitaecor"
-                type="text"
-                inputMode="decimal"
                 placeholder="0,00"
-                value={formatDecimalForDisplay(data.atrioEsquerdo)}
-                onChange={(e) => handleChange('atrioEsquerdo', e.target.value)}
+                value={data.atrioEsquerdo}
+                onChange={(val) => handleChange('atrioEsquerdo', val)}
               />
             </div>
           </div>
