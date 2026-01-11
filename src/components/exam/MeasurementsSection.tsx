@@ -2,7 +2,7 @@ import { Activity, Calculator } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useMemo, useState, useCallback, memo } from "react";
+import { useMemo, useState, useCallback, memo, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
@@ -15,6 +15,8 @@ export interface MeasurementsData {
   paredeLVs: string;
   aorta: string;
   atrioEsquerdo: string;
+  fracaoEncurtamento: string;
+  fracaoEjecaoTeicholz: string;
 }
 
 export interface ClassificationsData {
@@ -63,19 +65,19 @@ const StableDecimalInput = memo(function StableDecimalInput({
 }) {
   const [localValue, setLocalValue] = useState(formatDecimalForDisplay(value));
 
-  // Atualiza local quando valor externo muda (e não está sendo editado)
-  useMemo(() => {
+  // Atualiza local quando valor externo muda
+  useEffect(() => {
     setLocalValue(formatDecimalForDisplay(value));
   }, [value]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: import("react").ChangeEvent<HTMLInputElement>) => {
     const sanitized = sanitizeDecimalInput(e.target.value);
     setLocalValue(sanitized);
   };
 
   const handleBlur = () => {
     // Normaliza para ponto decimal ao perder foco
-    const normalized = localValue.replace(',', '.');
+    const normalized = sanitizeDecimalInput(localValue).replace(',', '.');
     onChange(normalized);
   };
 
@@ -96,6 +98,7 @@ const StableDecimalInput = memo(function StableDecimalInput({
 const MeasurementRow = memo(function MeasurementRow({
   label,
   inputValue,
+  inputPlaceholder,
   onInputChange,
   unit,
   reference,
@@ -107,6 +110,7 @@ const MeasurementRow = memo(function MeasurementRow({
 }: {
   label: string;
   inputValue?: string;
+  inputPlaceholder?: string;
   onInputChange?: (value: string) => void;
   unit?: string;
   reference: string;
@@ -128,7 +132,7 @@ const MeasurementRow = memo(function MeasurementRow({
         <div className="flex items-center gap-1">
           <StableDecimalInput
             className="input-vitaecor h-8 text-center"
-            placeholder="0,00"
+            placeholder={inputPlaceholder || "0,00"}
             value={inputValue || ''}
             onChange={(val) => onInputChange?.(val)}
           />
@@ -245,11 +249,11 @@ export function MeasurementsSection({
   // Handlers com estado local para Simpson
   const [localSimpson, setLocalSimpson] = useState(formatDecimalForDisplay(simpsonValue));
   
-  useMemo(() => {
+  useEffect(() => {
     setLocalSimpson(formatDecimalForDisplay(simpsonValue));
   }, [simpsonValue]);
 
-  const handleSimpsonChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSimpsonChange = (e: import("react").ChangeEvent<HTMLInputElement>) => {
     setLocalSimpson(sanitizeDecimalInput(e.target.value));
   };
 
@@ -348,23 +352,22 @@ export function MeasurementsSection({
           
           <MeasurementRow
             label="Fração de Encurtamento (FS)"
-            calculatedValue={fracaoEncurtamento}
+            inputValue={data.fracaoEncurtamento || fracaoEncurtamento || ''}
+            onInputChange={(val) => handleChange('fracaoEncurtamento', val)}
             unit="%"
             reference="Ref: 25-45%"
             classificationValue={classifications.fracaoEncurtamento}
             onClassificationChange={(val) => handleClassificationChange('fracaoEncurtamento', val)}
-            isCalculated
-            isAbnormal={isAbnormal(fracaoEncurtamento, 25, 45)}
           />
           
           <MeasurementRow
             label="Fração de Ejeção (FE Teicholz)"
-            calculatedValue={fracaoEjecaoTeicholz}
+            inputValue={data.fracaoEjecaoTeicholz || fracaoEjecaoTeicholz || ''}
+            onInputChange={(val) => handleChange('fracaoEjecaoTeicholz', val)}
             unit="%"
             reference="Ref: ..."
             classificationValue={classifications.fracaoEjecaoTeicholz}
             onClassificationChange={(val) => handleClassificationChange('fracaoEjecaoTeicholz', val)}
-            isCalculated
           />
           
           {/* Fração de Ejeção Simpson - campo editável */}
