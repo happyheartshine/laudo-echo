@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Json } from "@/integrations/supabase/types";
 import { Layout } from "@/components/Layout";
-import { MeasurementsSection } from "@/components/exam/MeasurementsSection";
+import { MeasurementsSection, ClassificationsData } from "@/components/exam/MeasurementsSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
 import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
@@ -72,6 +72,18 @@ export default function DadosExame() {
     paredeLVs: "",
     aorta: "",
     atrioEsquerdo: "",
+  });
+
+  // Classificações do Ventrículo Esquerdo
+  const [classificationsData, setClassificationsData] = useState<ClassificationsData>({
+    septoIVd: "",
+    dvedDiastole: "",
+    paredeLVd: "",
+    dvedSistole: "",
+    dvedNormalizado: "",
+    fracaoEncurtamento: "",
+    fracaoEjecaoTeicholz: "",
+    fracaoEjecaoSimpson: "",
   });
 
   // Novos campos de função diastólica
@@ -224,6 +236,7 @@ export default function DadosExame() {
         patientData?: PatientData;
         examInfo?: typeof examInfo;
         measurementsData?: typeof measurementsData;
+        classificationsData?: ClassificationsData;
         funcaoDiastolica?: typeof funcaoDiastolica;
         funcaoSistolica?: typeof funcaoSistolica;
         tdiLivre?: typeof tdiLivre;
@@ -240,6 +253,7 @@ export default function DadosExame() {
       if (content.patientData) setPatientData(content.patientData);
       if (content.examInfo) setExamInfo(content.examInfo);
       if (content.measurementsData) setMeasurementsData(content.measurementsData);
+      if (content.classificationsData) setClassificationsData(content.classificationsData);
       if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
       if (content.funcaoSistolica) setFuncaoSistolica(content.funcaoSistolica);
       if (content.tdiLivre) setTdiLivre(content.tdiLivre);
@@ -588,14 +602,24 @@ export default function DadosExame() {
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '';
 
-    if (measurementsData.septoIVd) addTableRow("Septo interventricular em diástole", `${formatNumber(measurementsData.septoIVd)} cm`);
-    if (measurementsData.dvedDiastole) addTableRow("Ventrículo esquerdo em diástole", `${formatNumber(measurementsData.dvedDiastole)} cm`);
-    if (measurementsData.paredeLVd) addTableRow("Parede livre do VE em diástole", `${formatNumber(measurementsData.paredeLVd)} cm`);
-    if (measurementsData.dvedSistole) addTableRow("Ventrículo esquerdo em sístole", `${formatNumber(measurementsData.dvedSistole)} cm`);
-    if (dvedNorm && dvedNorm !== '-') addTableRow("VE em diástole NORMALIZADO", formatNumber(dvedNorm));
-    if (calculatedValues.fracaoEncurtamento && calculatedValues.fracaoEncurtamento !== '-') addTableRow("Fração de Encurtamento", `${formatNumber(calculatedValues.fracaoEncurtamento)}%`);
-    if (calculatedValues.fracaoEjecaoTeicholz && calculatedValues.fracaoEjecaoTeicholz !== '-') addTableRow("Fração de Ejeção (Teicholz)", `${formatNumber(calculatedValues.fracaoEjecaoTeicholz)}%`);
-    if (funcaoSistolica.simpson) addTableRow("Fração de Ejeção (Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`);
+    // Helper para formatar classificação
+    const formatClassification = (key: keyof typeof classificationsData): string => {
+      const val = classificationsData[key];
+      if (!val || val === "none") return "";
+      if (val === "normal") return " (Normal)";
+      if (val === "diminuido") return " (Diminuído)";
+      if (val === "aumentado") return " (Aumentado)";
+      return "";
+    };
+
+    if (measurementsData.septoIVd) addTableRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm${formatClassification('septoIVd')}`);
+    if (measurementsData.dvedDiastole) addTableRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm${formatClassification('dvedDiastole')}`);
+    if (measurementsData.paredeLVd) addTableRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm${formatClassification('paredeLVd')}`);
+    if (measurementsData.dvedSistole) addTableRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm${formatClassification('dvedSistole')}`);
+    if (dvedNorm && dvedNorm !== '-') addTableRow("VE em diástole NORMALIZADO (DVEdN)", `${formatNumber(dvedNorm)}${formatClassification('dvedNormalizado')}`);
+    if (calculatedValues.fracaoEncurtamento && calculatedValues.fracaoEncurtamento !== '-') addTableRow("Fração de Encurtamento (FS)", `${formatNumber(calculatedValues.fracaoEncurtamento)}%${formatClassification('fracaoEncurtamento')}`);
+    if (calculatedValues.fracaoEjecaoTeicholz && calculatedValues.fracaoEjecaoTeicholz !== '-') addTableRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(calculatedValues.fracaoEjecaoTeicholz)}%${formatClassification('fracaoEjecaoTeicholz')}`);
+    if (funcaoSistolica.simpson) addTableRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%${formatClassification('fracaoEjecaoSimpson')}`);
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -981,6 +1005,7 @@ export default function DadosExame() {
         patientData,
         examInfo,
         measurementsData,
+        classificationsData,
         funcaoDiastolica,
         funcaoSistolica,
         tdiLivre,
@@ -1186,7 +1211,11 @@ export default function DadosExame() {
             peso={patientData.peso}
             modoMedicao={examInfo.modoMedicao}
             onModoChange={(modo) => setExamInfo({ ...examInfo, modoMedicao: modo })}
-            onChange={setMeasurementsData} 
+            onChange={setMeasurementsData}
+            classifications={classificationsData}
+            onClassificationsChange={setClassificationsData}
+            simpsonValue={funcaoSistolica.simpson}
+            onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
           />
 
           {/* Função Sistólica */}
