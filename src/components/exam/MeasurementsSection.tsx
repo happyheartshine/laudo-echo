@@ -45,6 +45,7 @@ export interface ClassificationsData {
 interface MeasurementsSectionProps {
   data: MeasurementsData;
   peso: string;
+  especie: string; // "canino" ou "felino"
   modoMedicao: "M" | "B";
   onModoChange: (modo: "M" | "B") => void;
   onChange: (data: MeasurementsData) => void;
@@ -54,8 +55,8 @@ interface MeasurementsSectionProps {
   onReferencesChange?: (references: ReferencesData) => void;
   simpsonValue?: string;
   onSimpsonChange?: (value: string) => void;
-  useCornellReferences?: boolean;
-  onCornellToggle?: (enabled: boolean) => void;
+  useAutoReferences?: boolean;
+  onAutoReferencesToggle?: (enabled: boolean) => void;
 }
 
 type ClassificationKey = keyof ClassificationsData;
@@ -71,7 +72,13 @@ const CORNELL_FORMULAS: Record<ReferenceKey, { minCoef: number; minExp: number; 
   paredeLVs: { minCoef: 0.48, minExp: 0.222, maxCoef: 0.87, maxExp: 0.222 },
 };
 
-// Calcula referência Cornell baseada no peso
+// Referências ACVIM 2020 para felinos (valores de corte fixos para HCM)
+const ACVIM_FELINE_REFERENCES: Partial<Record<ReferenceKey, { max: number; formatted: string }>> = {
+  septoIVd: { max: 0.60, formatted: "< 0,60" },
+  paredeLVd: { max: 0.60, formatted: "< 0,60" },
+};
+
+// Calcula referência Cornell baseada no peso (para caninos)
 const calculateCornellReference = (peso: number, field: ReferenceKey): { min: number; max: number; formatted: string } | null => {
   if (!peso || peso <= 0 || isNaN(peso)) return null;
   
@@ -88,11 +95,18 @@ const calculateCornellReference = (peso: number, field: ReferenceKey): { min: nu
   };
 };
 
-// Classifica valor baseado no intervalo de referência
+// Classifica valor baseado no intervalo de referência (Cornell - caninos)
 const classifyValue = (value: number, min: number, max: number): string => {
   if (isNaN(value)) return "";
   if (value < min) return "diminuido";
   if (value > max) return "aumentado";
+  return "normal";
+};
+
+// Classifica valor para felinos (ACVIM - apenas limite superior)
+const classifyFelineValue = (value: number, max: number): string => {
+  if (isNaN(value)) return "";
+  if (value >= max) return "aumentado";
   return "normal";
 };
 
@@ -230,7 +244,8 @@ const MeasurementRow = memo(function MeasurementRow({
 
 export function MeasurementsSection({ 
   data, 
-  peso, 
+  peso,
+  especie = "canino",
   modoMedicao, 
   onModoChange, 
   onChange,
@@ -256,11 +271,13 @@ export function MeasurementsSection({
     paredeLVs: "",
   },
   onReferencesChange,
-  useCornellReferences = true,
-  onCornellToggle,
+  useAutoReferences = true,
+  onAutoReferencesToggle,
   simpsonValue = "",
   onSimpsonChange,
 }: MeasurementsSectionProps) {
+  // Detecta se é felino para usar ACVIM ao invés de Cornell
+  const isFeline = especie.toLowerCase() === "felino";
   // Handler que aceita vírgula e converte para ponto internamente
   const handleChange = useCallback((field: keyof MeasurementsData, value: string) => {
     onChange({ ...data, [field]: value });
@@ -282,9 +299,9 @@ export function MeasurementsSection({
   const isFirstRender = useRef(true);
   const previousPeso = useRef(peso);
 
-  // Efeito para calcular referências Cornell automaticamente quando peso muda
+  // Efeito para calcular referências automaticamente quando peso/espécie muda
   useEffect(() => {
-    if (!useCornellReferences || !onReferencesChange || !onClassificationsChange) return;
+    if (!useAutoReferences || !onReferencesChange || !onClassificationsChange) return;
     
     const pesoNum = parseDecimal(peso);
     
@@ -296,12 +313,24 @@ export function MeasurementsSection({
       // Na primeira renderização, calcula referências se tiver peso
       if (pesoNum && pesoNum > 0) {
         const newReferences = { ...references };
-        (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
-          const ref = calculateCornellReference(pesoNum, field);
-          if (ref) {
-            newReferences[field] = ref.formatted;
-          }
-        });
+        
+        if (isFeline) {
+          // Para felinos, usa ACVIM 2020 (valores fixos)
+          (Object.keys(ACVIM_FELINE_REFERENCES) as ReferenceKey[]).forEach((field) => {
+            const ref = ACVIM_FELINE_REFERENCES[field];
+            if (ref) {
+              newReferences[field] = ref.formatted;
+            }
+          });
+        } else {
+          // Para caninos, usa Cornell 2004
+          (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
+            const ref = calculateCornellReference(pesoNum, field);
+            if (ref) {
+              newReferences[field] = ref.formatted;
+            }
+          });
+        }
         onReferencesChange(newReferences);
       }
       return;
@@ -315,52 +344,87 @@ export function MeasurementsSection({
     
     // Calcula e atualiza todas as referências
     const newReferences = { ...references };
-    (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
-      const ref = calculateCornellReference(pesoNum, field);
-      if (ref) {
-        newReferences[field] = ref.formatted;
-      }
-    });
+    
+    if (isFeline) {
+      // Para felinos, usa ACVIM 2020 (valores fixos)
+      (Object.keys(ACVIM_FELINE_REFERENCES) as ReferenceKey[]).forEach((field) => {
+        const ref = ACVIM_FELINE_REFERENCES[field];
+        if (ref) {
+          newReferences[field] = ref.formatted;
+        }
+      });
+    } else {
+      // Para caninos, usa Cornell 2004
+      (Object.keys(CORNELL_FORMULAS) as ReferenceKey[]).forEach((field) => {
+        const ref = calculateCornellReference(pesoNum, field);
+        if (ref) {
+          newReferences[field] = ref.formatted;
+        }
+      });
+    }
     onReferencesChange(newReferences);
-  }, [peso, useCornellReferences]);
+  }, [peso, useAutoReferences, isFeline]);
 
   // Efeito para classificar automaticamente valores quando medidas mudam
   useEffect(() => {
-    if (!useCornellReferences || !onClassificationsChange) return;
+    if (!useAutoReferences || !onClassificationsChange) return;
     
     const pesoNum = parseDecimal(peso);
     if (!pesoNum || pesoNum <= 0) return;
     
-    const fieldMappings: { dataField: keyof MeasurementsData; classField: ClassificationKey; refField: ReferenceKey }[] = [
-      { dataField: 'septoIVd', classField: 'septoIVd', refField: 'septoIVd' },
-      { dataField: 'dvedDiastole', classField: 'dvedDiastole', refField: 'dvedDiastole' },
-      { dataField: 'paredeLVd', classField: 'paredeLVd', refField: 'paredeLVd' },
-      { dataField: 'dvedSistole', classField: 'dvedSistole', refField: 'dvedSistole' },
-      { dataField: 'septoIVs', classField: 'septoIVs', refField: 'septoIVs' },
-      { dataField: 'paredeLVs', classField: 'paredeLVs', refField: 'paredeLVs' },
-    ];
-    
     const newClassifications = { ...classifications };
     let hasChanges = false;
     
-    fieldMappings.forEach(({ dataField, classField, refField }) => {
-      const value = parseDecimal(data[dataField]);
-      if (!value || isNaN(value)) return;
+    if (isFeline) {
+      // Para felinos, usa ACVIM 2020 (apenas septoIVd e paredeLVd)
+      const felineFields: { dataField: keyof MeasurementsData; classField: ClassificationKey; refField: ReferenceKey }[] = [
+        { dataField: 'septoIVd', classField: 'septoIVd', refField: 'septoIVd' },
+        { dataField: 'paredeLVd', classField: 'paredeLVd', refField: 'paredeLVd' },
+      ];
       
-      const ref = calculateCornellReference(pesoNum, refField);
-      if (!ref) return;
+      felineFields.forEach(({ dataField, classField, refField }) => {
+        const value = parseDecimal(data[dataField]);
+        if (!value || isNaN(value)) return;
+        
+        const ref = ACVIM_FELINE_REFERENCES[refField];
+        if (!ref) return;
+        
+        const classification = classifyFelineValue(value, ref.max);
+        if (newClassifications[classField] !== classification) {
+          newClassifications[classField] = classification;
+          hasChanges = true;
+        }
+      });
+    } else {
+      // Para caninos, usa Cornell 2004
+      const fieldMappings: { dataField: keyof MeasurementsData; classField: ClassificationKey; refField: ReferenceKey }[] = [
+        { dataField: 'septoIVd', classField: 'septoIVd', refField: 'septoIVd' },
+        { dataField: 'dvedDiastole', classField: 'dvedDiastole', refField: 'dvedDiastole' },
+        { dataField: 'paredeLVd', classField: 'paredeLVd', refField: 'paredeLVd' },
+        { dataField: 'dvedSistole', classField: 'dvedSistole', refField: 'dvedSistole' },
+        { dataField: 'septoIVs', classField: 'septoIVs', refField: 'septoIVs' },
+        { dataField: 'paredeLVs', classField: 'paredeLVs', refField: 'paredeLVs' },
+      ];
       
-      const classification = classifyValue(value, ref.min, ref.max);
-      if (newClassifications[classField] !== classification) {
-        newClassifications[classField] = classification;
-        hasChanges = true;
-      }
-    });
+      fieldMappings.forEach(({ dataField, classField, refField }) => {
+        const value = parseDecimal(data[dataField]);
+        if (!value || isNaN(value)) return;
+        
+        const ref = calculateCornellReference(pesoNum, refField);
+        if (!ref) return;
+        
+        const classification = classifyValue(value, ref.min, ref.max);
+        if (newClassifications[classField] !== classification) {
+          newClassifications[classField] = classification;
+          hasChanges = true;
+        }
+      });
+    }
     
     if (hasChanges) {
       onClassificationsChange(newClassifications);
     }
-  }, [data.septoIVd, data.dvedDiastole, data.paredeLVd, data.dvedSistole, data.septoIVs, data.paredeLVs, peso, useCornellReferences]);
+  }, [data.septoIVd, data.dvedDiastole, data.paredeLVd, data.dvedSistole, data.septoIVs, data.paredeLVs, peso, useAutoReferences, isFeline]);
 
   // Cálculo do DVED Normalizado (Fórmula Alométrica)
   const dvedNormalizado = useMemo(() => {
@@ -462,12 +526,12 @@ export function MeasurementsSection({
             </h3>
             <div className="flex items-center gap-2">
               <Switch
-                id="cornell-toggle"
-                checked={useCornellReferences}
-                onCheckedChange={(checked) => onCornellToggle?.(checked)}
+                id="auto-ref-toggle"
+                checked={useAutoReferences}
+                onCheckedChange={(checked) => onAutoReferencesToggle?.(checked)}
               />
-              <Label htmlFor="cornell-toggle" className="text-xs text-muted-foreground cursor-pointer">
-                Usar Referências Automáticas (Cornell 2004)
+              <Label htmlFor="auto-ref-toggle" className="text-xs text-muted-foreground cursor-pointer">
+                {isFeline ? "Usar Referências ACVIM 2020" : "Usar Referências Automáticas (Cornell 2004)"}
               </Label>
             </div>
           </div>

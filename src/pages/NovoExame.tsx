@@ -44,7 +44,39 @@ export default function NovoExame() {
     });
   };
 
+  // Validação de campos obrigatórios
+  const validateRequiredFields = (): boolean => {
+    const missingFields: string[] = [];
+    
+    if (!patientData.nome.trim()) missingFields.push("Nome do Paciente");
+    if (!patientData.especie) missingFields.push("Espécie");
+    if (!patientData.peso.trim()) missingFields.push("Peso");
+    if (!patientData.responsavel.trim()) missingFields.push("Responsável");
+    
+    if (missingFields.length > 0) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha os dados do paciente e responsável antes de prosseguir.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Verifica se pode avançar (todos os campos obrigatórios preenchidos)
+  const canProceed = 
+    patientData.nome.trim() !== "" &&
+    patientData.especie !== "" &&
+    patientData.peso.trim() !== "" &&
+    patientData.responsavel.trim() !== "";
+
   const handleContinueToExam = async () => {
+    // Validar campos obrigatórios antes de continuar
+    if (!validateRequiredFields()) {
+      return;
+    }
+
     setIsSaving(true);
 
     const isLikelyDicom = (file: File) => {
@@ -155,7 +187,12 @@ export default function NovoExame() {
             <Button variant="outline" onClick={() => navigate('/')}>
               Cancelar
             </Button>
-            <Button className="btn-cta" onClick={handleContinueToExam} disabled={isSaving}>
+            <Button 
+              className="btn-cta" 
+              onClick={handleContinueToExam} 
+              disabled={isSaving || !canProceed}
+              title={!canProceed ? "Preencha todos os campos obrigatórios" : ""}
+            >
               {isSaving ? "Salvando..." : "Continuar"}
             </Button>
           </div>
