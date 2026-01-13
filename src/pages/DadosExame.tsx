@@ -1479,9 +1479,71 @@ export default function DadosExame() {
                 <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.eTRIV)} />
               </div>
             </div>
+
+            {/* Subtítulo: Doppler Tecidual */}
+            <div className="mt-6 mb-4 pt-4 border-t border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Doppler Tecidual (TDI)</h3>
+            </div>
+
+            {/* TDI Campos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* TDI Parede Livre */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h4 className="font-semibold mb-3">Parede Livre</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="label-vitaecor">s' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.s)} onChange={(e) => setTdiLivre({...tdiLivre, s: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">e' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.e)} onChange={(e) => setTdiLivre({...tdiLivre, e: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">a' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.a)} onChange={(e) => setTdiLivre({...tdiLivre, a: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label className="label-vitaecor">E/e' Parede Livre</Label>
+                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeLivre)} />
+                </div>
+              </div>
+
+              {/* TDI Parede Septal */}
+              <div className="p-4 bg-secondary rounded-lg">
+                <h4 className="font-semibold mb-3">Parede Septal</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="label-vitaecor">s' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.s)} onChange={(e) => setTdiSeptal({...tdiSeptal, s: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">e' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.e)} onChange={(e) => setTdiSeptal({...tdiSeptal, e: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor">a' (cm/s)</Label>
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.a)} onChange={(e) => setTdiSeptal({...tdiSeptal, a: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label className="label-vitaecor">E/e' Parede Septal</Label>
+                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeSeptal)} />
+                </div>
+              </div>
+            </div>
+            
+            {/* Média E/e' em destaque */}
+            <div className="mt-4 p-4 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-foreground">Média E/e':</span>
+                <span className="text-xl font-bold text-primary">{calculatedValues.mediaEePrime}</span>
+              </div>
+            </div>
             
             {/* Padrão Diastólico */}
-            <div className="mt-4">
+            <div className="mt-6 pt-4 border-t border-border">
               <Label className="label-vitaecor">Padrão Diastólico</Label>
               <Select 
                 value={funcaoDiastolica.padraoDiastolico} 
@@ -1519,66 +1581,6 @@ export default function DadosExame() {
                 value={funcaoDiastolica.conclusaoDiastolica}
                 onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, conclusaoDiastolica: e.target.value})}
               />
-            </div>
-          </div>
-
-          {/* TDI - Doppler Tecidual */}
-          <div className="card-vitaecor animate-fade-in">
-            <h2 className="section-title">Doppler Tecidual (TDI)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* TDI Parede Livre */}
-              <div className="p-4 bg-secondary rounded-lg">
-                <h3 className="font-semibold mb-3">Parede Livre</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label className="label-vitaecor">s' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.s)} onChange={(e) => setTdiLivre({...tdiLivre, s: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                  <div>
-                    <Label className="label-vitaecor">e' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.e)} onChange={(e) => setTdiLivre({...tdiLivre, e: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                  <div>
-                    <Label className="label-vitaecor">a' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiLivre.a)} onChange={(e) => setTdiLivre({...tdiLivre, a: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <Label className="label-vitaecor">E/e' Parede Livre</Label>
-                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeLivre)} />
-                </div>
-              </div>
-
-              {/* TDI Parede Septal */}
-              <div className="p-4 bg-secondary rounded-lg">
-                <h3 className="font-semibold mb-3">Parede Septal</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <Label className="label-vitaecor">s' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.s)} onChange={(e) => setTdiSeptal({...tdiSeptal, s: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                  <div>
-                    <Label className="label-vitaecor">e' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.e)} onChange={(e) => setTdiSeptal({...tdiSeptal, e: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                  <div>
-                    <Label className="label-vitaecor">a' (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(tdiSeptal.a)} onChange={(e) => setTdiSeptal({...tdiSeptal, a: sanitizeDecimalInput(e.target.value)})} />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <Label className="label-vitaecor">E/e' Parede Septal</Label>
-                  <Input className="input-vitaecor bg-muted" readOnly value={formatNumber(calculatedValues.relacaoEePrimeSeptal)} />
-                </div>
-              </div>
-            </div>
-            
-            {/* Média E/e' em destaque */}
-            <div className="mt-4 p-4 bg-primary/10 rounded-lg border border-primary/20">
-              <div className="flex justify-between items-center">
-                <span className="font-semibold text-foreground">Média E/e':</span>
-                <span className="text-xl font-bold text-primary">{calculatedValues.mediaEePrime}</span>
-              </div>
             </div>
           </div>
 
