@@ -55,8 +55,8 @@ export default function NovoExame() {
     
     if (missingFields.length > 0) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha os dados do paciente e responsável antes de prosseguir.",
+        title: "Dados obrigatórios",
+        description: "Preencha os dados obrigatórios (Nome, Espécie, Peso, Proprietário) para iniciar o exame.",
         variant: "destructive",
       });
       return false;
