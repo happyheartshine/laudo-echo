@@ -633,7 +633,7 @@ export function MeasurementsSection({
             inputValue={data.fracaoEncurtamento || fracaoEncurtamento || ''}
             onInputChange={(val) => handleChange('fracaoEncurtamento', val)}
             unit="%"
-            reference="Ref: 25-45%"
+            reference=""
             classificationValue={classifications.fracaoEncurtamento}
             onClassificationChange={(val) => handleClassificationChange('fracaoEncurtamento', val)}
           />
