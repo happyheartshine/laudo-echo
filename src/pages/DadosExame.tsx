@@ -1130,22 +1130,45 @@ export default function DadosExame() {
       const availableWidth = pageWidth - 2 * imgMarginH;
       const availableHeight = pageHeight - startY - imgMarginV - 10; // Espaço para footer
       
-      // Dimensões das células da grade
+      // Dimensões das células da grade (altura fixa ~80mm para 3 linhas)
       const cellWidth = (availableWidth - (cols - 1) * gapBetweenImages) / cols;
       const cellHeight = (availableHeight - (rows - 1) * gapBetweenImages) / rows;
-      
-      // Proporção desejada: 590x675 = ~0.874 (largura/altura)
-      const targetAspectRatio = 590 / 675;
-      
-      // Calcula dimensões da imagem mantendo proporção dentro da célula
-      let imgWidth = cellWidth;
-      let imgHeight = imgWidth / targetAspectRatio;
-      
-      // Se a altura calculada exceder a célula, ajusta pela altura
-      if (imgHeight > cellHeight) {
-        imgHeight = cellHeight;
-        imgWidth = imgHeight * targetAspectRatio;
-      }
+
+      // Função auxiliar para obter dimensões reais da imagem
+      const getImageDimensions = (dataUrl: string): Promise<{width: number, height: number}> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          };
+          img.onerror = () => {
+            // Fallback para proporção 4:3 se não conseguir carregar
+            resolve({ width: 4, height: 3 });
+          };
+          img.src = dataUrl;
+        });
+      };
+
+      // Função para calcular dimensões mantendo proporção (object-fit: contain)
+      const calculateFitDimensions = (
+        originalWidth: number, 
+        originalHeight: number, 
+        maxWidth: number, 
+        maxHeight: number
+      ) => {
+        const aspectRatio = originalWidth / originalHeight;
+        
+        let finalWidth = maxWidth;
+        let finalHeight = maxWidth / aspectRatio;
+        
+        // Se a altura exceder o máximo, ajusta pela altura
+        if (finalHeight > maxHeight) {
+          finalHeight = maxHeight;
+          finalWidth = maxHeight * aspectRatio;
+        }
+        
+        return { width: finalWidth, height: finalHeight };
+      };
 
       let imageIndex = 0;
       
@@ -1163,11 +1186,9 @@ export default function DadosExame() {
         const row = Math.floor(pageImageIndex / cols);
         const col = pageImageIndex % cols;
 
-        // Calcula posição centralizando a imagem na célula
+        // Posição da célula
         const cellX = imgMarginH + col * (cellWidth + gapBetweenImages);
         const cellY = startY + row * (cellHeight + gapBetweenImages);
-        const x = cellX + (cellWidth - imgWidth) / 2;
-        const y = cellY + (cellHeight - imgHeight) / 2;
 
         const img = selectedImageData[imageIndex];
         if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image') || img.dataUrl.startsWith('http')) {
@@ -1177,8 +1198,24 @@ export default function DadosExame() {
             if (img.dataUrl.startsWith('http')) {
               imageData = await imageUrlToBase64(img.dataUrl);
             }
+            
+            // Obter dimensões reais da imagem
+            const dimensions = await getImageDimensions(imageData);
+            
+            // Calcular dimensões finais mantendo proporção (object-fit: contain)
+            const fitDimensions = calculateFitDimensions(
+              dimensions.width,
+              dimensions.height,
+              cellWidth,
+              cellHeight
+            );
+            
+            // Centralizar imagem dentro da célula
+            const x = cellX + (cellWidth - fitDimensions.width) / 2;
+            const y = cellY + (cellHeight - fitDimensions.height) / 2;
+            
             const format = imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-            pdf.addImage(imageData, format as any, x, y, imgWidth, imgHeight);
+            pdf.addImage(imageData, format as any, x, y, fitDimensions.width, fitDimensions.height);
           } catch (e) {
             console.error('Error adding image to PDF:', e);
           }
