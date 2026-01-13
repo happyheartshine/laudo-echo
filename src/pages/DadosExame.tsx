@@ -100,6 +100,9 @@ export default function DadosExame() {
     dvedSistole: "",
     septoIVs: "",
     paredeLVs: "",
+    fracaoEncurtamento: "",
+    fracaoEjecaoTeicholz: "",
+    fracaoEjecaoSimpson: "",
   });
 
   // Toggle para usar referências automáticas (Cornell para caninos, ACVIM para felinos)
@@ -147,6 +150,9 @@ export default function DadosExame() {
         dvedSistole: "",
         septoIVs: "",
         paredeLVs: "",
+        fracaoEncurtamento: "",
+        fracaoEjecaoTeicholz: "",
+        fracaoEjecaoSimpson: "",
       });
     } else {
       // Se ligar, recalcula referências baseadas no peso atual
@@ -162,6 +168,9 @@ export default function DadosExame() {
           dvedSistole: "",
           septoIVs: "",
           paredeLVs: "",
+          fracaoEncurtamento: "",
+          fracaoEjecaoTeicholz: "",
+          fracaoEjecaoSimpson: "",
         });
       } else {
         // Referências Cornell para caninos (baseadas no peso)
@@ -172,6 +181,9 @@ export default function DadosExame() {
           dvedSistole: calculateCornellReference(peso, 'dvedSistole'),
           septoIVs: calculateCornellReference(peso, 'septoIVs'),
           paredeLVs: calculateCornellReference(peso, 'paredeLVs'),
+          fracaoEncurtamento: "",
+          fracaoEjecaoTeicholz: "",
+          fracaoEjecaoSimpson: "",
         });
       }
     }

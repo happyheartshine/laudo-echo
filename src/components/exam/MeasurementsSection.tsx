@@ -27,6 +27,9 @@ export interface ReferencesData {
   dvedSistole: string;
   septoIVs: string;
   paredeLVs: string;
+  fracaoEncurtamento: string;
+  fracaoEjecaoTeicholz: string;
+  fracaoEjecaoSimpson: string;
 }
 
 export interface ClassificationsData {
@@ -62,14 +65,15 @@ interface MeasurementsSectionProps {
 type ClassificationKey = keyof ClassificationsData;
 type ReferenceKey = keyof ReferencesData;
 
-// Fórmulas Cornell 2004 para referências baseadas no peso
-const CORNELL_FORMULAS: Record<ReferenceKey, { minCoef: number; minExp: number; maxCoef: number; maxExp: number }> = {
+// Fórmulas Cornell 2004 para referências baseadas no peso (apenas dimensões, não índices funcionais)
+const CORNELL_FORMULAS: Partial<Record<ReferenceKey, { minCoef: number; minExp: number; maxCoef: number; maxExp: number }>> = {
   septoIVd: { minCoef: 0.29, minExp: 0.241, maxCoef: 0.59, maxExp: 0.241 },
   dvedDiastole: { minCoef: 1.27, minExp: 0.294, maxCoef: 1.85, maxExp: 0.294 },
   paredeLVd: { minCoef: 0.29, minExp: 0.232, maxCoef: 0.60, maxExp: 0.232 },
   dvedSistole: { minCoef: 0.71, minExp: 0.315, maxCoef: 1.26, maxExp: 0.315 },
   septoIVs: { minCoef: 0.43, minExp: 0.240, maxCoef: 0.79, maxExp: 0.240 },
   paredeLVs: { minCoef: 0.48, minExp: 0.222, maxCoef: 0.87, maxExp: 0.222 },
+  // Índices funcionais (FS, FE) não têm cálculo automático - preenchimento manual
 };
 
 // Referências ACVIM 2020 para felinos (valores de corte fixos para HCM)
@@ -269,6 +273,9 @@ export function MeasurementsSection({
     dvedSistole: "",
     septoIVs: "",
     paredeLVs: "",
+    fracaoEncurtamento: "",
+    fracaoEjecaoTeicholz: "",
+    fracaoEjecaoSimpson: "",
   },
   onReferencesChange,
   useAutoReferences = true,
@@ -633,8 +640,9 @@ export function MeasurementsSection({
             inputValue={data.fracaoEncurtamento || fracaoEncurtamento || ''}
             onInputChange={(val) => handleChange('fracaoEncurtamento', val)}
             unit="%"
-            reference=""
+            reference={references.fracaoEncurtamento || ""}
             referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('fracaoEncurtamento', val)}
             classificationValue={classifications.fracaoEncurtamento}
             onClassificationChange={(val) => handleClassificationChange('fracaoEncurtamento', val)}
           />
@@ -644,8 +652,9 @@ export function MeasurementsSection({
             inputValue={data.fracaoEjecaoTeicholz || fracaoEjecaoTeicholz || ''}
             onInputChange={(val) => handleChange('fracaoEjecaoTeicholz', val)}
             unit="%"
-            reference=""
+            reference={references.fracaoEjecaoTeicholz || ""}
             referenceEditable
+            onReferenceChange={(val) => handleReferenceChange('fracaoEjecaoTeicholz', val)}
             classificationValue={classifications.fracaoEjecaoTeicholz}
             onClassificationChange={(val) => handleClassificationChange('fracaoEjecaoTeicholz', val)}
           />
@@ -668,7 +677,8 @@ export function MeasurementsSection({
             <Input
               className="input-vitaecor h-8 text-xs text-center"
               placeholder=""
-              value=""
+              value={references.fracaoEjecaoSimpson || ""}
+              onChange={(e) => handleReferenceChange('fracaoEjecaoSimpson', e.target.value)}
             />
             <Select 
               value={classifications.fracaoEjecaoSimpson} 
