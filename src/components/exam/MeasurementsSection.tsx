@@ -213,7 +213,7 @@ const MeasurementRow = memo(function MeasurementRow({
       {referenceEditable ? (
         <Input
           className="input-vitaecor h-8 text-xs text-center"
-          placeholder="Ref: ..."
+          placeholder=""
           value={reference || ""}
           onChange={(e) => onReferenceChange?.(e.target.value)}
         />
@@ -616,15 +616,17 @@ export function MeasurementsSection({
             onClassificationChange={(val) => handleClassificationChange('paredeLVs', val)}
           />
           
-          <MeasurementRow
-            label="VE em diástole NORMALIZADO (DVEdN)"
-            calculatedValue={dvedNormalizado}
-            reference="Ref: ≤ 1,70"
-            classificationValue={classifications.dvedNormalizado}
-            onClassificationChange={(val) => handleClassificationChange('dvedNormalizado', val)}
-            isCalculated
-            isAbnormal={isAbnormal(dvedNormalizado, 0, 1.70)}
-          />
+          {!isFeline && (
+            <MeasurementRow
+              label="VE em diástole NORMALIZADO (DVEdN)"
+              calculatedValue={dvedNormalizado}
+              reference="Ref: ≤ 1,70"
+              classificationValue={classifications.dvedNormalizado}
+              onClassificationChange={(val) => handleClassificationChange('dvedNormalizado', val)}
+              isCalculated
+              isAbnormal={isAbnormal(dvedNormalizado, 0, 1.70)}
+            />
+          )}
           
           <MeasurementRow
             label="Fração de Encurtamento (FS)"
@@ -664,7 +666,7 @@ export function MeasurementsSection({
             </div>
             <Input
               className="input-vitaecor h-8 text-xs text-center"
-              placeholder="Ref: ..."
+              placeholder=""
               value=""
             />
             <Select 
