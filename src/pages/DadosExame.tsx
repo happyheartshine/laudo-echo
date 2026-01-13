@@ -115,35 +115,14 @@ export default function DadosExame() {
     conclusaoDiastolica: "",
   });
 
-  // Templates para conclusão diastólica baseados no padrão selecionado
-  const conclusaoDiastolicaTemplates: Record<string, string> = {
-    "normal": "Função diastólica do ventrículo esquerdo preservada.",
-    "tipo_i": "Disfunção diastólica de grau I (alteração do relaxamento ventricular).",
-    "tipo_ii": "Disfunção diastólica de grau II (padrão pseudonormal).",
-    "tipo_iii": "Disfunção diastólica de grau III/IV (padrão restritivo).",
-    "indeterminado": "Padrão diastólico indeterminado.",
-  };
-
   // Handler para mudança de padrão diastólico com auto-preenchimento
   const handlePadraoDiastolicoChange = (value: string) => {
-    setFuncaoDiastolica(prev => {
-      const newState = { ...prev, padraoDiastolico: value };
-      
-      // Mapear o valor do select para a chave do template
-      let templateKey = "";
-      if (value.includes("normal")) templateKey = "normal";
-      else if (value.includes("tipo I") || value.includes("E < A")) templateKey = "tipo_i";
-      else if (value.includes("pseudonormalizado") || value.includes("tipo II")) templateKey = "tipo_ii";
-      else if (value.includes("restritivo") || value.includes("tipo III")) templateKey = "tipo_iii";
-      else if (value.includes("indeterminado")) templateKey = "indeterminado";
-      
-      // Só preenche automaticamente se o campo estiver vazio
-      if (templateKey && !prev.conclusaoDiastolica.trim()) {
-        newState.conclusaoDiastolica = conclusaoDiastolicaTemplates[templateKey] || "";
-      }
-      
-      return newState;
-    });
+    // O value do select já contém o texto completo da descrição
+    setFuncaoDiastolica(prev => ({
+      ...prev,
+      padraoDiastolico: value,
+      conclusaoDiastolica: value // Preenche automaticamente com o texto do padrão selecionado
+    }));
   };
 
   // Função Sistólica - Novos campos
@@ -1524,16 +1503,16 @@ export default function DadosExame() {
                   <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular restritivo ou tipo III.">
                     Tipo III - Restritivo
                   </SelectItem>
-                  <SelectItem value="Padrão diastólico indeterminado.">
+                  <SelectItem value="O estudo Doppler mostrou padrão diastólico indeterminado.">
                     Indeterminado
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Conclusão / Descrição Diastólica */}
+            {/* Descrição Diastólica */}
             <div className="mt-4">
-              <Label className="label-vitaecor">Conclusão / Descrição</Label>
+              <Label className="label-vitaecor">Descrição (editável)</Label>
               <Textarea 
                 className="input-vitaecor min-h-[100px]"
                 placeholder="Digite a conclusão sobre a função diastólica..."
