@@ -1117,15 +1117,35 @@ export default function DadosExame() {
       pdf.setFont("helvetica", "bold");
       pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, { align: "center" });
 
-      const imagesPerPage = 8;
-      const cols = 2; // 2 columns
-      const rows = 4; // 4 rows
-      const imgMargin = 6;
-      const startY = 42; // Start below title
-      const availableWidth = pageWidth - 2 * margin;
-      const availableHeight = pageHeight - startY - 15; // Leave space for footer
-      const imgWidth = (availableWidth - (cols - 1) * imgMargin) / cols;
-      const imgHeight = (availableHeight - (rows - 1) * imgMargin) / rows;
+      // Configuração: 6 imagens por página (2 colunas x 3 linhas)
+      const imagesPerPage = 6;
+      const cols = 2; // 2 colunas
+      const rows = 3; // 3 linhas
+      const imgMarginH = 16 * 0.264583; // 16px convertido para mm (~4.23mm)
+      const imgMarginV = 16 * 0.264583; // 16px convertido para mm (~4.23mm)
+      const gapBetweenImages = 4; // Espaço entre imagens em mm
+      const startY = 42; // Início abaixo do título
+      
+      // Área disponível considerando margens de 16px (convertidas para mm)
+      const availableWidth = pageWidth - 2 * imgMarginH;
+      const availableHeight = pageHeight - startY - imgMarginV - 10; // Espaço para footer
+      
+      // Dimensões das células da grade
+      const cellWidth = (availableWidth - (cols - 1) * gapBetweenImages) / cols;
+      const cellHeight = (availableHeight - (rows - 1) * gapBetweenImages) / rows;
+      
+      // Proporção desejada: 590x675 = ~0.874 (largura/altura)
+      const targetAspectRatio = 590 / 675;
+      
+      // Calcula dimensões da imagem mantendo proporção dentro da célula
+      let imgWidth = cellWidth;
+      let imgHeight = imgWidth / targetAspectRatio;
+      
+      // Se a altura calculada exceder a célula, ajusta pela altura
+      if (imgHeight > cellHeight) {
+        imgHeight = cellHeight;
+        imgWidth = imgHeight * targetAspectRatio;
+      }
 
       let imageIndex = 0;
       
@@ -1143,8 +1163,11 @@ export default function DadosExame() {
         const row = Math.floor(pageImageIndex / cols);
         const col = pageImageIndex % cols;
 
-        const x = margin + col * (imgWidth + imgMargin);
-        const y = startY + row * (imgHeight + imgMargin);
+        // Calcula posição centralizando a imagem na célula
+        const cellX = imgMarginH + col * (cellWidth + gapBetweenImages);
+        const cellY = startY + row * (cellHeight + gapBetweenImages);
+        const x = cellX + (cellWidth - imgWidth) / 2;
+        const y = cellY + (cellHeight - imgHeight) / 2;
 
         const img = selectedImageData[imageIndex];
         if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image') || img.dataUrl.startsWith('http')) {
