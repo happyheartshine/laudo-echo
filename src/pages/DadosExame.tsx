@@ -101,8 +101,8 @@ export default function DadosExame() {
     paredeLVs: "",
   });
 
-  // Toggle para usar referências Cornell automáticas
-  const [useCornellReferences, setUseCornellReferences] = useState(true);
+  // Toggle para usar referências automáticas (Cornell para caninos, ACVIM para felinos)
+  const [useAutoReferences, setUseAutoReferences] = useState(true);
 
   // Novos campos de função diastólica
   const [funcaoDiastolica, setFuncaoDiastolica] = useState({
@@ -639,7 +639,7 @@ export default function DadosExame() {
     };
 
     // Verifica se deve mostrar colunas de referência (toggle ativado E tem peso)
-    const showReferenceColumns = useCornellReferences && patientData.peso && parseFloat(patientData.peso) > 0;
+    const showReferenceColumns = useAutoReferences && patientData.peso && parseFloat(patientData.peso) > 0;
 
     // Função para adicionar linha do VE com 4 colunas (ou 2 se sem referência)
     const addVETableRow = (
@@ -1321,6 +1321,7 @@ export default function DadosExame() {
           <MeasurementsSection 
             data={measurementsData} 
             peso={patientData.peso}
+            especie={patientData.especie}
             modoMedicao={examInfo.modoMedicao}
             onModoChange={(modo) => setExamInfo({ ...examInfo, modoMedicao: modo })}
             onChange={setMeasurementsData}
@@ -1328,8 +1329,8 @@ export default function DadosExame() {
             onClassificationsChange={setClassificationsData}
             references={referencesData}
             onReferencesChange={setReferencesData}
-            useCornellReferences={useCornellReferences}
-            onCornellToggle={setUseCornellReferences}
+            useAutoReferences={useAutoReferences}
+            onAutoReferencesToggle={setUseAutoReferences}
             simpsonValue={funcaoSistolica.simpson}
             onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
           />
