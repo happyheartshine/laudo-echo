@@ -952,7 +952,7 @@ export default function DadosExame() {
       }
       
       // Índices de função sistólica do VD
-      if (ventriculoDireito.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} mm`);
+      if (ventriculoDireito.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} cm`);
       if (ventriculoDireito.fac) addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
       if (ventriculoDireito.tdiS) addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
       yPosition += 3;

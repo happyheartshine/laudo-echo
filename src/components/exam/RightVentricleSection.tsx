@@ -89,7 +89,7 @@ export function RightVentricleSection({ data, onChange }: RightVentricleSectionP
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label className="label-vitaecor">TAPSE (mm)</Label>
+              <Label className="label-vitaecor">TAPSE (cm)</Label>
               <Input 
                 className="input-vitaecor" 
                 type="text" 
