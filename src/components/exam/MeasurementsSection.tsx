@@ -734,10 +734,6 @@ export function MeasurementsSection({
       </div>
 
       {/* Legenda */}
-      <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-block w-3 h-3 rounded bg-accent"></span>
-        <span>Valores em vermelho indicam valores fora da normalidade (DVEdN normal até 1,70)</span>
-      </div>
     </div>
   );
 }
