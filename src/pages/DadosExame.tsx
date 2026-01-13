@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { Json } from "@/integrations/supabase/types";
 import { Layout } from "@/components/Layout";
 import { MeasurementsSection, ClassificationsData, ReferencesData } from "@/components/exam/MeasurementsSection";
+import { RightVentricleSection, RightVentricleData } from "@/components/exam/RightVentricleSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
 import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
@@ -122,6 +123,15 @@ export default function DadosExame() {
     tipoDisfuncao: "",
   });
 
+  // Ventrículo Direito - Nova seção
+  const [ventriculoDireito, setVentriculoDireito] = useState<RightVentricleData>({
+    atrioDireito: "",
+    ventriculoDireito: "",
+    tapse: "",
+    fac: "",
+    tdiS: "",
+  });
+
   // TDI - Dois grupos: Parede Livre e Parede Septal
   const [tdiLivre, setTdiLivre] = useState({
     s: "",
@@ -212,7 +222,6 @@ export default function DadosExame() {
   });
 
   const [outros, setOutros] = useState({
-    camarasDireitas: "normais",
     septos: "interventricular e interatrial íntegros",
     pericardio: "normal, sem derrame",
   });
@@ -259,6 +268,7 @@ export default function DadosExame() {
         classificationsData?: ClassificationsData;
         funcaoDiastolica?: typeof funcaoDiastolica;
         funcaoSistolica?: typeof funcaoSistolica;
+        ventriculoDireito?: RightVentricleData;
         tdiLivre?: typeof tdiLivre;
         tdiSeptal?: typeof tdiSeptal;
         valvasDoppler?: typeof valvasDoppler;
@@ -276,6 +286,7 @@ export default function DadosExame() {
       if (content.classificationsData) setClassificationsData(content.classificationsData);
       if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
       if (content.funcaoSistolica) setFuncaoSistolica(content.funcaoSistolica);
+      if (content.ventriculoDireito) setVentriculoDireito(content.ventriculoDireito);
       if (content.tdiLivre) setTdiLivre(content.tdiLivre);
       if (content.tdiSeptal) setTdiSeptal(content.tdiSeptal);
       if (content.valvasDoppler) setValvasDoppler(content.valvasDoppler);
@@ -925,9 +936,30 @@ export default function DadosExame() {
       }
     }
 
+    // Ventrículo Direito - Nova seção
+    const hasRightVentricleData = ventriculoDireito.atrioDireito || ventriculoDireito.ventriculoDireito || 
+      ventriculoDireito.tapse || ventriculoDireito.fac || ventriculoDireito.tdiS;
+    
+    if (hasRightVentricleData) {
+      await addSectionHeader("VENTRÍCULO DIREITO");
+      
+      // Avaliação qualitativa
+      if (ventriculoDireito.atrioDireito && ventriculoDireito.atrioDireito !== "none") {
+        addTableRow("Átrio Direito", ventriculoDireito.atrioDireito);
+      }
+      if (ventriculoDireito.ventriculoDireito && ventriculoDireito.ventriculoDireito !== "none") {
+        addTableRow("Ventrículo Direito", ventriculoDireito.ventriculoDireito);
+      }
+      
+      // Índices de função sistólica do VD
+      if (ventriculoDireito.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} mm`);
+      if (ventriculoDireito.fac) addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
+      if (ventriculoDireito.tdiS) addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
+      yPosition += 3;
+    }
+
     // Outros
     await addSectionHeader("OUTROS");
-    addTableRow("Câmaras Direitas", outros.camarasDireitas);
     addTableRow("Septos", outros.septos);
     addTableRow("Pericárdio", outros.pericardio);
     yPosition += 5;
@@ -1120,6 +1152,7 @@ export default function DadosExame() {
         classificationsData,
         funcaoDiastolica,
         funcaoSistolica,
+        ventriculoDireito,
         tdiLivre,
         tdiSeptal,
         valvasDoppler,
@@ -1333,6 +1366,12 @@ export default function DadosExame() {
             onAutoReferencesToggle={setUseAutoReferences}
             simpsonValue={funcaoSistolica.simpson}
             onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
+          />
+
+          {/* Ventrículo Direito - Nova Seção (logo após VE) */}
+          <RightVentricleSection 
+            data={ventriculoDireito}
+            onChange={setVentriculoDireito}
           />
 
           {/* Função Sistólica */}
@@ -1575,14 +1614,11 @@ export default function DadosExame() {
             </div>
           </div>
 
+
           {/* Outros */}
           <div className="card-vitaecor animate-fade-in">
             <h2 className="section-title">Outros Achados</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label className="label-vitaecor">Câmaras Direitas</Label>
-                <Input className="input-vitaecor" value={outros.camarasDireitas} onChange={(e) => setOutros({...outros, camarasDireitas: e.target.value})} />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="label-vitaecor">Septos</Label>
                 <Input className="input-vitaecor" value={outros.septos} onChange={(e) => setOutros({...outros, septos: e.target.value})} />
