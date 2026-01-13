@@ -105,12 +105,41 @@ export default function DadosExame() {
   // Toggle para usar referências automáticas (Cornell para caninos, ACVIM para felinos)
   const [useAutoReferences, setUseAutoReferences] = useState(true);
 
-  // Handler para toggle de referências - limpa campos quando desligado
+  // Fórmulas Cornell 2004 para cálculo de referências
+  const CORNELL_FORMULAS: Record<string, { minCoef: number; minExp: number; maxCoef: number; maxExp: number }> = {
+    septoIVd: { minCoef: 0.29, minExp: 0.241, maxCoef: 0.59, maxExp: 0.241 },
+    dvedDiastole: { minCoef: 1.27, minExp: 0.294, maxCoef: 1.85, maxExp: 0.294 },
+    paredeLVd: { minCoef: 0.29, minExp: 0.232, maxCoef: 0.60, maxExp: 0.232 },
+    dvedSistole: { minCoef: 0.71, minExp: 0.315, maxCoef: 1.26, maxExp: 0.315 },
+    septoIVs: { minCoef: 0.43, minExp: 0.240, maxCoef: 0.79, maxExp: 0.240 },
+    paredeLVs: { minCoef: 0.48, minExp: 0.222, maxCoef: 0.87, maxExp: 0.222 },
+  };
+
+  // Referências ACVIM 2020 para felinos
+  const ACVIM_FELINE_REFERENCES: Record<string, string> = {
+    septoIVd: "< 0,60",
+    paredeLVd: "< 0,60",
+  };
+
+  // Calcula referência Cornell baseada no peso
+  const calculateCornellReference = (peso: number, field: string): string => {
+    if (!peso || peso <= 0 || isNaN(peso)) return "";
+    
+    const formula = CORNELL_FORMULAS[field];
+    if (!formula) return "";
+    
+    const min = formula.minCoef * Math.pow(peso, formula.minExp);
+    const max = formula.maxCoef * Math.pow(peso, formula.maxExp);
+    
+    return `${min.toFixed(2).replace('.', ',')} - ${max.toFixed(2).replace('.', ',')}`;
+  };
+
+  // Handler para toggle de referências - limpa ou recalcula campos
   const handleAutoReferencesToggle = (enabled: boolean) => {
     setUseAutoReferences(enabled);
     
-    // Se desligar, limpa todos os campos de referência
     if (!enabled) {
+      // Se desligar, limpa todos os campos de referência
       setReferencesData({
         septoIVd: "",
         dvedDiastole: "",
@@ -119,6 +148,32 @@ export default function DadosExame() {
         septoIVs: "",
         paredeLVs: "",
       });
+    } else {
+      // Se ligar, recalcula referências baseadas no peso atual
+      const peso = parseFloat(patientData.peso?.replace(',', '.') || '0');
+      const isFeline = patientData.especie === 'felino';
+      
+      if (isFeline) {
+        // Referências ACVIM para felinos
+        setReferencesData({
+          septoIVd: ACVIM_FELINE_REFERENCES.septoIVd || "",
+          dvedDiastole: "",
+          paredeLVd: ACVIM_FELINE_REFERENCES.paredeLVd || "",
+          dvedSistole: "",
+          septoIVs: "",
+          paredeLVs: "",
+        });
+      } else {
+        // Referências Cornell para caninos (baseadas no peso)
+        setReferencesData({
+          septoIVd: calculateCornellReference(peso, 'septoIVd'),
+          dvedDiastole: calculateCornellReference(peso, 'dvedDiastole'),
+          paredeLVd: calculateCornellReference(peso, 'paredeLVd'),
+          dvedSistole: calculateCornellReference(peso, 'dvedSistole'),
+          septoIVs: calculateCornellReference(peso, 'septoIVs'),
+          paredeLVs: calculateCornellReference(peso, 'paredeLVs'),
+        });
+      }
     }
   };
 
