@@ -112,7 +112,39 @@ export default function DadosExame() {
     tempoDesaceleracao: "",
     triv: "",
     padraoDiastolico: "",
+    conclusaoDiastolica: "",
   });
+
+  // Templates para conclusão diastólica baseados no padrão selecionado
+  const conclusaoDiastolicaTemplates: Record<string, string> = {
+    "normal": "Função diastólica do ventrículo esquerdo preservada.",
+    "tipo_i": "Disfunção diastólica de grau I (alteração do relaxamento ventricular).",
+    "tipo_ii": "Disfunção diastólica de grau II (padrão pseudonormal).",
+    "tipo_iii": "Disfunção diastólica de grau III/IV (padrão restritivo).",
+    "indeterminado": "Padrão diastólico indeterminado.",
+  };
+
+  // Handler para mudança de padrão diastólico com auto-preenchimento
+  const handlePadraoDiastolicoChange = (value: string) => {
+    setFuncaoDiastolica(prev => {
+      const newState = { ...prev, padraoDiastolico: value };
+      
+      // Mapear o valor do select para a chave do template
+      let templateKey = "";
+      if (value.includes("normal")) templateKey = "normal";
+      else if (value.includes("tipo I") || value.includes("E < A")) templateKey = "tipo_i";
+      else if (value.includes("pseudonormalizado") || value.includes("tipo II")) templateKey = "tipo_ii";
+      else if (value.includes("restritivo") || value.includes("tipo III")) templateKey = "tipo_iii";
+      else if (value.includes("indeterminado")) templateKey = "indeterminado";
+      
+      // Só preenche automaticamente se o campo estiver vazio
+      if (templateKey && !prev.conclusaoDiastolica.trim()) {
+        newState.conclusaoDiastolica = conclusaoDiastolicaTemplates[templateKey] || "";
+      }
+      
+      return newState;
+    });
+  };
 
   // Função Sistólica - Novos campos
   const [funcaoSistolica, setFuncaoSistolica] = useState({
@@ -845,6 +877,20 @@ export default function DadosExame() {
           yPosition += 5;
         }
       }
+      
+      // Conclusão / Descrição Diastólica
+      if (funcaoDiastolica.conclusaoDiastolica) {
+        yPosition += 2;
+        pdf.setTextColor(60, 60, 60);
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "italic");
+        const conclusaoLines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
+        for (const line of conclusaoLines) {
+          await checkPageBreak(5);
+          pdf.text(line, margin, yPosition);
+          yPosition += 5;
+        }
+      }
       yPosition += 3;
     }
 
@@ -1460,7 +1506,7 @@ export default function DadosExame() {
               <Label className="label-vitaecor">Padrão Diastólico</Label>
               <Select 
                 value={funcaoDiastolica.padraoDiastolico} 
-                onValueChange={(value) => setFuncaoDiastolica({...funcaoDiastolica, padraoDiastolico: value})}
+                onValueChange={handlePadraoDiastolicoChange}
               >
                 <SelectTrigger className="input-vitaecor">
                   <SelectValue placeholder="Selecione o padrão diastólico..." />
@@ -1478,8 +1524,22 @@ export default function DadosExame() {
                   <SelectItem value="O estudo Doppler mostrou padrão diastólico de enchimento ventricular restritivo ou tipo III.">
                     Tipo III - Restritivo
                   </SelectItem>
+                  <SelectItem value="Padrão diastólico indeterminado.">
+                    Indeterminado
+                  </SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Conclusão / Descrição Diastólica */}
+            <div className="mt-4">
+              <Label className="label-vitaecor">Conclusão / Descrição</Label>
+              <Textarea 
+                className="input-vitaecor min-h-[100px]"
+                placeholder="Digite a conclusão sobre a função diastólica..."
+                value={funcaoDiastolica.conclusaoDiastolica}
+                onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, conclusaoDiastolica: e.target.value})}
+              />
             </div>
           </div>
 
