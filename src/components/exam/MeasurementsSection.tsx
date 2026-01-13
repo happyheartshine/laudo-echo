@@ -214,12 +214,12 @@ const MeasurementRow = memo(function MeasurementRow({
         <Input
           className="input-vitaecor h-8 text-xs text-center"
           placeholder="Ref: ..."
-          value={reference}
+          value={reference || ""}
           onChange={(e) => onReferenceChange?.(e.target.value)}
         />
       ) : (
         <div className="text-xs text-muted-foreground text-center">
-          {reference}
+          {reference || ""}
         </div>
       )}
       
@@ -549,7 +549,7 @@ export function MeasurementsSection({
             inputValue={data.septoIVd}
             onInputChange={(val) => handleChange('septoIVd', val)}
             unit="cm"
-            reference={references.septoIVd || "Ref: ..."}
+            reference={references.septoIVd}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('septoIVd', val)}
             classificationValue={classifications.septoIVd}
@@ -561,7 +561,7 @@ export function MeasurementsSection({
             inputValue={data.dvedDiastole}
             onInputChange={(val) => handleChange('dvedDiastole', val)}
             unit="cm"
-            reference={references.dvedDiastole || "Ref: ..."}
+            reference={references.dvedDiastole}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('dvedDiastole', val)}
             classificationValue={classifications.dvedDiastole}
@@ -573,7 +573,7 @@ export function MeasurementsSection({
             inputValue={data.paredeLVd}
             onInputChange={(val) => handleChange('paredeLVd', val)}
             unit="cm"
-            reference={references.paredeLVd || "Ref: ..."}
+            reference={references.paredeLVd}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('paredeLVd', val)}
             classificationValue={classifications.paredeLVd}
@@ -585,7 +585,7 @@ export function MeasurementsSection({
             inputValue={data.dvedSistole}
             onInputChange={(val) => handleChange('dvedSistole', val)}
             unit="cm"
-            reference={references.dvedSistole || "Ref: ..."}
+            reference={references.dvedSistole}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('dvedSistole', val)}
             classificationValue={classifications.dvedSistole}
@@ -597,7 +597,7 @@ export function MeasurementsSection({
             inputValue={data.septoIVs}
             onInputChange={(val) => handleChange('septoIVs', val)}
             unit="cm"
-            reference={references.septoIVs || "Ref: ..."}
+            reference={references.septoIVs}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('septoIVs', val)}
             classificationValue={classifications.septoIVs}
@@ -609,7 +609,7 @@ export function MeasurementsSection({
             inputValue={data.paredeLVs}
             onInputChange={(val) => handleChange('paredeLVs', val)}
             unit="cm"
-            reference={references.paredeLVs || "Ref: ..."}
+            reference={references.paredeLVs}
             referenceEditable
             onReferenceChange={(val) => handleReferenceChange('paredeLVs', val)}
             classificationValue={classifications.paredeLVs}
@@ -641,7 +641,8 @@ export function MeasurementsSection({
             inputValue={data.fracaoEjecaoTeicholz || fracaoEjecaoTeicholz || ''}
             onInputChange={(val) => handleChange('fracaoEjecaoTeicholz', val)}
             unit="%"
-            reference="Ref: ..."
+            reference=""
+            referenceEditable
             classificationValue={classifications.fracaoEjecaoTeicholz}
             onClassificationChange={(val) => handleClassificationChange('fracaoEjecaoTeicholz', val)}
           />
@@ -661,9 +662,11 @@ export function MeasurementsSection({
               />
               <span className="text-xs text-muted-foreground whitespace-nowrap">%</span>
             </div>
-            <div className="text-xs text-muted-foreground text-center">
-              Ref: ...
-            </div>
+            <Input
+              className="input-vitaecor h-8 text-xs text-center"
+              placeholder="Ref: ..."
+              value=""
+            />
             <Select 
               value={classifications.fracaoEjecaoSimpson} 
               onValueChange={(val) => handleClassificationChange('fracaoEjecaoSimpson', val)}
