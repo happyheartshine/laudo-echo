@@ -105,6 +105,23 @@ export default function DadosExame() {
   // Toggle para usar referências automáticas (Cornell para caninos, ACVIM para felinos)
   const [useAutoReferences, setUseAutoReferences] = useState(true);
 
+  // Handler para toggle de referências - limpa campos quando desligado
+  const handleAutoReferencesToggle = (enabled: boolean) => {
+    setUseAutoReferences(enabled);
+    
+    // Se desligar, limpa todos os campos de referência
+    if (!enabled) {
+      setReferencesData({
+        septoIVd: "",
+        dvedDiastole: "",
+        paredeLVd: "",
+        dvedSistole: "",
+        septoIVs: "",
+        paredeLVs: "",
+      });
+    }
+  };
+
   // Novos campos de função diastólica
   const [funcaoDiastolica, setFuncaoDiastolica] = useState({
     ondaE: "",
@@ -1388,7 +1405,7 @@ export default function DadosExame() {
             references={referencesData}
             onReferencesChange={setReferencesData}
             useAutoReferences={useAutoReferences}
-            onAutoReferencesToggle={setUseAutoReferences}
+            onAutoReferencesToggle={handleAutoReferencesToggle}
             simpsonValue={funcaoSistolica.simpson}
             onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
           />
