@@ -515,7 +515,24 @@ export async function generateExamPdf(
   if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
   // Medidas funcionais (FS, FE, DVEdN)
-  if (dvedNorm && dvedNorm !== '-') addVE4ColumnRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), undefined, 'dvedNormalizado');
+  if (dvedNorm && dvedNorm !== '-') {
+    // DVEdN com referência fixa "< 1,70"
+    pdf.setFontSize(9);
+    pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+    pdf.setFont("helvetica", "normal");
+    const col1X = margin;
+    const col2X = margin + 68;
+    const col3X = margin + 100;
+    const col4X = margin + 142;
+    pdf.text("VE em diástole NORMALIZADO (DVEdN)", col1X, yPosition);
+    pdf.text(formatNumber(dvedNorm), col2X, yPosition);
+    pdf.setFontSize(8);
+    pdf.text("< 1,70", col3X, yPosition);
+    pdf.setFontSize(9);
+    const classText = getClassificationText('dvedNormalizado');
+    if (classText) pdf.text(classText, col4X, yPosition);
+    yPosition += 5;
+  }
   if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
   if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
   if (funcaoSistolica?.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
