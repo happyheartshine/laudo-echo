@@ -852,96 +852,103 @@ export default function DadosExame() {
       yPosition += 3;
     }
 
-    // Função Diastólica
-    const hasDiastolicData = funcaoDiastolica.ondaE || funcaoDiastolica.ondaA || funcaoDiastolica.tempoDesaceleracao || funcaoDiastolica.triv || funcaoDiastolica.padraoDiastolico;
-    if (hasDiastolicData) {
-      await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
-      if (funcaoDiastolica.ondaE) addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
-      if (funcaoDiastolica.ondaA) addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
-      if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
-      if (funcaoDiastolica.tempoDesaceleracao) addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
-      if (funcaoDiastolica.triv) addTableRow("TRIV", `${formatNumber(funcaoDiastolica.triv)} ms`);
-      if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
-      yPosition += 3;
-    }
-    
-    // TDI - Duas colunas: Parede Livre e Parede Septal
-    const hasTdiData = tdiLivre.s || tdiLivre.e || tdiLivre.a || tdiSeptal.s || tdiSeptal.e || tdiSeptal.a;
-    if (hasTdiData) {
-      await addSectionHeader("DOPPLER TECIDUAL (TDI)");
+      // Função Diastólica do Ventrículo Esquerdo (inclui TDI como subseção)
+      const hasDiastolicData = funcaoDiastolica.ondaE || funcaoDiastolica.ondaA || funcaoDiastolica.tempoDesaceleracao || funcaoDiastolica.triv || funcaoDiastolica.padraoDiastolico;
+      const hasTdiData = tdiLivre.s || tdiLivre.e || tdiLivre.a || tdiSeptal.s || tdiSeptal.e || tdiSeptal.a;
       
-      // TDI Parede Livre
-      if (tdiLivre.s || tdiLivre.e || tdiLivre.a) {
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9);
-        pdf.setTextColor(60, 60, 60);
-        pdf.text("Parede Livre:", margin, yPosition);
-        pdf.setFont("helvetica", "normal");
-        const livreValues = [];
-        if (tdiLivre.s) livreValues.push(`s': ${formatTdi(tdiLivre.s)} cm/s`);
-        if (tdiLivre.e) livreValues.push(`e': ${formatTdi(tdiLivre.e)} cm/s`);
-        if (tdiLivre.a) livreValues.push(`a': ${formatTdi(tdiLivre.a)} cm/s`);
-        pdf.text(livreValues.join(" | "), margin + 25, yPosition);
-        yPosition += 5;
+      if (hasDiastolicData || hasTdiData) {
+        await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
         
-        // E/e' Parede Livre - só imprime se tdiLivre.e tiver valor
-        if (tdiLivre.e && calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(9);
-          pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-          pdf.text(`E/e' (Livre): ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`, margin, yPosition);
-          yPosition += 5;
-        }
-      }
-      
-      // TDI Parede Septal
-      if (tdiSeptal.s || tdiSeptal.e || tdiSeptal.a) {
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(9);
-        pdf.setTextColor(60, 60, 60);
-        pdf.text("Parede Septal:", margin, yPosition);
-        pdf.setFont("helvetica", "normal");
-        const septalValues = [];
-        if (tdiSeptal.s) septalValues.push(`s': ${formatTdi(tdiSeptal.s)} cm/s`);
-        if (tdiSeptal.e) septalValues.push(`e': ${formatTdi(tdiSeptal.e)} cm/s`);
-        if (tdiSeptal.a) septalValues.push(`a': ${formatTdi(tdiSeptal.a)} cm/s`);
-        pdf.text(septalValues.join(" | "), margin + 25, yPosition);
-        yPosition += 5;
+        // Dados do Doppler Mitral
+        if (funcaoDiastolica.ondaE) addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
+        if (funcaoDiastolica.ondaA) addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
+        if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
+        if (funcaoDiastolica.tempoDesaceleracao) addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
+        if (funcaoDiastolica.triv) addTableRow("TRIV", `${formatNumber(funcaoDiastolica.triv)} ms`);
+        if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
         
-        // E/e' Parede Septal - só imprime se tdiSeptal.e tiver valor
-        if (tdiSeptal.e && calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
-          pdf.setFont("helvetica", "normal");
+        // TDI como subseção dentro da Função Diastólica
+        if (hasTdiData) {
+          yPosition += 3;
+          pdf.setFont("helvetica", "bold");
           pdf.setFontSize(9);
-          pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-          pdf.text(`E/e' (Septal): ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`, margin, yPosition);
+          pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+          pdf.text("Doppler Tecidual (TDI)", margin, yPosition);
           yPosition += 5;
+          
+          // TDI Parede Livre
+          if (tdiLivre.s || tdiLivre.e || tdiLivre.a) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(9);
+            pdf.setTextColor(60, 60, 60);
+            pdf.text("Parede Livre:", margin, yPosition);
+            pdf.setFont("helvetica", "normal");
+            const livreValues = [];
+            if (tdiLivre.s) livreValues.push(`s': ${formatTdi(tdiLivre.s)} cm/s`);
+            if (tdiLivre.e) livreValues.push(`e': ${formatTdi(tdiLivre.e)} cm/s`);
+            if (tdiLivre.a) livreValues.push(`a': ${formatTdi(tdiLivre.a)} cm/s`);
+            pdf.text(livreValues.join(" | "), margin + 25, yPosition);
+            yPosition += 5;
+            
+            // E/e' Parede Livre - só imprime se tdiLivre.e tiver valor
+            if (tdiLivre.e && calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
+              pdf.setFont("helvetica", "normal");
+              pdf.setFontSize(9);
+              pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+              pdf.text(`E/e' (Livre): ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`, margin, yPosition);
+              yPosition += 5;
+            }
+          }
+          
+          // TDI Parede Septal
+          if (tdiSeptal.s || tdiSeptal.e || tdiSeptal.a) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(9);
+            pdf.setTextColor(60, 60, 60);
+            pdf.text("Parede Septal:", margin, yPosition);
+            pdf.setFont("helvetica", "normal");
+            const septalValues = [];
+            if (tdiSeptal.s) septalValues.push(`s': ${formatTdi(tdiSeptal.s)} cm/s`);
+            if (tdiSeptal.e) septalValues.push(`e': ${formatTdi(tdiSeptal.e)} cm/s`);
+            if (tdiSeptal.a) septalValues.push(`a': ${formatTdi(tdiSeptal.a)} cm/s`);
+            pdf.text(septalValues.join(" | "), margin + 25, yPosition);
+            yPosition += 5;
+            
+            // E/e' Parede Septal - só imprime se tdiSeptal.e tiver valor
+            if (tdiSeptal.e && calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
+              pdf.setFont("helvetica", "normal");
+              pdf.setFontSize(9);
+              pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+              pdf.text(`E/e' (Septal): ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`, margin, yPosition);
+              yPosition += 5;
+            }
+          }
+          
+          // Média E/e' - SOMENTE se ambos (Livre e Septal) estiverem preenchidos
+          if (tdiLivre.e && tdiSeptal.e && calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+            pdf.setFontSize(9);
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+            pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
+            yPosition += 5;
+          }
         }
-      }
-      
-      // Média E/e' - SOMENTE se ambos (Livre e Septal) estiverem preenchidos
-      if (tdiLivre.e && tdiSeptal.e && calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-        pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
-        yPosition += 5;
-      }
-      
-      // Conclusão / Descrição Diastólica (campo editável pelo usuário)
-      if (funcaoDiastolica.conclusaoDiastolica) {
-        yPosition += 2;
-        pdf.setTextColor(60, 60, 60);
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "italic");
-        const conclusaoLines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
-        for (const line of conclusaoLines) {
-          await checkPageBreak(5);
-          pdf.text(line, margin, yPosition);
-          yPosition += 5;
+        
+        // Conclusão / Descrição Diastólica (campo editável pelo usuário) - SEMPRE no final da seção
+        if (funcaoDiastolica.conclusaoDiastolica) {
+          yPosition += 2;
+          pdf.setTextColor(60, 60, 60);
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "italic");
+          const conclusaoLines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
+          for (const line of conclusaoLines) {
+            await checkPageBreak(5);
+            pdf.text(line, margin, yPosition);
+            yPosition += 5;
+          }
         }
+        yPosition += 3;
       }
-      yPosition += 3;
-    }
 
     // Função Sistólica - MOVIDA PARA DEPOIS DA DIASTÓLICA
     const hasSystolicData = funcaoSistolica.mapse || funcaoSistolica.epss || funcaoSistolica.statusFuncao || funcaoSistolica.tipoDisfuncao;
