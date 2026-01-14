@@ -488,7 +488,7 @@ export async function generateExamPdf(
   const dvedNum = parseFloat(measurementsData.dvedDiastole || "0");
   const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '';
 
-  // Cabeçalho das 4 colunas
+  // Cabeçalho das 4 colunas (sem linha divisória para visual mais limpo)
   pdf.setFontSize(8);
   pdf.setFont("helvetica", "bold");
   pdf.setTextColor(100, 100, 100);
@@ -496,10 +496,7 @@ export async function generateExamPdf(
   pdf.text("Valor", margin + 68, yPosition);
   pdf.text("Referência", margin + 100, yPosition);
   pdf.text("Status", margin + 142, yPosition);
-  yPosition += 4;
-  pdf.setDrawColor(200, 200, 200);
-  pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 3;
+  yPosition += 6;
 
   const fsValue = measurementsData.fracaoEncurtamento?.trim()
     ? measurementsData.fracaoEncurtamento
@@ -634,13 +631,34 @@ export async function generateExamPdf(
   }
 
   // ========== 3. AVALIAÇÃO HEMODINÂMICA - VALVAS ==========
+  // IMPORTANTE: Bloco inteiro tratado junto para evitar título órfão (page-break-inside: avoid)
   const hasValveData = valvasDoppler?.mitralVelocidade || valvasDoppler?.mitralGradiente || valvasDoppler?.mitralDpDt ||
     valvasDoppler?.tricuspideVelocidade || valvasDoppler?.tricuspideGradiente ||
     valvasDoppler?.pulmonarVelocidade || valvasDoppler?.pulmonarGradiente ||
     valvasDoppler?.aorticaVelocidade || valvasDoppler?.aorticaGradiente;
 
   if (hasValveData) {
-    await addSectionHeader("AVALIAÇÃO HEMODINÂMICA", 40);
+    // Calcula altura total estimada do bloco de valvas para decidir se cabe na página atual
+    const estimateValveBlockHeight = () => {
+      let height = 10; // Header
+      const countMitral = [valvasDoppler?.mitralVelocidade, valvasDoppler?.mitralGradiente, valvasDoppler?.mitralDpDt].filter(v => v && !isEmpty(v)).length;
+      const countTricuspide = [valvasDoppler?.tricuspideVelocidade, valvasDoppler?.tricuspideGradiente].filter(v => v && !isEmpty(v)).length;
+      const countAortica = [valvasDoppler?.aorticaVelocidade, valvasDoppler?.aorticaGradiente].filter(v => v && !isEmpty(v)).length;
+      const countPulmonar = [valvasDoppler?.pulmonarVelocidade, valvasDoppler?.pulmonarGradiente].filter(v => v && !isEmpty(v)).length;
+      
+      if (countMitral > 0) height += 8 + countMitral * 5;
+      if (countTricuspide > 0) height += 8 + countTricuspide * 5;
+      if (countAortica > 0) height += 8 + countAortica * 5;
+      if (countPulmonar > 0) height += 8 + countPulmonar * 5;
+      return height;
+    };
+
+    const totalBlockHeight = estimateValveBlockHeight();
+    
+    // Se o bloco inteiro não couber, pula para próxima página (evita título órfão)
+    await checkPageBreak(Math.min(totalBlockHeight, 80)); // Cap em 80mm para blocos muito grandes
+
+    await addSectionHeader("AVALIAÇÃO HEMODINÂMICA", 30);
     yPosition += 2;
 
     const addValveBlock = async (title: string, rows: Array<{ label: string; value: string }>) => {
@@ -678,16 +696,14 @@ export async function generateExamPdf(
 
     // VALVA AÓRTICA
     if (valvasDoppler?.aorticaVelocidade || valvasDoppler?.aorticaGradiente) {
-      await checkPageBreak(40);
       await addValveBlock("VALVA AÓRTICA", [
         { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.aorticaVelocidade ? `${formatNumber(valvasDoppler.aorticaVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.aorticaGradiente ? `${formatNumber(valvasDoppler.aorticaGradiente)} mmHg` : "" },
       ]);
     }
 
-    // VALVA PULMONAR (OBRIGATÓRIA)
+    // VALVA PULMONAR
     if (valvasDoppler?.pulmonarVelocidade || valvasDoppler?.pulmonarGradiente) {
-      await checkPageBreak(40);
       await addValveBlock("VALVA PULMONAR", [
         { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.pulmonarGradiente ? `${formatNumber(valvasDoppler.pulmonarGradiente)} mmHg` : "" },
