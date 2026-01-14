@@ -43,6 +43,7 @@ export interface ClassificationsData {
   fracaoEjecaoSimpson: string;
   septoIVs: string;
   paredeLVs: string;
+  relacaoAEAo: string;
 }
 
 interface MeasurementsSectionProps {
@@ -264,6 +265,7 @@ export function MeasurementsSection({
     fracaoEjecaoSimpson: "",
     septoIVs: "",
     paredeLVs: "",
+    relacaoAEAo: "",
   },
   onClassificationsChange,
   references = {
@@ -444,6 +446,23 @@ export function MeasurementsSection({
     return result.toFixed(2);
   }, [peso, data.dvedDiastole]);
 
+  // Efeito para auto-classificar DVEdN quando calculado (Cornell: 1.27-1.85 = Normal)
+  useEffect(() => {
+    if (!onClassificationsChange || isFeline) return; // Só para caninos
+    
+    if (!dvedNormalizado) return;
+    
+    const value = parseFloat(dvedNormalizado);
+    if (isNaN(value)) return;
+    
+    // Classificação Cornell: entre 1.27 e 1.85 é Normal, fora é Aumentado
+    const newClassification = (value >= 1.27 && value <= 1.85) ? "normal" : "aumentado";
+    
+    if (classifications.dvedNormalizado !== newClassification) {
+      onClassificationsChange({ ...classifications, dvedNormalizado: newClassification });
+    }
+  }, [dvedNormalizado, isFeline]);
+
   // Relação AE/Ao
   const relacaoAEAo = useMemo(() => {
     const ae = parseDecimal(data.atrioEsquerdo);
@@ -453,6 +472,22 @@ export function MeasurementsSection({
     
     return (ae / ao).toFixed(2);
   }, [data.atrioEsquerdo, data.aorta]);
+
+  // Efeito para auto-classificar AE/Ao quando calculado (≤1.59 = Normal, >1.59 = Aumentado)
+  useEffect(() => {
+    if (!onClassificationsChange) return;
+    
+    if (!relacaoAEAo) return;
+    
+    const value = parseFloat(relacaoAEAo);
+    if (isNaN(value)) return;
+    
+    const newClassification = value <= 1.59 ? "normal" : "aumentado";
+    
+    if (classifications.relacaoAEAo !== newClassification) {
+      onClassificationsChange({ ...classifications, relacaoAEAo: newClassification });
+    }
+  }, [relacaoAEAo]);
 
   // Fração de Encurtamento
   const fracaoEncurtamento = useMemo(() => {
@@ -733,11 +768,26 @@ export function MeasurementsSection({
             </h3>
             
             <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-border">
+              <div className="grid grid-cols-[1fr_80px_140px] gap-3 items-center py-2 border-b border-border">
                 <span className="text-sm text-muted-foreground">Relação AE/Ao:</span>
-                <span className={`font-semibold ${isAbnormal(relacaoAEAo, 0, 1.6) ? 'value-abnormal' : 'text-foreground'}`}>
+                <span className={`font-semibold text-center ${isAbnormal(relacaoAEAo, 0, 1.59) ? 'value-abnormal' : 'text-foreground'}`}>
                   {relacaoAEAo ? relacaoAEAo : '--'}
                 </span>
+                <Select 
+                  value={classifications.relacaoAEAo || ""} 
+                  onValueChange={(val) => handleClassificationChange('relacaoAEAo', val)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Classificação" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    {CLASSIFICATION_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value || "none"}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

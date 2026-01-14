@@ -90,6 +90,7 @@ export default function DadosExame() {
     fracaoEjecaoSimpson: "",
     septoIVs: "",
     paredeLVs: "",
+    relacaoAEAo: "",
   });
 
   // Referências Cornell
@@ -795,8 +796,13 @@ export default function DadosExame() {
       yPosition += 5;
     };
 
-    // Função para linha simples (sem referência Cornell - como FS, FE, VEdN)
-    const addVESimpleRow = (label: string, value: string, classificationKey?: keyof typeof classificationsData) => {
+    // Função para linha com 4 colunas (usada para FS, FE, VEdN) - mostra referência manual se houver
+    const addVEFullRow = (
+      label: string, 
+      value: string, 
+      referenceKey?: keyof typeof referencesData,
+      classificationKey?: keyof typeof classificationsData
+    ) => {
       if (isEmpty(value)) return;
       
       pdf.setFontSize(9);
@@ -805,14 +811,31 @@ export default function DadosExame() {
       
       const col1X = margin;
       const col2X = margin + 68;
+      const col3X = margin + 100;
+      const col4X = margin + 142;
       
+      // Coluna 1: Nome do parâmetro
       pdf.text(label, col1X, yPosition);
       
-      const classText = classificationKey ? getClassificationText(classificationKey) : "";
-      if (classText) {
-        pdf.text(`${value}  (${classText})`, col2X, yPosition);
-      } else {
-        pdf.text(value, col2X, yPosition);
+      // Coluna 2: Valor
+      pdf.text(value, col2X, yPosition);
+      
+      // Coluna 3: Referência (se houver - manual)
+      if (referenceKey) {
+        const refText = getReferenceText(referenceKey);
+        if (refText) {
+          pdf.setFontSize(8);
+          pdf.text(refText, col3X, yPosition);
+          pdf.setFontSize(9);
+        }
+      }
+      
+      // Coluna 4: Status/Classificação
+      if (classificationKey) {
+        const classText = getClassificationText(classificationKey);
+        if (classText) {
+          pdf.text(classText, col4X, yPosition);
+        }
       }
       
       yPosition += 5;
@@ -850,11 +873,11 @@ export default function DadosExame() {
     if (measurementsData.septoIVs) addVETableRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
     if (measurementsData.paredeLVs) addVETableRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
     
-    // Medidas sem referência Cornell (linha simples com status)
-    if (dvedNorm && dvedNorm !== '-') addVESimpleRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), 'dvedNormalizado');
-    if (fsValue && fsValue !== '-') addVESimpleRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento');
-    if (feTeicholzValue && feTeicholzValue !== '-') addVESimpleRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz');
-    if (funcaoSistolica.simpson) addVESimpleRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson');
+    // Medidas funcionais com 4 colunas (Parâmetro | Valor | Referência manual | Status)
+    if (dvedNorm && dvedNorm !== '-') addVEFullRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), undefined, 'dvedNormalizado');
+    if (fsValue && fsValue !== '-') addVEFullRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+    if (feTeicholzValue && feTeicholzValue !== '-') addVEFullRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+    if (funcaoSistolica.simpson) addVEFullRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
