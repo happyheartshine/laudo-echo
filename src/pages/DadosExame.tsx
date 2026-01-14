@@ -927,21 +927,7 @@ export default function DadosExame() {
         yPosition += 5;
       }
       
-      // Padrão Diastólico (texto longo com quebra de linha)
-      if (funcaoDiastolica.padraoDiastolico) {
-        yPosition += 2;
-        pdf.setTextColor(60, 60, 60);
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "normal");
-        const diastolicLines = pdf.splitTextToSize(funcaoDiastolica.padraoDiastolico, pageWidth - 2 * margin);
-        for (const line of diastolicLines) {
-          await checkPageBreak(5);
-          pdf.text(line, margin, yPosition);
-          yPosition += 5;
-        }
-      }
-      
-      // Conclusão / Descrição Diastólica
+      // Conclusão / Descrição Diastólica (campo editável pelo usuário)
       if (funcaoDiastolica.conclusaoDiastolica) {
         yPosition += 2;
         pdf.setTextColor(60, 60, 60);
