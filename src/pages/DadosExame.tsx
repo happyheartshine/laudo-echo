@@ -1167,8 +1167,10 @@ export default function DadosExame() {
     return pdf;
   }, [patientData, examInfo, measurementsData, classificationsData, referencesData, funcaoDiastolica, funcaoSistolica, ventriculoDireito, tdiLivre, tdiSeptal, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
 
-  const handlePreviewPDF = async () => {
+  // Preview PDF - gera instantaneamente a partir do estado ATUAL da tela
+  const handlePreviewPDF = useCallback(async () => {
     try {
+      // Gera o PDF diretamente do estado atual (sem salvar antes)
       const pdf = await generatePdfDocument();
       const pdfBlob = pdf.output("blob");
       const blobUrl = URL.createObjectURL(pdfBlob);
@@ -1203,7 +1205,7 @@ export default function DadosExame() {
         variant: "destructive",
       });
     }
-  };
+  }, [generatePdfDocument, toast]);
 
   // Função para salvar o exame no banco de dados
   const saveExam = async (): Promise<boolean> => {
@@ -1323,11 +1325,12 @@ export default function DadosExame() {
     }
   };
 
-  const handleDownloadPDF = async () => {
+  // Download PDF - gera instantaneamente a partir do estado ATUAL da tela
+  // IMPORTANTE: NÃO salva antes de gerar para garantir que o PDF reflete exatamente o que está na tela
+  const handleDownloadPDF = useCallback(async () => {
     try {
-      // Salvar exame antes de gerar o PDF
-      await saveExam();
-      
+      // Gera o PDF diretamente do estado atual - sem save prévio
+      // Isso garante que qualquer alteração feita aparece no PDF imediatamente
       const pdf = await generatePdfDocument();
       const today = new Date().toLocaleDateString('pt-BR');
       pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
@@ -1344,7 +1347,7 @@ export default function DadosExame() {
         variant: "destructive",
       });
     }
-  };
+  }, [generatePdfDocument, patientData.nome, toast]);
 
   if (isLoading) {
     return (
