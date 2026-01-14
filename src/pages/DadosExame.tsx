@@ -513,20 +513,22 @@ export default function DadosExame() {
     const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
-    const headerHeight = 25; // Height of the header area
-    const contentStartY = headerHeight + 10; // Content starts below header with padding
-    const SAFE_PAGE_START_Y = 45; // altura reduzida para menos espaço em branco
+    const margin = 16; // 16px margin
+    const headerHeight = 25;
+    const contentStartY = headerHeight + 10;
+    const bottomSafeArea = 20;
     let yPosition = margin;
 
     const navyBlue = [26, 42, 82];
-    const bottomSafeArea = 20; // keeps space for footer page numbers
+    const normalGray = [60, 60, 60];
 
+    // ========== HELPER FUNCTIONS ==========
+    
     const checkPageBreak = async (neededHeight: number) => {
       if (yPosition + neededHeight > pageHeight - bottomSafeArea) {
         pdf.addPage();
         await addHeader(pdf, pageWidth);
-        yPosition = contentStartY; // Reset Y to below header
+        yPosition = contentStartY;
         return true;
       }
       return false;
@@ -543,64 +545,106 @@ export default function DadosExame() {
       yPosition += 8;
     };
 
-    // Removida função isValueAbnormal - não usamos mais cores de alerta
+    const isEmpty = (value: string | undefined): boolean => {
+      if (!value) return true;
+      const trimmed = value.trim();
+      if (trimmed === "" || trimmed === "-" || trimmed === "--" || trimmed === "0") return true;
+      if (/^-\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
+      if (/^0\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
+      return false;
+    };
 
-    // Cor padrão para todos os textos (sem vermelho)
-    const normalGray = [60, 60, 60];
-
-    // Formatar TDI com 1 casa decimal
     const formatTdi = (value: string): string => {
       if (!value || value === "-") return "-";
       const num = parseFloat(value);
       return isNaN(num) ? "-" : num.toFixed(1).replace(".", ",");
     };
 
-    // Verifica se um valor está vazio ou é "-" ou "0"
-    const isEmpty = (value: string | undefined): boolean => {
-      if (!value) return true;
-      const trimmed = value.trim();
-      if (trimmed === "" || trimmed === "-" || trimmed === "--" || trimmed === "0") return true;
-      // Verifica padrões como "- cm", "- cm/s", etc.
-      if (/^-\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
-      // Verifica valores que são apenas "0" com unidade
-      if (/^0\s*(cm|cm\/s|ms|mmHg|mmHg\/s|bpm|%|kg)?$/.test(trimmed)) return true;
-      return false;
-    };
-
     const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string) => {
-      // Não imprime se valor estiver vazio
       if (isEmpty(value) && (!col2Value || isEmpty(col2Value))) return;
       
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
       
-      // Primeira coluna (só imprime se não estiver vazia)
       if (!isEmpty(value)) {
         pdf.text(`${label}: ${value}`, margin, yPosition);
       }
       
-      // Segunda coluna (se existir e não estiver vazia)
       if (col2Label && col2Value && !isEmpty(col2Value)) {
         pdf.text(`${col2Label}: ${col2Value}`, pageWidth / 2, yPosition);
       }
       yPosition += 5;
     };
 
+    const getClassificationText = (key: keyof typeof classificationsData): string => {
+      const val = classificationsData[key];
+      if (!val || val === "none") return "";
+      if (val === "normal") return "Normal";
+      if (val === "diminuido") return "Diminuído";
+      if (val === "aumentado") return "Aumentado";
+      return "";
+    };
+
+    const getReferenceText = (key: keyof typeof referencesData): string => {
+      const ref = referencesData[key as keyof typeof referencesData];
+      return ref ? formatNumber(ref) : "";
+    };
+
+    // Função para linha do VE com 4 colunas: Parâmetro | Valor | Referência | Status
+    const addVE4ColumnRow = (
+      label: string, 
+      value: string, 
+      referenceKey?: keyof typeof referencesData,
+      classificationKey?: keyof typeof classificationsData
+    ) => {
+      if (isEmpty(value)) return;
+      
+      pdf.setFontSize(9);
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      pdf.setFont("helvetica", "normal");
+      
+      const col1X = margin;
+      const col2X = margin + 68;
+      const col3X = margin + 100;
+      const col4X = margin + 142;
+      
+      // Coluna 1: Parâmetro
+      pdf.text(label, col1X, yPosition);
+      
+      // Coluna 2: Valor
+      pdf.text(value, col2X, yPosition);
+      
+      // Coluna 3: Referência (sempre exibe se houver dado)
+      if (referenceKey) {
+        const refText = getReferenceText(referenceKey);
+        if (refText) {
+          pdf.setFontSize(8);
+          pdf.text(refText, col3X, yPosition);
+          pdf.setFontSize(9);
+        }
+      }
+      
+      // Coluna 4: Status
+      if (classificationKey) {
+        const classText = getClassificationText(classificationKey);
+        if (classText) {
+          pdf.text(classText, col4X, yPosition);
+        }
+      }
+      
+      yPosition += 5;
+    };
+
     const addSignatureBlock = async () => {
       const titlePrefix = profile?.sexo === "feminino" ? "Dra." : "Dr.";
-      const name = profile?.nome 
-        ? `${titlePrefix} ${profile.nome}`
-        : "Veterinário Responsável";
-      const crmvText = profile?.crmv
-        ? `CRMV ${profile?.uf_crmv ? `${profile.uf_crmv} ` : ""}${profile.crmv}`
-        : "";
+      const name = profile?.nome ? `${titlePrefix} ${profile.nome}` : "Veterinário Responsável";
+      const crmvText = profile?.crmv ? `CRMV ${profile?.uf_crmv ? `${profile.uf_crmv} ` : ""}${profile.crmv}` : "";
       const specialtyText = profile?.especialidade || "";
       const signatureUrl = profile?.signature_url;
 
-      // Approximate block height: signature image (if any) + text lines
       const hasSignatureImage = !!signatureUrl;
-      const signatureImgHeight = hasSignatureImage ? 15 : 0; // ~1.5cm height
+      const signatureImgHeight = hasSignatureImage ? 15 : 0;
       const lineCount = 1 + (crmvText ? 1 : 0) + (specialtyText ? 1 : 0);
       const blockHeight = 10 + signatureImgHeight + lineCount * 4 + 4;
       const footerReserved = 12;
@@ -613,7 +657,6 @@ export default function DadosExame() {
 
       yPosition += 10;
 
-      // If we have a signature image, add it instead of line
       if (signatureUrl) {
         try {
           const sigImg = new Image();
@@ -624,7 +667,6 @@ export default function DadosExame() {
             sigImg.src = signatureUrl;
           });
           
-          // Calculate proportional dimensions (width ~4cm = 40mm)
           const targetWidth = 40;
           const ratio = sigImg.height / sigImg.width;
           const targetHeight = targetWidth * ratio;
@@ -633,12 +675,10 @@ export default function DadosExame() {
           pdf.addImage(sigImg, 'PNG', imgX, yPosition, targetWidth, Math.min(targetHeight, 15));
           yPosition += Math.min(targetHeight, 15) + 2;
         } catch (e) {
-          // Fallback: no image, just skip
           console.error('Error loading signature image:', e);
         }
       }
 
-      // Name - fonte reduzida e linhas mais próximas
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "bold");
@@ -660,7 +700,7 @@ export default function DadosExame() {
       yPosition += 4;
     };
 
-    // Page 1 Header
+    // ========== PAGE 1 HEADER ==========
     await addHeader(pdf, pageWidth);
     yPosition = 35;
 
@@ -671,10 +711,10 @@ export default function DadosExame() {
     pdf.text("RELATÓRIO DE ESTUDO ECOCARDIOGRÁFICO", pageWidth / 2, yPosition, { align: "center" });
     yPosition += 12;
 
-    // Patient Info - More compact layout with reduced label-value spacing
+    // Patient Info
     const col1 = margin;
     const col2 = pageWidth / 2;
-    const labelOffset = 2; // Reduced spacing between label and value
+    const labelOffset = 2;
     
     pdf.setFontSize(9);
     pdf.setTextColor(60, 60, 60);
@@ -694,12 +734,9 @@ export default function DadosExame() {
       yPosition += 4.5;
     };
 
-    // Formatar data de ISO para pt-BR para exibição no PDF
     const formatDateForPdf = (dateStr: string) => {
       if (!dateStr) return '-';
-      // Se já estiver em formato pt-BR (dd/mm/yyyy), retorna como está
       if (dateStr.includes('/')) return dateStr;
-      // Se estiver em formato ISO (yyyy-mm-dd), converte
       const parts = dateStr.split('-');
       if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -714,14 +751,14 @@ export default function DadosExame() {
     addCompactRow("Solicitante:", examInfo.solicitante || '-', "Clínica/Hospital:", examInfo.clinica || '-');
     yPosition += 6;
 
-    // Parâmetros Observados - só imprime se houver dados
+    // Parâmetros Observados
     if (examInfo.ritmo || examInfo.frequenciaCardiaca) {
       await addSectionHeader("PARÂMETROS OBSERVADOS");
       addTableRow("Ritmo", examInfo.ritmo, "Frequência Cardíaca", examInfo.frequenciaCardiaca ? `${examInfo.frequenciaCardiaca} bpm` : "");
       yPosition += 5;
     }
 
-    // Ventrículo Esquerdo - título dinâmico baseado no modo
+    // ========== 1. VENTRÍCULO ESQUERDO (MODO M) - TABELA 4 COLUNAS ==========
     const modoLabel = examInfo.modoMedicao === "B" ? "MODO B" : "MODO M";
     await addSectionHeader(`VENTRÍCULO ESQUERDO (${modoLabel})`);
     
@@ -729,133 +766,18 @@ export default function DadosExame() {
     const dvedNum = parseFloat(measurementsData.dvedDiastole);
     const dvedNorm = dvedNum && pesoNum ? (dvedNum / Math.pow(pesoNum, 0.294)).toFixed(2) : '';
 
-    // Helper para formatar classificação (retorna apenas o texto, sem parênteses)
-    const getClassificationText = (key: keyof typeof classificationsData): string => {
-      const val = classificationsData[key];
-      if (!val || val === "none") return "";
-      if (val === "normal") return "Normal";
-      if (val === "diminuido") return "Diminuído";
-      if (val === "aumentado") return "Aumentado";
-      return "";
-    };
-
-    // Helper para pegar referência
-    const getReferenceText = (key: keyof typeof referencesData): string => {
-      const ref = referencesData[key as keyof typeof referencesData];
-      return ref ? `Ref: ${formatNumber(ref)}` : "";
-    };
-
-    // Verifica se há alguma referência preenchida (auto ou manual)
-    const hasAnyReference = Object.values(referencesData).some(ref => ref && ref.trim() !== "");
-    
-    // Mostra colunas de referência se: (toggle ativo E tem peso) OU se há referências manuais preenchidas
-    const showReferenceColumns = (useAutoReferences && patientData.peso && parseFloat(patientData.peso) > 0) || hasAnyReference;
-
-    // Função para adicionar linha do VE com 4 colunas: Parâmetro | Valor | Referência | Status
-    const addVETableRow = (
-      label: string, 
-      value: string, 
-      referenceKey?: keyof typeof referencesData,
-      classificationKey?: keyof typeof classificationsData
-    ) => {
-      if (isEmpty(value)) return;
-      
-      pdf.setFontSize(9);
-      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      
-      const col1X = margin;
-      const col2X = margin + 68; // Valor medido
-      const col3X = margin + 100; // Referência
-      const col4X = margin + 142; // Classificação/Status
-      
-      // Coluna 1: Nome do parâmetro
-      pdf.setFont("helvetica", "normal");
-      pdf.text(label, col1X, yPosition);
-      
-      // Coluna 2: Valor medido
-      pdf.text(value, col2X, yPosition);
-      
-      // Coluna 3: Referência (sempre tenta mostrar se houver dados)
-      if (referenceKey) {
-        const refText = getReferenceText(referenceKey);
-        if (refText) {
-          pdf.setFontSize(8);
-          pdf.text(refText, col3X, yPosition);
-          pdf.setFontSize(9);
-        }
-      }
-      
-      // Coluna 4: Status/Classificação
-      if (classificationKey) {
-        const classText = getClassificationText(classificationKey);
-        if (classText) {
-          pdf.text(classText, col4X, yPosition);
-        }
-      }
-      
-      yPosition += 5;
-    };
-
-    // Função para linha com 4 colunas (usada para FS, FE, VEdN) - mostra referência manual se houver
-    const addVEFullRow = (
-      label: string, 
-      value: string, 
-      referenceKey?: keyof typeof referencesData,
-      classificationKey?: keyof typeof classificationsData
-    ) => {
-      if (isEmpty(value)) return;
-      
-      pdf.setFontSize(9);
-      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      pdf.setFont("helvetica", "normal");
-      
-      const col1X = margin;
-      const col2X = margin + 68;
-      const col3X = margin + 100;
-      const col4X = margin + 142;
-      
-      // Coluna 1: Nome do parâmetro
-      pdf.text(label, col1X, yPosition);
-      
-      // Coluna 2: Valor
-      pdf.text(value, col2X, yPosition);
-      
-      // Coluna 3: Referência (se houver - manual)
-      if (referenceKey) {
-        const refText = getReferenceText(referenceKey);
-        if (refText) {
-          pdf.setFontSize(8);
-          pdf.text(refText, col3X, yPosition);
-          pdf.setFontSize(9);
-        }
-      }
-      
-      // Coluna 4: Status/Classificação
-      if (classificationKey) {
-        const classText = getClassificationText(classificationKey);
-        if (classText) {
-          pdf.text(classText, col4X, yPosition);
-        }
-      }
-      
-      yPosition += 5;
-    };
-
-    // Cabeçalho das colunas do VE (se houver referências)
-    if (showReferenceColumns) {
-      pdf.setFontSize(8);
-      pdf.setFont("helvetica", "bold");
-      pdf.setTextColor(100, 100, 100);
-      pdf.text("Parâmetro", margin, yPosition);
-      pdf.text("Valor", margin + 68, yPosition);
-      pdf.text("Referência", margin + 100, yPosition);
-      pdf.text("Status", margin + 142, yPosition);
-      yPosition += 4;
-      // Linha separadora
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 3;
-    }
+    // Cabeçalho das 4 colunas
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(100, 100, 100);
+    pdf.text("Parâmetro", margin, yPosition);
+    pdf.text("Valor", margin + 68, yPosition);
+    pdf.text("Referência", margin + 100, yPosition);
+    pdf.text("Status", margin + 142, yPosition);
+    yPosition += 4;
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 3;
 
     const fsValue = measurementsData.fracaoEncurtamento?.trim()
       ? measurementsData.fracaoEncurtamento
@@ -865,19 +787,19 @@ export default function DadosExame() {
       ? measurementsData.fracaoEjecaoTeicholz
       : calculatedValues.fracaoEjecaoTeicholz;
 
-    // Medidas com referência Cornell (4 colunas: Parâmetro | Valor | Referência | Status)
-    if (measurementsData.septoIVd) addVETableRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm`, 'septoIVd', 'septoIVd');
-    if (measurementsData.dvedDiastole) addVETableRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm`, 'dvedDiastole', 'dvedDiastole');
-    if (measurementsData.paredeLVd) addVETableRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm`, 'paredeLVd', 'paredeLVd');
-    if (measurementsData.dvedSistole) addVETableRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm`, 'dvedSistole', 'dvedSistole');
-    if (measurementsData.septoIVs) addVETableRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
-    if (measurementsData.paredeLVs) addVETableRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
+    // Medidas com referência Cornell
+    if (measurementsData.septoIVd) addVE4ColumnRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm`, 'septoIVd', 'septoIVd');
+    if (measurementsData.dvedDiastole) addVE4ColumnRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm`, 'dvedDiastole', 'dvedDiastole');
+    if (measurementsData.paredeLVd) addVE4ColumnRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm`, 'paredeLVd', 'paredeLVd');
+    if (measurementsData.dvedSistole) addVE4ColumnRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm`, 'dvedSistole', 'dvedSistole');
+    if (measurementsData.septoIVs) addVE4ColumnRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
+    if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
     
-    // Medidas funcionais com 4 colunas (Parâmetro | Valor | Referência manual | Status)
-    if (dvedNorm && dvedNorm !== '-') addVEFullRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), undefined, 'dvedNormalizado');
-    if (fsValue && fsValue !== '-') addVEFullRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
-    if (feTeicholzValue && feTeicholzValue !== '-') addVEFullRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
-    if (funcaoSistolica.simpson) addVEFullRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+    // Medidas funcionais (FS, FE, DVEdN) - referência manual se houver
+    if (dvedNorm && dvedNorm !== '-') addVE4ColumnRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), undefined, 'dvedNormalizado');
+    if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+    if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+    if (funcaoSistolica.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -888,120 +810,109 @@ export default function DadosExame() {
         : '';
       if (measurementsData.aorta) addTableRow("Aorta", `${formatNumber(measurementsData.aorta)} cm`);
       if (measurementsData.atrioEsquerdo) addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo)} cm`);
-      if (aeAo) addTableRow("Relação Átrio esquerdo/Aorta", formatNumber(aeAo));
-      yPosition += 3;
-    }
-
-      // Função Diastólica do Ventrículo Esquerdo (inclui TDI como subseção)
-      const hasDiastolicData = funcaoDiastolica.ondaE || funcaoDiastolica.ondaA || funcaoDiastolica.tempoDesaceleracao || funcaoDiastolica.triv || funcaoDiastolica.padraoDiastolico;
-      const hasTdiData = tdiLivre.s || tdiLivre.e || tdiLivre.a || tdiSeptal.s || tdiSeptal.e || tdiSeptal.a;
-      
-      if (hasDiastolicData || hasTdiData) {
-        await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
-        
-        // Dados do Doppler Mitral
-        if (funcaoDiastolica.ondaE) addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
-        if (funcaoDiastolica.ondaA) addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
-        if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
-        if (funcaoDiastolica.tempoDesaceleracao) addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
-        if (funcaoDiastolica.triv) addTableRow("TRIV", `${formatNumber(funcaoDiastolica.triv)} ms`);
-        if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
-        
-        // TDI como subseção dentro da Função Diastólica
-        if (hasTdiData) {
-          yPosition += 3;
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(9);
-          pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
-          pdf.text("Doppler Tecidual (TDI)", margin, yPosition);
-          yPosition += 5;
-          
-          // TDI Parede Livre
-          if (tdiLivre.s || tdiLivre.e || tdiLivre.a) {
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(9);
-            pdf.setTextColor(60, 60, 60);
-            pdf.text("Parede Livre:", margin, yPosition);
-            pdf.setFont("helvetica", "normal");
-            const livreValues = [];
-            if (tdiLivre.s) livreValues.push(`s': ${formatTdi(tdiLivre.s)} cm/s`);
-            if (tdiLivre.e) livreValues.push(`e': ${formatTdi(tdiLivre.e)} cm/s`);
-            if (tdiLivre.a) livreValues.push(`a': ${formatTdi(tdiLivre.a)} cm/s`);
-            pdf.text(livreValues.join(" | "), margin + 25, yPosition);
-            yPosition += 5;
-            
-            // E/e' Parede Livre - só imprime se tdiLivre.e tiver valor
-            if (tdiLivre.e && calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
-              pdf.setFont("helvetica", "normal");
-              pdf.setFontSize(9);
-              pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-              pdf.text(`E/e' (Livre): ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`, margin, yPosition);
-              yPosition += 5;
-            }
-          }
-          
-          // TDI Parede Septal
-          if (tdiSeptal.s || tdiSeptal.e || tdiSeptal.a) {
-            pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(9);
-            pdf.setTextColor(60, 60, 60);
-            pdf.text("Parede Septal:", margin, yPosition);
-            pdf.setFont("helvetica", "normal");
-            const septalValues = [];
-            if (tdiSeptal.s) septalValues.push(`s': ${formatTdi(tdiSeptal.s)} cm/s`);
-            if (tdiSeptal.e) septalValues.push(`e': ${formatTdi(tdiSeptal.e)} cm/s`);
-            if (tdiSeptal.a) septalValues.push(`a': ${formatTdi(tdiSeptal.a)} cm/s`);
-            pdf.text(septalValues.join(" | "), margin + 25, yPosition);
-            yPosition += 5;
-            
-            // E/e' Parede Septal - só imprime se tdiSeptal.e tiver valor
-            if (tdiSeptal.e && calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
-              pdf.setFont("helvetica", "normal");
-              pdf.setFontSize(9);
-              pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-              pdf.text(`E/e' (Septal): ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`, margin, yPosition);
-              yPosition += 5;
-            }
-          }
-          
-          // Média E/e' - SOMENTE se ambos (Livre e Septal) estiverem preenchidos
-          if (tdiLivre.e && tdiSeptal.e && calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
-            pdf.setFontSize(9);
-            pdf.setFont("helvetica", "normal");
-            pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-            pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
-            yPosition += 5;
-          }
-        }
-        
-        // Conclusão / Descrição Diastólica (campo editável pelo usuário) - SEMPRE no final da seção
-        if (funcaoDiastolica.conclusaoDiastolica) {
-          yPosition += 2;
-          pdf.setTextColor(60, 60, 60);
-          pdf.setFontSize(9);
-          pdf.setFont("helvetica", "italic");
-          const conclusaoLines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
-          for (const line of conclusaoLines) {
-            await checkPageBreak(5);
-            pdf.text(line, margin, yPosition);
-            yPosition += 5;
-          }
-        }
-        yPosition += 3;
+      if (aeAo) {
+        // Exibe relação AE/Ao com classificação
+        const aeAoClass = classificationsData.relacaoAEAo 
+          ? (classificationsData.relacaoAEAo === 'normal' ? 'Normal' : 'Aumentado') 
+          : '';
+        const aeAoDisplay = aeAoClass ? `${formatNumber(aeAo)} (${aeAoClass})` : formatNumber(aeAo);
+        addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
       }
-
-    // Função Sistólica - MOVIDA PARA DEPOIS DA DIASTÓLICA
-    const hasSystolicData = funcaoSistolica.mapse || funcaoSistolica.epss || funcaoSistolica.statusFuncao || funcaoSistolica.tipoDisfuncao;
-    if (hasSystolicData) {
-      await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
-      if (funcaoSistolica.mapse) addTableRow("MAPSE", `${formatNumber(funcaoSistolica.mapse)} cm`);
-      if (funcaoSistolica.epss) addTableRow("EPSS", `${formatNumber(funcaoSistolica.epss)} cm`);
-      if (funcaoSistolica.statusFuncao) addTableRow("Status da Função", funcaoSistolica.statusFuncao);
-      if (funcaoSistolica.tipoDisfuncao) addTableRow("Tipo de Disfunção", funcaoSistolica.tipoDisfuncao);
       yPosition += 3;
     }
 
-    // Avaliação Hemodinâmica - Valvas (apenas se houver dados)
+    // ========== 2. FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO ==========
+    const hasDiastolicData = funcaoDiastolica.ondaE || funcaoDiastolica.ondaA || funcaoDiastolica.tempoDesaceleracao || funcaoDiastolica.triv;
+    const hasTdiData = tdiLivre.s || tdiLivre.e || tdiLivre.a || tdiSeptal.s || tdiSeptal.e || tdiSeptal.a;
+    
+    if (hasDiastolicData || hasTdiData || funcaoDiastolica.conclusaoDiastolica) {
+      await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
+      
+      // Dados do Doppler Mitral
+      if (funcaoDiastolica.ondaE) addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
+      if (funcaoDiastolica.ondaA) addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
+      if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
+      if (funcaoDiastolica.tempoDesaceleracao) addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
+      if (funcaoDiastolica.triv) addTableRow("Tempo de Relaxamento Isovolumétrico (TRIV)", `${formatNumber(funcaoDiastolica.triv)} ms`);
+      if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
+      
+      // ========== SUBSEÇÃO TDI (OBRIGATÓRIA) ==========
+      if (hasTdiData) {
+        yPosition += 3;
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
+        pdf.text("Doppler Tecidual (TDI)", margin, yPosition);
+        yPosition += 5;
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        
+        // TDI Parede Livre
+        if (tdiLivre.s || tdiLivre.e || tdiLivre.a) {
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "italic");
+          pdf.text("Parede Livre:", margin, yPosition);
+          yPosition += 4;
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          
+          const tdiLivreValues: string[] = [];
+          if (tdiLivre.s) tdiLivreValues.push(`s': ${formatTdi(tdiLivre.s)} cm/s`);
+          if (tdiLivre.e) tdiLivreValues.push(`e': ${formatTdi(tdiLivre.e)} cm/s`);
+          if (tdiLivre.a) tdiLivreValues.push(`a': ${formatTdi(tdiLivre.a)} cm/s`);
+          if (calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
+            tdiLivreValues.push(`E/e': ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`);
+          }
+          pdf.text(tdiLivreValues.join("   |   "), margin + 2, yPosition);
+          yPosition += 5;
+        }
+        
+        // TDI Parede Septal
+        if (tdiSeptal.s || tdiSeptal.e || tdiSeptal.a) {
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "italic");
+          pdf.text("Parede Septal:", margin, yPosition);
+          yPosition += 4;
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          
+          const tdiSeptalValues: string[] = [];
+          if (tdiSeptal.s) tdiSeptalValues.push(`s': ${formatTdi(tdiSeptal.s)} cm/s`);
+          if (tdiSeptal.e) tdiSeptalValues.push(`e': ${formatTdi(tdiSeptal.e)} cm/s`);
+          if (tdiSeptal.a) tdiSeptalValues.push(`a': ${formatTdi(tdiSeptal.a)} cm/s`);
+          if (calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
+            tdiSeptalValues.push(`E/e': ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`);
+          }
+          pdf.text(tdiSeptalValues.join("   |   "), margin + 2, yPosition);
+          yPosition += 5;
+        }
+        
+        // Média E/e'
+        if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
+          pdf.setFont("helvetica", "normal");
+          yPosition += 5;
+        }
+      }
+      
+      // ========== CONCLUSÃO DIASTÓLICA (APENAS diastolicDescription) ==========
+      if (funcaoDiastolica.conclusaoDiastolica) {
+        yPosition += 3;
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        const lines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
+        for (const line of lines) {
+          await checkPageBreak(5);
+          pdf.text(line, margin, yPosition);
+          yPosition += 5;
+        }
+      }
+      yPosition += 3;
+    }
+
+    // ========== 3. AVALIAÇÃO HEMODINÂMICA - VALVAS (MITRAL, TRICÚSPIDE, AÓRTICA, PULMONAR) ==========
     const hasValveData = valvasDoppler.mitralVelocidade || valvasDoppler.mitralGradiente || valvasDoppler.mitralDpDt ||
       valvasDoppler.tricuspideVelocidade || valvasDoppler.tricuspideGradiente ||
       valvasDoppler.pulmonarVelocidade || valvasDoppler.pulmonarGradiente ||
@@ -1011,9 +922,7 @@ export default function DadosExame() {
       await addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
       yPosition += 2;
 
-      // Helper to check page break before each valve block
       const addValveBlock = async (title: string, rows: Array<{ label: string; value: string }>) => {
-        // Filtrar linhas vazias
         const filledRows = rows.filter(r => r.value && !isEmpty(r.value));
         if (filledRows.length === 0) return;
         
@@ -1032,7 +941,7 @@ export default function DadosExame() {
         yPosition += 3;
       };
 
-      // Valva Mitral
+      // VALVA MITRAL
       if (valvasDoppler.mitralVelocidade || valvasDoppler.mitralGradiente || valvasDoppler.mitralDpDt) {
         await addValveBlock("VALVA MITRAL", [
           { label: "Velocidade máxima do fluxo retrógrado da IM", value: valvasDoppler.mitralVelocidade ? `${formatNumber(valvasDoppler.mitralVelocidade)} cm/s` : "" },
@@ -1041,7 +950,7 @@ export default function DadosExame() {
         ]);
       }
 
-      // Valva Tricúspide
+      // VALVA TRICÚSPIDE
       if (valvasDoppler.tricuspideVelocidade || valvasDoppler.tricuspideGradiente) {
         await addValveBlock("VALVA TRICÚSPIDE", [
           { label: "Velocidade máxima do fluxo retrógrado da IT", value: valvasDoppler.tricuspideVelocidade ? `${formatNumber(valvasDoppler.tricuspideVelocidade)} cm/s` : "" },
@@ -1049,23 +958,8 @@ export default function DadosExame() {
         ]);
       }
 
-      // Valva Pulmonar - verificação de quebra de página antes do título
-      if (valvasDoppler.pulmonarVelocidade || valvasDoppler.pulmonarGradiente) {
-        // Verificar se há espaço suficiente para título + conteúdo (40mm)
-        if (yPosition + 40 > pageHeight - bottomSafeArea) {
-          pdf.addPage();
-          await addHeader(pdf, pageWidth);
-          yPosition = contentStartY;
-        }
-        await addValveBlock("VALVA PULMONAR", [
-          { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
-          { label: "Gradiente", value: valvasDoppler.pulmonarGradiente ? `${formatNumber(valvasDoppler.pulmonarGradiente)} mmHg` : "" },
-        ]);
-      }
-
-      // Valva Aórtica - verificação de quebra de página antes do título
+      // VALVA AÓRTICA
       if (valvasDoppler.aorticaVelocidade || valvasDoppler.aorticaGradiente) {
-        // Verificar se há espaço suficiente para título + conteúdo (40mm)
         if (yPosition + 40 > pageHeight - bottomSafeArea) {
           pdf.addPage();
           await addHeader(pdf, pageWidth);
@@ -1076,16 +970,28 @@ export default function DadosExame() {
           { label: "Gradiente", value: valvasDoppler.aorticaGradiente ? `${formatNumber(valvasDoppler.aorticaGradiente)} mmHg` : "" },
         ]);
       }
+
+      // VALVA PULMONAR (OBRIGATÓRIA - não deve sumir)
+      if (valvasDoppler.pulmonarVelocidade || valvasDoppler.pulmonarGradiente) {
+        if (yPosition + 40 > pageHeight - bottomSafeArea) {
+          pdf.addPage();
+          await addHeader(pdf, pageWidth);
+          yPosition = contentStartY;
+        }
+        await addValveBlock("VALVA PULMONAR", [
+          { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
+          { label: "Gradiente", value: valvasDoppler.pulmonarGradiente ? `${formatNumber(valvasDoppler.pulmonarGradiente)} mmHg` : "" },
+        ]);
+      }
     }
 
-    // Ventrículo Direito - Nova seção
+    // Ventrículo Direito
     const hasRightVentricleData = ventriculoDireito.atrioDireito || ventriculoDireito.ventriculoDireito || 
       ventriculoDireito.tapse || ventriculoDireito.fac || ventriculoDireito.tdiS;
     
     if (hasRightVentricleData) {
       await addSectionHeader("VENTRÍCULO DIREITO");
       
-      // Avaliação qualitativa
       if (ventriculoDireito.atrioDireito && ventriculoDireito.atrioDireito !== "none") {
         addTableRow("Átrio Direito", ventriculoDireito.atrioDireito);
       }
@@ -1093,7 +999,6 @@ export default function DadosExame() {
         addTableRow("Ventrículo Direito", ventriculoDireito.ventriculoDireito);
       }
       
-      // Índices de função sistólica do VD
       if (ventriculoDireito.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} cm`);
       if (ventriculoDireito.fac) addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
       if (ventriculoDireito.tdiS) addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
@@ -1135,39 +1040,36 @@ export default function DadosExame() {
       }
     }
 
-    // Assinatura (uma única vez, ao final da parte descritiva)
+    // Assinatura
     await addSignatureBlock();
 
-    // Images - 8 per page (2 columns x 4 rows for better visibility)
+    // ========== 4. IMAGENS (CORREÇÃO DE DISTORÇÃO) ==========
     const selectedImageData = storedImages.filter((_, index) => selectedImages.includes(index));
     if (selectedImageData.length > 0) {
       pdf.addPage();
       await addHeader(pdf, pageWidth);
       
-      // Add section title
       pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
       pdf.setFontSize(12);
       pdf.setFont("helvetica", "bold");
       pdf.text("ANEXOS / IMAGENS DO EXAME", pageWidth / 2, 35, { align: "center" });
 
-      // Configuração: 6 imagens por página (2 colunas x 3 linhas)
+      // Grid: 2 colunas x 3 linhas = 6 imagens por página
       const imagesPerPage = 6;
-      const cols = 2; // 2 colunas
-      const rows = 3; // 3 linhas
-      const imgMarginH = 16 * 0.264583; // 16px convertido para mm (~4.23mm)
-      const imgMarginV = 16 * 0.264583; // 16px convertido para mm (~4.23mm)
-      const gapBetweenImages = 4; // Espaço entre imagens em mm
-      const startY = 42; // Início abaixo do título
+      const cols = 2;
+      const rows = 3;
+      const imgMarginH = 16 * 0.264583; // 16px em mm
+      const imgMarginV = 16 * 0.264583;
+      const gapBetweenImages = 4;
+      const startY = 42;
       
-      // Área disponível considerando margens de 16px (convertidas para mm)
       const availableWidth = pageWidth - 2 * imgMarginH;
-      const availableHeight = pageHeight - startY - imgMarginV - 10; // Espaço para footer
+      const availableHeight = pageHeight - startY - imgMarginV - 10;
       
-      // Dimensões das células da grade (altura fixa ~80mm para 3 linhas)
       const cellWidth = (availableWidth - (cols - 1) * gapBetweenImages) / cols;
-      const cellHeight = (availableHeight - (rows - 1) * gapBetweenImages) / rows;
+      // Container com altura fixa de ~80mm (300px convertido)
+      const cellHeight = 80; // 300px ≈ 80mm - altura fixa conforme especificado
 
-      // Função auxiliar para obter dimensões reais da imagem
       const getImageDimensions = (dataUrl: string): Promise<{width: number, height: number}> => {
         return new Promise((resolve) => {
           const img = new Image();
@@ -1175,14 +1077,13 @@ export default function DadosExame() {
             resolve({ width: img.naturalWidth, height: img.naturalHeight });
           };
           img.onerror = () => {
-            // Fallback para proporção 4:3 se não conseguir carregar
             resolve({ width: 4, height: 3 });
           };
           img.src = dataUrl;
         });
       };
 
-      // Função para calcular dimensões mantendo proporção (object-fit: contain)
+      // object-fit: contain - mantém proporção dentro do container
       const calculateFitDimensions = (
         originalWidth: number, 
         originalHeight: number, 
@@ -1194,7 +1095,6 @@ export default function DadosExame() {
         let finalWidth = maxWidth;
         let finalHeight = maxWidth / aspectRatio;
         
-        // Se a altura exceder o máximo, ajusta pela altura
         if (finalHeight > maxHeight) {
           finalHeight = maxHeight;
           finalWidth = maxHeight * aspectRatio;
@@ -1219,23 +1119,21 @@ export default function DadosExame() {
         const row = Math.floor(pageImageIndex / cols);
         const col = pageImageIndex % cols;
 
-        // Posição da célula
+        // Posição da célula (container)
         const cellX = imgMarginH + col * (cellWidth + gapBetweenImages);
         const cellY = startY + row * (cellHeight + gapBetweenImages);
 
         const img = selectedImageData[imageIndex];
         if (img.type.startsWith('image/') || img.dataUrl.startsWith('data:image') || img.dataUrl.startsWith('http')) {
           try {
-            // Converter URL remota para base64 se necessário
             let imageData = img.dataUrl;
             if (img.dataUrl.startsWith('http')) {
               imageData = await imageUrlToBase64(img.dataUrl);
             }
             
-            // Obter dimensões reais da imagem
             const dimensions = await getImageDimensions(imageData);
             
-            // Calcular dimensões finais mantendo proporção (object-fit: contain)
+            // Calcular dimensões mantendo proporção (object-fit: contain)
             const fitDimensions = calculateFitDimensions(
               dimensions.width,
               dimensions.height,
@@ -1243,7 +1141,7 @@ export default function DadosExame() {
               cellHeight
             );
             
-            // Centralizar imagem dentro da célula
+            // Centralizar imagem dentro do container (flex center)
             const x = cellX + (cellWidth - fitDimensions.width) / 2;
             const y = cellY + (cellHeight - fitDimensions.height) / 2;
             
@@ -1257,7 +1155,7 @@ export default function DadosExame() {
       }
     }
 
-    // Footer: only page numbers (no repeated signature)
+    // Footer: page numbers
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       pdf.setPage(i);
@@ -1267,7 +1165,7 @@ export default function DadosExame() {
     }
 
     return pdf;
-  }, [patientData, examInfo, measurementsData, funcaoDiastolica, funcaoSistolica, tdiLivre, tdiSeptal, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
+  }, [patientData, examInfo, measurementsData, classificationsData, referencesData, funcaoDiastolica, funcaoSistolica, ventriculoDireito, tdiLivre, tdiSeptal, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
 
   const handlePreviewPDF = async () => {
     try {
