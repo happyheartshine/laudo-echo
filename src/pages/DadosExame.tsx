@@ -744,10 +744,13 @@ export default function DadosExame() {
       return ref ? `Ref: ${formatNumber(ref)}` : "";
     };
 
-    // Verifica se deve mostrar colunas de referência (toggle ativado E tem peso)
-    const showReferenceColumns = useAutoReferences && patientData.peso && parseFloat(patientData.peso) > 0;
+    // Verifica se há alguma referência preenchida (auto ou manual)
+    const hasAnyReference = Object.values(referencesData).some(ref => ref && ref.trim() !== "");
+    
+    // Mostra colunas de referência se: (toggle ativo E tem peso) OU se há referências manuais preenchidas
+    const showReferenceColumns = (useAutoReferences && patientData.peso && parseFloat(patientData.peso) > 0) || hasAnyReference;
 
-    // Função para adicionar linha do VE com 4 colunas (ou 2 se sem referência)
+    // Função para adicionar linha do VE com 4 colunas: Parâmetro | Valor | Referência | Status
     const addVETableRow = (
       label: string, 
       value: string, 
@@ -761,8 +764,8 @@ export default function DadosExame() {
       
       const col1X = margin;
       const col2X = margin + 68; // Valor medido
-      const col3X = margin + 98; // Referência
-      const col4X = margin + 140; // Classificação
+      const col3X = margin + 100; // Referência
+      const col4X = margin + 142; // Classificação/Status
       
       // Coluna 1: Nome do parâmetro
       pdf.setFont("helvetica", "normal");
@@ -771,23 +774,21 @@ export default function DadosExame() {
       // Coluna 2: Valor medido
       pdf.text(value, col2X, yPosition);
       
-      // Colunas 3 e 4: Referência e Classificação (só se ativado)
-      if (showReferenceColumns && referenceKey) {
+      // Coluna 3: Referência (sempre tenta mostrar se houver dados)
+      if (referenceKey) {
         const refText = getReferenceText(referenceKey);
-        const classText = classificationKey ? getClassificationText(classificationKey) : "";
-        
-        if (refText || classText) {
-          // Coluna 3: Referência (fonte menor)
-          if (refText) {
-            pdf.setFontSize(8);
-            pdf.text(refText, col3X, yPosition);
-          }
-          
-          // Coluna 4: Classificação
-          if (classText) {
-            pdf.setFontSize(9);
-            pdf.text(classText, col4X, yPosition);
-          }
+        if (refText) {
+          pdf.setFontSize(8);
+          pdf.text(refText, col3X, yPosition);
+          pdf.setFontSize(9);
+        }
+      }
+      
+      // Coluna 4: Status/Classificação
+      if (classificationKey) {
+        const classText = getClassificationText(classificationKey);
+        if (classText) {
+          pdf.text(classText, col4X, yPosition);
         }
       }
       
@@ -817,6 +818,22 @@ export default function DadosExame() {
       yPosition += 5;
     };
 
+    // Cabeçalho das colunas do VE (se houver referências)
+    if (showReferenceColumns) {
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(100, 100, 100);
+      pdf.text("Parâmetro", margin, yPosition);
+      pdf.text("Valor", margin + 68, yPosition);
+      pdf.text("Referência", margin + 100, yPosition);
+      pdf.text("Status", margin + 142, yPosition);
+      yPosition += 4;
+      // Linha separadora
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 3;
+    }
+
     const fsValue = measurementsData.fracaoEncurtamento?.trim()
       ? measurementsData.fracaoEncurtamento
       : calculatedValues.fracaoEncurtamento;
@@ -825,7 +842,7 @@ export default function DadosExame() {
       ? measurementsData.fracaoEjecaoTeicholz
       : calculatedValues.fracaoEjecaoTeicholz;
 
-    // Medidas com referência Cornell (4 colunas)
+    // Medidas com referência Cornell (4 colunas: Parâmetro | Valor | Referência | Status)
     if (measurementsData.septoIVd) addVETableRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm`, 'septoIVd', 'septoIVd');
     if (measurementsData.dvedDiastole) addVETableRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm`, 'dvedDiastole', 'dvedDiastole');
     if (measurementsData.paredeLVd) addVETableRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm`, 'paredeLVd', 'paredeLVd');
@@ -833,7 +850,7 @@ export default function DadosExame() {
     if (measurementsData.septoIVs) addVETableRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
     if (measurementsData.paredeLVs) addVETableRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
     
-    // Medidas sem referência Cornell (linha simples)
+    // Medidas sem referência Cornell (linha simples com status)
     if (dvedNorm && dvedNorm !== '-') addVESimpleRow("VE em diástole NORMALIZADO (DVEdN)", formatNumber(dvedNorm), 'dvedNormalizado');
     if (fsValue && fsValue !== '-') addVESimpleRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento');
     if (feTeicholzValue && feTeicholzValue !== '-') addVESimpleRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz');
