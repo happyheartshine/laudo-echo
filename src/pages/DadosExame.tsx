@@ -138,12 +138,17 @@ export default function DadosExame() {
     return `${min.toFixed(2).replace('.', ',')} - ${max.toFixed(2).replace('.', ',')}`;
   };
 
-  // Handler para toggle de referências - limpa ou recalcula campos
+  // Handler para toggle de referências - preserva referências manuais de FS/FE
   const handleAutoReferencesToggle = (enabled: boolean) => {
     setUseAutoReferences(enabled);
     
+    // Preservar referências manuais de FS, FE Teicholz e FE Simpson
+    const manualFsRef = referencesData.fracaoEncurtamento;
+    const manualFeTeicholzRef = referencesData.fracaoEjecaoTeicholz;
+    const manualFeSimpsonRef = referencesData.fracaoEjecaoSimpson;
+    
     if (!enabled) {
-      // Se desligar, limpa todos os campos de referência
+      // Se desligar, limpa campos calculados mas preserva os manuais (FS, FE)
       setReferencesData({
         septoIVd: "",
         dvedDiastole: "",
@@ -151,12 +156,12 @@ export default function DadosExame() {
         dvedSistole: "",
         septoIVs: "",
         paredeLVs: "",
-        fracaoEncurtamento: "",
-        fracaoEjecaoTeicholz: "",
-        fracaoEjecaoSimpson: "",
+        fracaoEncurtamento: manualFsRef, // Preserva valor manual
+        fracaoEjecaoTeicholz: manualFeTeicholzRef, // Preserva valor manual
+        fracaoEjecaoSimpson: manualFeSimpsonRef, // Preserva valor manual
       });
     } else {
-      // Se ligar, recalcula referências baseadas no peso atual
+      // Se ligar, recalcula referências Cornell/ACVIM mas preserva FS/FE manuais
       const peso = parseFloat(patientData.peso?.replace(',', '.') || '0');
       const isFeline = patientData.especie === 'felino';
       
@@ -169,9 +174,9 @@ export default function DadosExame() {
           dvedSistole: "",
           septoIVs: "",
           paredeLVs: "",
-          fracaoEncurtamento: "",
-          fracaoEjecaoTeicholz: "",
-          fracaoEjecaoSimpson: "",
+          fracaoEncurtamento: manualFsRef, // Preserva valor manual
+          fracaoEjecaoTeicholz: manualFeTeicholzRef, // Preserva valor manual
+          fracaoEjecaoSimpson: manualFeSimpsonRef, // Preserva valor manual
         });
       } else {
         // Referências Cornell para caninos (baseadas no peso)
@@ -182,9 +187,9 @@ export default function DadosExame() {
           dvedSistole: calculateCornellReference(peso, 'dvedSistole'),
           septoIVs: calculateCornellReference(peso, 'septoIVs'),
           paredeLVs: calculateCornellReference(peso, 'paredeLVs'),
-          fracaoEncurtamento: "",
-          fracaoEjecaoTeicholz: "",
-          fracaoEjecaoSimpson: "",
+          fracaoEncurtamento: manualFsRef, // Preserva valor manual
+          fracaoEjecaoTeicholz: manualFeTeicholzRef, // Preserva valor manual
+          fracaoEjecaoSimpson: manualFeSimpsonRef, // Preserva valor manual
         });
       }
     }
@@ -362,6 +367,7 @@ export default function DadosExame() {
         examInfo?: typeof examInfo;
         measurementsData?: typeof measurementsData;
         classificationsData?: ClassificationsData;
+        referencesData?: typeof referencesData;
         funcaoDiastolica?: typeof funcaoDiastolica;
         funcaoSistolica?: typeof funcaoSistolica;
         ventriculoDireito?: RightVentricleData;
@@ -380,6 +386,7 @@ export default function DadosExame() {
       if (content.examInfo) setExamInfo(content.examInfo);
       if (content.measurementsData) setMeasurementsData((prev) => ({ ...prev, ...content.measurementsData }));
       if (content.classificationsData) setClassificationsData(content.classificationsData);
+      if (content.referencesData) setReferencesData(content.referencesData);
       if (content.funcaoDiastolica) setFuncaoDiastolica(content.funcaoDiastolica);
       if (content.funcaoSistolica) setFuncaoSistolica(content.funcaoSistolica);
       if (content.ventriculoDireito) setVentriculoDireito(content.ventriculoDireito);
@@ -1252,6 +1259,7 @@ export default function DadosExame() {
         examInfo,
         measurementsData,
         classificationsData,
+        referencesData,
         funcaoDiastolica,
         funcaoSistolica,
         ventriculoDireito,
