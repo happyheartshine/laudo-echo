@@ -275,8 +275,9 @@ export async function generateExamPdf(
     return false;
   };
 
-  const addSectionHeader = async (title: string) => {
-    await checkPageBreak(15);
+  const addSectionHeader = async (title: string, minContentHeight: number = 25) => {
+    // Verifica se há espaço para o título + conteúdo mínimo (evita títulos órfãos)
+    await checkPageBreak(7 + minContentHeight);
     pdf.setFillColor(240, 240, 240);
     pdf.rect(margin, yPosition - 4, pageWidth - 2 * margin, 7, "F");
     pdf.setTextColor(navyBlue[0], navyBlue[1], navyBlue[2]);
@@ -322,7 +323,19 @@ export async function generateExamPdf(
 
   const getReferenceText = (key: string): string => {
     const ref = (referencesData as unknown as Record<string, string>)?.[key];
-    return ref ? formatNumber(ref) : "";
+    if (ref) return formatNumber(ref);
+    
+    // Mapeamento de referências Cornell para espécies caninas/felinas (fallback)
+    const cornellReferences: Record<string, string> = {
+      septoIVd: "0,35 - 0,94",
+      dvedDiastole: "1,0 - 4,6",
+      paredeLVd: "0,41 - 0,83",
+      dvedSistole: "0,61 - 3,04",
+      septoIVs: "0,48 - 1,32",
+      paredeLVs: "0,67 - 1,29"
+    };
+    
+    return cornellReferences[key] ? formatNumber(cornellReferences[key]) : "";
   };
 
   const addVE4ColumnRow = (
@@ -627,7 +640,7 @@ export async function generateExamPdf(
     valvasDoppler?.aorticaVelocidade || valvasDoppler?.aorticaGradiente;
 
   if (hasValveData) {
-    await addSectionHeader("AVALIAÇÃO HEMODINÂMICA");
+    await addSectionHeader("AVALIAÇÃO HEMODINÂMICA", 40);
     yPosition += 2;
 
     const addValveBlock = async (title: string, rows: Array<{ label: string; value: string }>) => {
