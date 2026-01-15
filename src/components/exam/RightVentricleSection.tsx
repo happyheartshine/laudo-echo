@@ -1,6 +1,7 @@
 import { Activity } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDecimalForDisplay, sanitizeDecimalInput } from "@/lib/decimalInput";
 
@@ -15,6 +16,8 @@ export interface RightVentricleData {
 interface RightVentricleSectionProps {
   data: RightVentricleData;
   onChange: (data: RightVentricleData) => void;
+  observacoes?: string;
+  onObservacoesChange?: (value: string) => void;
 }
 
 const QUALITATIVE_OPTIONS = [
@@ -24,7 +27,7 @@ const QUALITATIVE_OPTIONS = [
   { value: "Aumentado", label: "Aumentado" },
 ];
 
-export function RightVentricleSection({ data, onChange }: RightVentricleSectionProps) {
+export function RightVentricleSection({ data, onChange, observacoes = "", onObservacoesChange }: RightVentricleSectionProps) {
   const handleChange = (field: keyof RightVentricleData, value: string) => {
     onChange({ ...data, [field]: value });
   };
@@ -122,6 +125,17 @@ export function RightVentricleSection({ data, onChange }: RightVentricleSectionP
               />
             </div>
           </div>
+        </div>
+        
+        {/* Observações / Outros Índices */}
+        <div>
+          <Label className="label-vitaecor">Observações / Outros Índices</Label>
+          <Textarea 
+            className="input-vitaecor min-h-[60px]"
+            placeholder="Observações adicionais sobre o ventrículo direito..."
+            value={observacoes}
+            onChange={(e) => onObservacoesChange?.(e.target.value)}
+          />
         </div>
       </div>
     </div>

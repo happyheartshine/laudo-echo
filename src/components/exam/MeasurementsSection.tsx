@@ -1,6 +1,7 @@
 import { Activity, Calculator } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMemo, useState, useCallback, memo, useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -61,6 +62,8 @@ interface MeasurementsSectionProps {
   onSimpsonChange?: (value: string) => void;
   useAutoReferences?: boolean;
   onAutoReferencesToggle?: (enabled: boolean) => void;
+  observacoesAEAo?: string;
+  onObservacoesAEAoChange?: (value: string) => void;
 }
 
 type ClassificationKey = keyof ClassificationsData;
@@ -284,6 +287,8 @@ export function MeasurementsSection({
   onAutoReferencesToggle,
   simpsonValue = "",
   onSimpsonChange,
+  observacoesAEAo = "",
+  onObservacoesAEAoChange,
 }: MeasurementsSectionProps) {
   // Detecta se é felino para usar ACVIM ao invés de Cornell
   const isFeline = especie.toLowerCase() === "felino";
@@ -790,6 +795,17 @@ export function MeasurementsSection({
                 </Select>
               </div>
             </div>
+          </div>
+          
+          {/* Observações / Outros Índices */}
+          <div className="mt-4">
+            <Label className="label-vitaecor">Observações / Outros Índices</Label>
+            <Textarea 
+              className="input-vitaecor min-h-[60px]"
+              placeholder="Observações adicionais sobre AE/Ao, medidas..."
+              value={observacoesAEAo}
+              onChange={(e) => onObservacoesAEAoChange?.(e.target.value)}
+            />
           </div>
         </div>
       </div>
