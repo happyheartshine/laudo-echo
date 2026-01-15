@@ -87,6 +87,20 @@ export interface OutrosData {
   septos?: string;
   pericardio?: string;
   camarasDireitas?: string;
+  observacoes?: string;
+}
+
+export interface ObservacoesSecoesData {
+  atrioEsquerdoAorta?: string;
+  funcaoDiastolica?: string;
+  ventriculoDireito?: string;
+}
+
+export interface ObservacoesValvasData {
+  mitral?: string;
+  tricuspide?: string;
+  pulmonar?: string;
+  aortica?: string;
 }
 
 export interface PdfExamData {
@@ -112,6 +126,8 @@ export interface PdfExamData {
   conclusoes?: string;
   storedImages?: StoredImageData[];
   selectedImages?: number[];
+  observacoesSecoes?: ObservacoesSecoesData;
+  observacoesValvas?: ObservacoesValvasData;
 }
 
 interface PdfGeneratorOptions {
@@ -147,6 +163,8 @@ export async function generateExamPdf(
   const comentariosAdicionais = (examData as PdfExamData & { comentariosAdicionais?: string }).comentariosAdicionais || "";
   const storedImages = examData.storedImages || [];
   const selectedImages = examData.selectedImages || [];
+  const observacoesSecoes: ObservacoesSecoesData = examData.observacoesSecoes || {};
+  const observacoesValvas: ObservacoesValvasData = examData.observacoesValvas || {};
 
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -554,6 +572,19 @@ export async function generateExamPdf(
       const aeAoDisplay = aeAoClass ? `${formatNumber(aeAo)} (${aeAoClass})` : formatNumber(aeAo);
       addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
     }
+    // Observações da seção Átrio Esquerdo/Aorta
+    if (observacoesSecoes?.atrioEsquerdoAorta?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.atrioEsquerdoAorta, pageWidth - 2 * margin);
+      for (const line of obsLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
     yPosition += 3;
   }
 
@@ -645,6 +676,19 @@ export async function generateExamPdf(
         yPosition += 5;
       }
     }
+    // Observações da Função Diastólica
+    if (observacoesSecoes?.funcaoDiastolica?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoDiastolica, pageWidth - 2 * margin);
+      for (const line of obsLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
     yPosition += 3;
   }
 
@@ -702,6 +746,14 @@ export async function generateExamPdf(
         { label: "Gradiente", value: valvasDoppler.mitralGradiente ? `${formatNumber(valvasDoppler.mitralGradiente)} mmHg` : "" },
         { label: "+dP/dT", value: valvasDoppler.mitralDpDt ? `${formatNumber(valvasDoppler.mitralDpDt)} mmHg/s` : "" },
       ]);
+      if (observacoesValvas?.mitral?.trim()) {
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        const obsLines = pdf.splitTextToSize(observacoesValvas.mitral, pageWidth - 2 * margin);
+        for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+        yPosition += 2;
+      }
     }
 
     // VALVA TRICÚSPIDE
@@ -710,6 +762,14 @@ export async function generateExamPdf(
         { label: "Velocidade máxima do fluxo retrógrado da IT", value: valvasDoppler.tricuspideVelocidade ? `${formatNumber(valvasDoppler.tricuspideVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.tricuspideGradiente ? `${formatNumber(valvasDoppler.tricuspideGradiente)} mmHg` : "" },
       ]);
+      if (observacoesValvas?.tricuspide?.trim()) {
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        const obsLines = pdf.splitTextToSize(observacoesValvas.tricuspide, pageWidth - 2 * margin);
+        for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+        yPosition += 2;
+      }
     }
 
     // VALVA AÓRTICA
@@ -718,6 +778,14 @@ export async function generateExamPdf(
         { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.aorticaVelocidade ? `${formatNumber(valvasDoppler.aorticaVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.aorticaGradiente ? `${formatNumber(valvasDoppler.aorticaGradiente)} mmHg` : "" },
       ]);
+      if (observacoesValvas?.aortica?.trim()) {
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        const obsLines = pdf.splitTextToSize(observacoesValvas.aortica, pageWidth - 2 * margin);
+        for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+        yPosition += 2;
+      }
     }
 
     // VALVA PULMONAR
@@ -726,6 +794,14 @@ export async function generateExamPdf(
         { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.pulmonarGradiente ? `${formatNumber(valvasDoppler.pulmonarGradiente)} mmHg` : "" },
       ]);
+      if (observacoesValvas?.pulmonar?.trim()) {
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+        const obsLines = pdf.splitTextToSize(observacoesValvas.pulmonar, pageWidth - 2 * margin);
+        for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+        yPosition += 2;
+      }
     }
   }
 
@@ -744,6 +820,14 @@ export async function generateExamPdf(
     if (ventriculoDireito?.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} cm`);
     if (ventriculoDireito?.fac) addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
     if (ventriculoDireito?.tdiS) addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
+    if (observacoesSecoes?.ventriculoDireito?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.ventriculoDireito, pageWidth - 2 * margin);
+      for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+    }
     yPosition += 3;
   }
 
@@ -751,6 +835,14 @@ export async function generateExamPdf(
   await addSectionHeader("OUTROS");
   addTableRow("Septos", outros?.septos || "interventricular e interatrial íntegros");
   addTableRow("Pericárdio", outros?.pericardio || "normal, sem derrame");
+  if (outros?.observacoes?.trim()) {
+    yPosition += 2;
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+    const obsLines = pdf.splitTextToSize(outros.observacoes, pageWidth - 2 * margin);
+    for (const line of obsLines) { await checkPageBreak(5); pdf.text(line, margin, yPosition); yPosition += 5; }
+  }
   yPosition += 5;
 
   // Achados
