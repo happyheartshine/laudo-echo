@@ -325,6 +325,22 @@ export default function DadosExame() {
   const [outros, setOutros] = useState({
     septos: "interventricular e interatrial íntegros",
     pericardio: "normal, sem derrame",
+    observacoes: "", // Novo campo de observações
+  });
+
+  // Novos estados para observações de cada seção
+  const [observacoesSecoes, setObservacoesSecoes] = useState({
+    atrioEsquerdoAorta: "",
+    funcaoDiastolica: "",
+    ventriculoDireito: "",
+  });
+
+  // Observações específicas de cada valva
+  const [observacoesValvas, setObservacoesValvas] = useState({
+    mitral: "",
+    tricuspide: "",
+    pulmonar: "",
+    aortica: "",
   });
 
   const [valvesData, setValvesData] = useState({
@@ -380,6 +396,8 @@ export default function DadosExame() {
         achados?: string;
         conclusoes?: string;
         comentariosAdicionais?: string;
+        observacoesSecoes?: typeof observacoesSecoes;
+        observacoesValvas?: typeof observacoesValvas;
         storedImages?: StoredImageData[];
         selectedImages?: number[];
       };
@@ -400,6 +418,8 @@ export default function DadosExame() {
       if (content.achados) setAchados(content.achados);
       if (content.conclusoes) setConclusoes(content.conclusoes);
       if (content.comentariosAdicionais) setComentariosAdicionais(content.comentariosAdicionais);
+      if (content.observacoesSecoes) setObservacoesSecoes(content.observacoesSecoes);
+      if (content.observacoesValvas) setObservacoesValvas(content.observacoesValvas);
       
       // Carregar imagens salvas no Storage
       if (content.storedImages && content.storedImages.length > 0) {
@@ -1291,6 +1311,8 @@ export default function DadosExame() {
         achados,
         conclusoes,
         comentariosAdicionais,
+        observacoesSecoes,
+        observacoesValvas,
         calculatedValues,
         storedImages: uploadedImages,
         selectedImages: uploadedImages.map((_, i) => i),
@@ -1498,12 +1520,16 @@ export default function DadosExame() {
             onAutoReferencesToggle={handleAutoReferencesToggle}
             simpsonValue={funcaoSistolica.simpson}
             onSimpsonChange={(value) => setFuncaoSistolica({...funcaoSistolica, simpson: value})}
+            observacoesAEAo={observacoesSecoes.atrioEsquerdoAorta}
+            onObservacoesAEAoChange={(value) => setObservacoesSecoes({...observacoesSecoes, atrioEsquerdoAorta: value})}
           />
 
           {/* Ventrículo Direito - Nova Seção (logo após VE) */}
           <RightVentricleSection 
             data={ventriculoDireito}
             onChange={setVentriculoDireito}
+            observacoes={observacoesSecoes.ventriculoDireito}
+            onObservacoesChange={(value) => setObservacoesSecoes({...observacoesSecoes, ventriculoDireito: value})}
           />
 
           {/* Função Sistólica */}
@@ -1689,6 +1715,17 @@ export default function DadosExame() {
                 onChange={(e) => setFuncaoDiastolica({...funcaoDiastolica, conclusaoDiastolica: e.target.value})}
               />
             </div>
+            
+            {/* Observações / Outros Índices */}
+            <div className="mt-4">
+              <Label className="label-vitaecor">Observações / Outros Índices</Label>
+              <Textarea 
+                className="input-vitaecor min-h-[60px]"
+                placeholder="Observações adicionais sobre a função diastólica..."
+                value={observacoesSecoes.funcaoDiastolica}
+                onChange={(e) => setObservacoesSecoes({...observacoesSecoes, funcaoDiastolica: e.target.value})}
+              />
+            </div>
           </div>
 
           {/* Avaliação Hemodinâmica - Doppler das Valvas */}
@@ -1712,6 +1749,10 @@ export default function DadosExame() {
                     <Label className="label-vitaecor">+dP/dT (mmHg/s)</Label>
                     <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralDpDt)} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralDpDt: sanitizeDecimalInput(e.target.value)})} />
                   </div>
+                  <div>
+                    <Label className="label-vitaecor text-xs">Observações da Valva</Label>
+                    <Textarea className="input-vitaecor min-h-[50px] text-sm" placeholder="Observações..." value={observacoesValvas.mitral} onChange={(e) => setObservacoesValvas({...observacoesValvas, mitral: e.target.value})} />
+                  </div>
                 </div>
               </div>
 
@@ -1726,6 +1767,10 @@ export default function DadosExame() {
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
                     <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.tricuspideGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideGradiente: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor text-xs">Observações da Valva</Label>
+                    <Textarea className="input-vitaecor min-h-[50px] text-sm" placeholder="Observações..." value={observacoesValvas.tricuspide} onChange={(e) => setObservacoesValvas({...observacoesValvas, tricuspide: e.target.value})} />
                   </div>
                 </div>
               </div>
@@ -1742,6 +1787,10 @@ export default function DadosExame() {
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
                     <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.pulmonarGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarGradiente: sanitizeDecimalInput(e.target.value)})} />
                   </div>
+                  <div>
+                    <Label className="label-vitaecor text-xs">Observações da Valva</Label>
+                    <Textarea className="input-vitaecor min-h-[50px] text-sm" placeholder="Observações..." value={observacoesValvas.pulmonar} onChange={(e) => setObservacoesValvas({...observacoesValvas, pulmonar: e.target.value})} />
+                  </div>
                 </div>
               </div>
 
@@ -1756,6 +1805,10 @@ export default function DadosExame() {
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
                     <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.aorticaGradiente)} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaGradiente: sanitizeDecimalInput(e.target.value)})} />
+                  </div>
+                  <div>
+                    <Label className="label-vitaecor text-xs">Observações da Valva</Label>
+                    <Textarea className="input-vitaecor min-h-[50px] text-sm" placeholder="Observações..." value={observacoesValvas.aortica} onChange={(e) => setObservacoesValvas({...observacoesValvas, aortica: e.target.value})} />
                   </div>
                 </div>
               </div>
@@ -1775,6 +1828,15 @@ export default function DadosExame() {
                 <Label className="label-vitaecor">Pericárdio</Label>
                 <Input className="input-vitaecor" value={outros.pericardio} onChange={(e) => setOutros({...outros, pericardio: e.target.value})} />
               </div>
+            </div>
+            <div className="mt-4">
+              <Label className="label-vitaecor">Observações / Outros Índices</Label>
+              <Textarea 
+                className="input-vitaecor min-h-[60px]"
+                placeholder="Observações adicionais sobre pericárdio, septos..."
+                value={outros.observacoes}
+                onChange={(e) => setOutros({...outros, observacoes: e.target.value})}
+              />
             </div>
           </div>
           
