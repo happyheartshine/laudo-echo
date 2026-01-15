@@ -144,6 +144,7 @@ export async function generateExamPdf(
   const outros: OutrosData = examData.outros || { septos: "interventricular e interatrial íntegros", pericardio: "normal, sem derrame" };
   const achados = examData.achados || "";
   const conclusoes = examData.conclusoes || "";
+  const comentariosAdicionais = (examData as PdfExamData & { comentariosAdicionais?: string }).comentariosAdicionais || "";
   const storedImages = examData.storedImages || [];
   const selectedImages = examData.selectedImages || [];
 
@@ -767,9 +768,9 @@ export async function generateExamPdf(
     yPosition += 3;
   }
 
-  // Conclusões
+  // Impressão Diagnóstica
   if (conclusoes) {
-    await addSectionHeader("CONCLUSÕES E COMENTÁRIOS");
+    await addSectionHeader("IMPRESSÃO DIAGNÓSTICA");
     pdf.setTextColor(60, 60, 60);
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
@@ -778,6 +779,19 @@ export async function generateExamPdf(
       await checkPageBreak(5);
       pdf.text(line, margin, yPosition);
       yPosition += 5;
+    }
+    
+    // Comentários Adicionais (em negrito, sem rótulo)
+    if (comentariosAdicionais) {
+      yPosition += 6; // Espaçamento equivalente a ~2 quebras de linha / margin-top: 20px
+      pdf.setFont("helvetica", "bold");
+      const commentLines = pdf.splitTextToSize(comentariosAdicionais, pageWidth - 2 * margin);
+      for (const line of commentLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+      pdf.setFont("helvetica", "normal");
     }
   }
 
