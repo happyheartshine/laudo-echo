@@ -1036,17 +1036,34 @@ export default function DadosExame() {
       yPosition += 3;
     }
 
-    // Conclusões
-    if (conclusoes) {
-      await addSectionHeader("CONCLUSÕES E COMENTÁRIOS");
+    // Impressão Diagnóstica (título fixo - hardcoded)
+    if (conclusoes || comentariosAdicionais) {
+      await addSectionHeader("IMPRESSÃO DIAGNÓSTICA");
       pdf.setTextColor(60, 60, 60);
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
-      const lines = pdf.splitTextToSize(conclusoes, pageWidth - 2 * margin);
-      for (const line of lines) {
-        await checkPageBreak(5);
-        pdf.text(line, margin, yPosition);
-        yPosition += 5;
+      
+      // Texto principal da impressão diagnóstica
+      if (conclusoes) {
+        const lines = pdf.splitTextToSize(conclusoes, pageWidth - 2 * margin);
+        for (const line of lines) {
+          await checkPageBreak(5);
+          pdf.text(line, margin, yPosition);
+          yPosition += 5;
+        }
+      }
+      
+      // Comentários Adicionais (em negrito, sem rótulo, com espaçamento)
+      if (comentariosAdicionais) {
+        yPosition += 6; // ~2 quebras de linha
+        pdf.setFont("helvetica", "bold");
+        const commentLines = pdf.splitTextToSize(comentariosAdicionais, pageWidth - 2 * margin);
+        for (const line of commentLines) {
+          await checkPageBreak(5);
+          pdf.text(line, margin, yPosition);
+          yPosition += 5;
+        }
+        pdf.setFont("helvetica", "normal");
       }
     }
 
