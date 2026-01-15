@@ -336,6 +336,7 @@ export default function DadosExame() {
 
   const [achados, setAchados] = useState("");
   const [conclusoes, setConclusoes] = useState("");
+  const [comentariosAdicionais, setComentariosAdicionais] = useState("");
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
   // Preview state no longer needed - opening in new tab
@@ -378,6 +379,7 @@ export default function DadosExame() {
         valvesData?: typeof valvesData;
         achados?: string;
         conclusoes?: string;
+        comentariosAdicionais?: string;
         storedImages?: StoredImageData[];
         selectedImages?: number[];
       };
@@ -397,6 +399,7 @@ export default function DadosExame() {
       if (content.valvesData) setValvesData(content.valvesData);
       if (content.achados) setAchados(content.achados);
       if (content.conclusoes) setConclusoes(content.conclusoes);
+      if (content.comentariosAdicionais) setComentariosAdicionais(content.comentariosAdicionais);
       
       // Carregar imagens salvas no Storage
       if (content.storedImages && content.storedImages.length > 0) {
@@ -1270,6 +1273,7 @@ export default function DadosExame() {
         valvesData,
         achados,
         conclusoes,
+        comentariosAdicionais,
         calculatedValues,
         storedImages: uploadedImages,
         selectedImages: uploadedImages.map((_, i) => i),
@@ -1764,15 +1768,24 @@ export default function DadosExame() {
             onTextChange={setAchados}
           />
 
-          {/* Conclusões */}
+          {/* Impressão Diagnóstica */}
           <div className="card-vitaecor animate-fade-in">
-            <h2 className="section-title">Conclusões e Comentários</h2>
+            <h2 className="section-title">Impressão Diagnóstica</h2>
             <Textarea
               className="input-vitaecor min-h-[120px]"
-              placeholder="Digite as conclusões e comentários do laudo..."
+              placeholder="Digite a impressão diagnóstica do laudo..."
               value={conclusoes}
               onChange={(e) => setConclusoes(e.target.value)}
             />
+            <div className="mt-4">
+              <Label className="label-vitaecor">Comentários (Adicionais)</Label>
+              <Textarea
+                className="input-vitaecor min-h-[80px]"
+                placeholder="Digite comentários adicionais (aparecerão em negrito no PDF)..."
+                value={comentariosAdicionais}
+                onChange={(e) => setComentariosAdicionais(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
