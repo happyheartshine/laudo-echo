@@ -92,7 +92,7 @@ export interface OutrosData {
 
 export interface ObservacoesSecoesData {
   atrioEsquerdoAorta?: string;
-  funcaoDiastolica?: string;
+  funcaoSistolica?: string;
   ventriculoDireito?: string;
 }
 
@@ -555,6 +555,19 @@ export async function generateExamPdf(
   if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
   if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
   if (funcaoSistolica?.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+  // Observações da Função Sistólica
+  if (observacoesSecoes?.funcaoSistolica?.trim()) {
+    yPosition += 2;
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+    const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoSistolica, pageWidth - 2 * margin);
+    for (const line of obsLines) {
+      await checkPageBreak(5);
+      pdf.text(line, margin, yPosition);
+      yPosition += 5;
+    }
+  }
   yPosition += 3;
 
   // Átrio Esquerdo e Aorta
@@ -671,19 +684,6 @@ export async function generateExamPdf(
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
       const lines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
       for (const line of lines) {
-        await checkPageBreak(5);
-        pdf.text(line, margin, yPosition);
-        yPosition += 5;
-      }
-    }
-    // Observações da Função Diastólica
-    if (observacoesSecoes?.funcaoDiastolica?.trim()) {
-      yPosition += 2;
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoDiastolica, pageWidth - 2 * margin);
-      for (const line of obsLines) {
         await checkPageBreak(5);
         pdf.text(line, margin, yPosition);
         yPosition += 5;
