@@ -97,8 +97,14 @@ export default function Historico() {
         description: "Aguarde enquanto o laudo é gerado."
       });
       const pdf = await generatePdfFromExam(exam);
-      const today = new Date().toLocaleDateString('pt-BR');
-      pdf.save(`laudo-${exam.patient_name}-${today.replace(/\//g, '-')}.pdf`);
+      
+      // Gera nome do arquivo com timestamp para evitar cache do navegador
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR').replace(/\//g, '');
+      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+      const fileName = `Laudo_${(exam.patient_name || 'Paciente').replace(/\s+/g, '_')}_${dateStr}_${timeStr}.pdf`;
+      
+      pdf.save(fileName);
       toast({
         title: "PDF gerado!",
         description: "O laudo foi baixado com sucesso."

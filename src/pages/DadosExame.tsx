@@ -468,8 +468,12 @@ export default function DadosExame() {
     loadData();
   }, [navigate, isEditMode, examId, loadExamData]);
 
+  // Salvar - força blur para sincronizar inputs com estado antes de salvar
   const handleSave = async () => {
-    const activeEl = document.activeElement as HTMLElement | null; activeEl?.blur(); await new Promise((r) => setTimeout(r, 0)); await saveExam();
+    const activeEl = document.activeElement as HTMLElement | null;
+    activeEl?.blur();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await saveExam();
   };
 
   const addHeader = async (pdf: jsPDF, pageWidth: number) => {
@@ -1215,9 +1219,16 @@ export default function DadosExame() {
   }, [patientData, examInfo, measurementsData, classificationsData, referencesData, funcaoDiastolica, funcaoSistolica, ventriculoDireito, tdiLivre, tdiSeptal, valvasDoppler, outros, achados, conclusoes, storedImages, selectedImages, clinic, profile, addHeader, calculatedValues]);
 
   // Preview PDF - gera instantaneamente a partir do estado ATUAL da tela
+  // IMPORTANTE: Força blur para sincronizar inputs com estado antes de gerar
   const handlePreviewPDF = useCallback(async () => {
     try {
-      // Gera o PDF diretamente do estado atual (sem salvar antes)
+      // Força blur no elemento ativo para garantir que o valor seja sincronizado com o estado
+      const activeEl = document.activeElement as HTMLElement | null;
+      activeEl?.blur();
+      // Aguarda um tick para o React processar o onBlur e atualizar o estado
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      
+      // Agora gera o PDF com os valores atualizados
       const pdf = await generatePdfDocument();
       const pdfBlob = pdf.output("blob");
       const blobUrl = URL.createObjectURL(pdfBlob);
@@ -1377,14 +1388,25 @@ export default function DadosExame() {
   };
 
   // Download PDF - gera instantaneamente a partir do estado ATUAL da tela
-  // IMPORTANTE: NÃO salva antes de gerar para garantir que o PDF reflete exatamente o que está na tela
+  // IMPORTANTE: Força blur para sincronizar inputs com estado antes de gerar
   const handleDownloadPDF = useCallback(async () => {
     try {
-      // Gera o PDF diretamente do estado atual - sem save prévio
-      // Isso garante que qualquer alteração feita aparece no PDF imediatamente
+      // Força blur no elemento ativo para garantir que o valor seja sincronizado com o estado
+      const activeEl = document.activeElement as HTMLElement | null;
+      activeEl?.blur();
+      // Aguarda um tick para o React processar o onBlur e atualizar o estado
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      
+      // Agora gera o PDF com os valores atualizados
       const pdf = await generatePdfDocument();
-      const today = new Date().toLocaleDateString('pt-BR');
-      pdf.save(`laudo-${patientData.nome || 'paciente'}-${today.replace(/\//g, '-')}.pdf`);
+      
+      // Gera nome do arquivo com timestamp para evitar cache do navegador
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR').replace(/\//g, '');
+      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+      const fileName = `Laudo_${(patientData.nome || 'Paciente').replace(/\s+/g, '_')}_${dateStr}_${timeStr}.pdf`;
+      
+      pdf.save(fileName);
 
       toast({
         title: "PDF gerado!",
