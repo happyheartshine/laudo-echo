@@ -379,7 +379,7 @@ export async function generateExamPdf(
     const hasSignatureImage = !!signatureUrl;
     const signatureImgHeight = hasSignatureImage ? 15 : 0;
     const lineCount = 1 + (crmvText ? 1 : 0) + (specialtyText ? 1 : 0);
-    const blockHeight = 6 + signatureImgHeight + lineCount * 4 + 4;
+    const blockHeight = 2 + signatureImgHeight + lineCount * 4 + 4;
     const footerReserved = 12;
 
     if (yPosition + blockHeight > pageHeight - footerReserved) {
@@ -387,7 +387,7 @@ export async function generateExamPdf(
       await addHeader();
       yPosition = 35;
     }
-    yPosition += 6; // Reduzido de 10 para 6mm (~20-25px de respiro)
+    yPosition += 2; // Reduzido para 2mm
 
     if (signatureUrl) {
       try {
