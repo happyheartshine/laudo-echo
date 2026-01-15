@@ -469,7 +469,7 @@ export default function DadosExame() {
   }, [navigate, isEditMode, examId, loadExamData]);
 
   const handleSave = async () => {
-    await saveExam();
+    const activeEl = document.activeElement as HTMLElement | null; activeEl?.blur(); await new Promise((r) => setTimeout(r, 0)); await saveExam();
   };
 
   const addHeader = async (pdf: jsPDF, pageWidth: number) => {
