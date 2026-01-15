@@ -331,7 +331,7 @@ export default function DadosExame() {
   // Novos estados para observações de cada seção
   const [observacoesSecoes, setObservacoesSecoes] = useState({
     atrioEsquerdoAorta: "",
-    funcaoDiastolica: "",
+    funcaoSistolica: "",
     ventriculoDireito: "",
   });
 
@@ -834,6 +834,19 @@ export default function DadosExame() {
     if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
     if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
     if (funcaoSistolica.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+    // Observações da Função Sistólica
+    if (observacoesSecoes.funcaoSistolica?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoSistolica, pageWidth - 2 * margin);
+      for (const line of obsLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
     yPosition += 3;
 
     // Átrio Esquerdo e Aorta
@@ -951,19 +964,6 @@ export default function DadosExame() {
         pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
         const lines = pdf.splitTextToSize(funcaoDiastolica.conclusaoDiastolica, pageWidth - 2 * margin);
         for (const line of lines) {
-          await checkPageBreak(5);
-          pdf.text(line, margin, yPosition);
-          yPosition += 5;
-        }
-      }
-      // Observações da Função Diastólica
-      if (observacoesSecoes.funcaoDiastolica?.trim()) {
-        yPosition += 2;
-        pdf.setFontSize(9);
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-        const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoDiastolica, pageWidth - 2 * margin);
-        for (const line of obsLines) {
           await checkPageBreak(5);
           pdf.text(line, margin, yPosition);
           yPosition += 5;
@@ -1707,6 +1707,17 @@ export default function DadosExame() {
                 <Input className="input-vitaecor" placeholder="Ex: Global, Segmentar..." value={funcaoSistolica.tipoDisfuncao} onChange={(e) => setFuncaoSistolica({...funcaoSistolica, tipoDisfuncao: e.target.value})} />
               </div>
             </div>
+            
+            {/* Observações / Outros Índices */}
+            <div className="mt-4">
+              <Label className="label-vitaecor">Observações / Outros Índices</Label>
+              <Textarea 
+                className="input-vitaecor min-h-[60px]"
+                placeholder="Observações adicionais sobre a função sistólica..."
+                value={observacoesSecoes.funcaoSistolica}
+                onChange={(e) => setObservacoesSecoes({...observacoesSecoes, funcaoSistolica: e.target.value})}
+              />
+            </div>
           </div>
 
           {/* Função Diastólica */}
@@ -1842,16 +1853,6 @@ export default function DadosExame() {
               />
             </div>
             
-            {/* Observações / Outros Índices */}
-            <div className="mt-4">
-              <Label className="label-vitaecor">Observações / Outros Índices</Label>
-              <Textarea 
-                className="input-vitaecor min-h-[60px]"
-                placeholder="Observações adicionais sobre a função diastólica..."
-                value={observacoesSecoes.funcaoDiastolica}
-                onChange={(e) => setObservacoesSecoes({...observacoesSecoes, funcaoDiastolica: e.target.value})}
-              />
-            </div>
           </div>
 
           {/* Avaliação Hemodinâmica - Doppler das Valvas */}
