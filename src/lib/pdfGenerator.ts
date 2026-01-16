@@ -554,21 +554,45 @@ export async function generateExamPdf(
   }
   if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
   if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
-  if (funcaoSistolica?.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
-  // Observações da Função Sistólica
-  if (observacoesSecoes?.funcaoSistolica?.trim()) {
-    yPosition += 2;
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-    const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoSistolica, pageWidth - 2 * margin);
-    for (const line of obsLines) {
-      await checkPageBreak(5);
-      pdf.text(line, margin, yPosition);
-      yPosition += 5;
-    }
-  }
   yPosition += 3;
+
+  // ========== AVALIAÇÃO DA FUNÇÃO SISTÓLICA ==========
+  const hasSystolicData = funcaoSistolica?.mapse || funcaoSistolica?.epss || 
+    funcaoSistolica?.simpson || funcaoSistolica?.statusFuncao || 
+    funcaoSistolica?.tipoDisfuncao || observacoesSecoes?.funcaoSistolica?.trim();
+
+  if (hasSystolicData) {
+    await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
+
+    if (funcaoSistolica?.mapse) addTableRow("MAPSE", `${formatNumber(funcaoSistolica.mapse)} cm`);
+    if (funcaoSistolica?.epss) addTableRow("EPSS", `${formatNumber(funcaoSistolica.epss)} cm`);
+    if (funcaoSistolica?.simpson) addTableRow("Fração de Ejeção (Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`);
+
+    // Status da Função Sistólica
+    if (funcaoSistolica?.statusFuncao) {
+      const statusText = funcaoSistolica.statusFuncao === 'normal' 
+        ? 'Função sistólica preservada' 
+        : funcaoSistolica.statusFuncao === 'disfuncao' 
+          ? `Disfunção sistólica${funcaoSistolica.tipoDisfuncao ? ` ${funcaoSistolica.tipoDisfuncao}` : ''}`
+          : funcaoSistolica.statusFuncao;
+      addTableRow("Avaliação", statusText);
+    }
+
+    // Observações da Função Sistólica
+    if (observacoesSecoes?.funcaoSistolica?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoSistolica, pageWidth - 2 * margin);
+      for (const line of obsLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
+    yPosition += 3;
+  }
 
   // Átrio Esquerdo e Aorta
   if (measurementsData.aorta || measurementsData.atrioEsquerdo) {
