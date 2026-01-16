@@ -54,6 +54,7 @@ export type Database = {
           id: string
           owner_name: string | null
           partner_clinic_id: string | null
+          partner_vet_id: string | null
           patient_name: string
           species: string | null
           updated_at: string
@@ -68,6 +69,7 @@ export type Database = {
           id?: string
           owner_name?: string | null
           partner_clinic_id?: string | null
+          partner_vet_id?: string | null
           patient_name: string
           species?: string | null
           updated_at?: string
@@ -82,6 +84,7 @@ export type Database = {
           id?: string
           owner_name?: string | null
           partner_clinic_id?: string | null
+          partner_vet_id?: string | null
           patient_name?: string
           species?: string | null
           updated_at?: string
@@ -100,6 +103,13 @@ export type Database = {
             columns: ["partner_clinic_id"]
             isOneToOne: false
             referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exams_partner_vet_id_fkey"
+            columns: ["partner_vet_id"]
+            isOneToOne: false
+            referencedRelation: "partner_veterinarians"
             referencedColumns: ["id"]
           },
         ]
