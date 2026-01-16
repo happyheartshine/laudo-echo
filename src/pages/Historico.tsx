@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2, Loader2 } from "lucide-react";
+import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2, Loader2, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -14,6 +14,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from "@/components/ui/label";
 import { deleteExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 import { generateExamPdf, PdfExamData } from "@/lib/pdfGenerator";
+
+interface PartnerClinic {
+  id: string;
+  nome: string;
+  telefone: string | null;
+}
+
 interface Exam {
   id: string;
   patient_name: string;
@@ -23,6 +30,7 @@ interface Exam {
   exam_date: string;
   content: unknown;
   created_at: string;
+  partner_clinic_id: string | null;
 }
 
 // Função utilitária para formatar números no padrão BR
@@ -52,9 +60,12 @@ export default function Historico() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   useEffect(() => {
     if (user) {
       fetchExams();
+      fetchPartnerClinics();
     }
   }, [user]);
   const fetchExams = async () => {
@@ -77,6 +88,16 @@ export default function Historico() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPartnerClinics = async () => {
+    const { data, error } = await supabase
+      .from("partner_clinics")
+      .select("id, nome, telefone");
+    
+    if (!error && data) {
+      setPartnerClinics(data);
     }
   };
   const filteredExams = exams.filter(exam => exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) || exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -121,6 +142,95 @@ export default function Historico() {
   const handleEdit = (exam: Exam) => {
     // Navigate to edit page with exam ID
     navigate(`/novo-exame/dados-exame?id=${exam.id}`);
+  };
+
+  const handleWhatsApp = async (exam: Exam) => {
+    try {
+      setIsSendingWhatsApp(true);
+      
+      // Find phone number from partner clinic
+      let phoneNumber: string | null = null;
+      
+      if (exam.partner_clinic_id) {
+        const partnerClinic = partnerClinics.find(c => c.id === exam.partner_clinic_id);
+        if (partnerClinic?.telefone) {
+          phoneNumber = partnerClinic.telefone;
+        }
+      }
+      
+      // Fallback: check content for tutor phone
+      if (!phoneNumber) {
+        const content = exam.content as Record<string, unknown>;
+        if (content?.telefone_tutor && typeof content.telefone_tutor === 'string') {
+          phoneNumber = content.telefone_tutor;
+        }
+      }
+      
+      if (!phoneNumber) {
+        toast({
+          title: "Nenhum telefone cadastrado",
+          description: "Não foi encontrado telefone para esta clínica ou exame.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Clean phone number (remove non-digits)
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      
+      // Generate PDF and upload to storage
+      toast({
+        title: "Preparando laudo...",
+        description: "Gerando PDF para envio."
+      });
+      
+      const pdfDoc = await generatePdfFromExam(exam);
+      const pdfBlob = pdfDoc.output('blob');
+      
+      const safePatientName = exam.patient_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+      const fileName = `laudo_whatsapp_${safePatientName}_${Date.now()}.pdf`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('email-pdfs')
+        .upload(fileName, pdfBlob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('email-pdfs')
+        .getPublicUrl(fileName);
+      
+      const pdfUrl = urlData.publicUrl;
+      
+      // Format date
+      const examDate = new Date(exam.exam_date).toLocaleDateString('pt-BR');
+      
+      // Build WhatsApp message
+      const message = `Olá! Aqui é ${profile?.sexo === 'feminino' ? 'a Dra.' : 'o Dr.'} ${profile?.nome || 'veterinário(a)'}. Segue o link do laudo do paciente *${exam.patient_name}* realizado em ${examDate}.\n\n📄 ${pdfUrl}`;
+      
+      // Open WhatsApp
+      const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+      
+      toast({
+        title: "WhatsApp aberto!",
+        description: "A mensagem foi preparada para envio."
+      });
+    } catch (error) {
+      console.error("Erro ao preparar WhatsApp:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível preparar o envio via WhatsApp.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSendingWhatsApp(false);
+    }
   };
   const handleOpenEmailDialog = (exam: Exam) => {
     setSelectedExamForEmail(exam);
@@ -309,6 +419,16 @@ export default function Historico() {
                         <div className="flex items-center justify-end gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleEdit(exam)} title="Editar exame">
                             <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleWhatsApp(exam)} 
+                            title="Enviar via WhatsApp"
+                            disabled={isSendingWhatsApp}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            <MessageCircle className="w-4 h-4" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handleOpenEmailDialog(exam)} title="Enviar por email">
                             <Mail className="w-4 h-4" />
