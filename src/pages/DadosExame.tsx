@@ -46,7 +46,7 @@ export default function DadosExame() {
   // Track current exam ID to avoid duplicates (INSERT once, then UPDATE)
   const [currentExamId, setCurrentExamId] = useState<string | null>(examId || null);
 
-  const [patientData, setPatientData] = useState<PatientData>({
+const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
     responsavel: "",
     especie: "",
@@ -63,7 +63,77 @@ export default function DadosExame() {
     ritmo: "",
     frequenciaCardiaca: "",
     modoMedicao: "M" as "M" | "B", // Modo M ou B para medidas
+    partnerClinicId: "" as string, // ID da clínica parceira selecionada
+    partnerVetId: "" as string, // ID do veterinário parceiro selecionado
   });
+
+  // Estados para clínicas e veterinários parceiros
+  interface PartnerClinic {
+    id: string;
+    nome: string;
+    valor_exame: number;
+    responsavel: string | null;
+    telefone: string | null;
+  }
+  
+  interface PartnerVet {
+    id: string;
+    partner_clinic_id: string;
+    nome: string;
+  }
+  
+  const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
+  const [partnerVets, setPartnerVets] = useState<PartnerVet[]>([]);
+  
+  // Buscar clínicas e veterinários parceiros
+  useEffect(() => {
+    const fetchPartnerData = async () => {
+      if (!user) return;
+      
+      const { data: clinics } = await supabase
+        .from("partner_clinics")
+        .select("id, nome, valor_exame, responsavel, telefone")
+        .order("nome");
+      
+      const { data: vets } = await supabase
+        .from("partner_veterinarians")
+        .select("id, partner_clinic_id, nome")
+        .order("nome");
+      
+      if (clinics) setPartnerClinics(clinics);
+      if (vets) setPartnerVets(vets);
+    };
+    
+    fetchPartnerData();
+  }, [user]);
+  
+  // Veterinários filtrados pela clínica selecionada
+  const filteredVets = examInfo.partnerClinicId 
+    ? partnerVets.filter(v => v.partner_clinic_id === examInfo.partnerClinicId)
+    : [];
+  
+  // Handler para seleção de clínica - atualiza nome e limpa veterinário se mudar
+  const handleClinicSelect = (clinicId: string) => {
+    const selectedClinic = partnerClinics.find(c => c.id === clinicId);
+    setExamInfo(prev => ({
+      ...prev,
+      partnerClinicId: clinicId,
+      clinica: selectedClinic?.nome || "",
+      // Limpa veterinário se mudar de clínica
+      partnerVetId: "",
+      solicitante: "",
+    }));
+  };
+  
+  // Handler para seleção de veterinário
+  const handleVetSelect = (vetId: string) => {
+    const selectedVet = partnerVets.find(v => v.id === vetId);
+    setExamInfo(prev => ({
+      ...prev,
+      partnerVetId: vetId,
+      solicitante: selectedVet?.nome || "",
+    }));
+  };
 
   const [measurementsData, setMeasurementsData] = useState({
     dvedDiastole: "",
@@ -1433,12 +1503,13 @@ export default function DadosExame() {
         selectedImages: uploadedImages.map((_, i) => i),
       };
 
-      const examData = {
+const examData = {
         patient_name: patientData.nome || "Paciente sem nome",
         owner_name: patientData.responsavel || null,
         species: patientData.especie || null,
         breed: patientData.raca || null,
         exam_date: examDate,
+        partner_clinic_id: examInfo.partnerClinicId || null,
         content: JSON.parse(JSON.stringify(examContent)),
       };
 
@@ -1581,7 +1652,8 @@ export default function DadosExame() {
               Informações do Exame
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* 1. Data do Exame */}
               <div>
                 <Label className="label-vitaecor">Data do Exame</Label>
                 <Input
@@ -1591,24 +1663,59 @@ export default function DadosExame() {
                   onChange={(e) => setExamInfo({ ...examInfo, data: e.target.value })}
                 />
               </div>
-              <div>
-                <Label className="label-vitaecor">Solicitante</Label>
-                <Input
-                  className="input-vitaecor"
-                  placeholder="Ex: Dr. [Nome do Veterinário]"
-                  value={examInfo.solicitante}
-                  onChange={(e) => setExamInfo({ ...examInfo, solicitante: e.target.value })}
-                />
-              </div>
+              
+              {/* 2. Clínica/Hospital - Dropdown com clínicas parceiras */}
               <div>
                 <Label className="label-vitaecor">Clínica/Hospital</Label>
-                <Input
-                  className="input-vitaecor"
-                  placeholder="Ex: Nome da Clínica"
-                  value={examInfo.clinica}
-                  onChange={(e) => setExamInfo({ ...examInfo, clinica: e.target.value })}
-                />
+                <Select 
+                  value={examInfo.partnerClinicId} 
+                  onValueChange={handleClinicSelect}
+                >
+                  <SelectTrigger className="input-vitaecor">
+                    <SelectValue placeholder="Selecione a clínica..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {partnerClinics.map((clinic) => (
+                      <SelectItem key={clinic.id} value={clinic.id}>
+                        {clinic.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {partnerClinics.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nenhuma clínica cadastrada. <a href="/parceiros" className="text-primary underline">Cadastrar clínicas</a>
+                  </p>
+                )}
               </div>
+              
+              {/* 3. Solicitante - Dropdown com veterinários da clínica selecionada */}
+              <div>
+                <Label className="label-vitaecor">Solicitante</Label>
+                <Select 
+                  value={examInfo.partnerVetId} 
+                  onValueChange={handleVetSelect}
+                  disabled={!examInfo.partnerClinicId}
+                >
+                  <SelectTrigger className="input-vitaecor">
+                    <SelectValue placeholder={examInfo.partnerClinicId ? "Selecione o veterinário..." : "Selecione uma clínica primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredVets.map((vet) => (
+                      <SelectItem key={vet.id} value={vet.id}>
+                        {vet.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {examInfo.partnerClinicId && filteredVets.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nenhum veterinário nesta clínica. <a href="/parceiros" className="text-primary underline">Cadastrar veterinários</a>
+                  </p>
+                )}
+              </div>
+              
+              {/* 4. Ritmo */}
               <div>
                 <Label className="label-vitaecor">Ritmo</Label>
                 <Input
@@ -1618,6 +1725,8 @@ export default function DadosExame() {
                   onChange={(e) => setExamInfo({ ...examInfo, ritmo: e.target.value })}
                 />
               </div>
+              
+              {/* 5. Frequência Cardíaca */}
               <div>
                 <Label className="label-vitaecor">Frequência Cardíaca (bpm)</Label>
                 <Input
