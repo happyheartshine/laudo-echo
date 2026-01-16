@@ -1,4 +1,4 @@
-import { FileText, Home, History, Settings, User, LogOut, Users, Building2 } from "lucide-react";
+import { FileText, Home, History, Settings, User, LogOut, Users, Building2, Wallet } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import logoVitaecor from "@/assets/logo-vitaecor.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,9 +17,13 @@ const menuItems = [{
   url: "/historico",
   icon: History
 }, {
-  title: "Clínicas & Parceiros",
-  url: "/clinicas-parceiros",
+  title: "Parceiros",
+  url: "/parceiros",
   icon: Building2
+}, {
+  title: "Financeiro",
+  url: "/financeiro",
+  icon: Wallet
 }];
 export function AppSidebar() {
   const location = useLocation();
