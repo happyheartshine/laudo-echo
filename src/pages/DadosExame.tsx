@@ -100,23 +100,34 @@ const [patientData, setPatientData] = useState<PatientData>({
   // Buscar clínicas, veterinários parceiros e membros da equipe
   useEffect(() => {
     const fetchPartnerData = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('DadosExame: No user yet, skipping fetch');
+        return;
+      }
       
-      const { data: clinics } = await supabase
+      console.log('DadosExame: Fetching partner data for user:', user.id);
+      
+      const { data: clinics, error: clinicsError } = await supabase
         .from("partner_clinics")
         .select("id, nome, valor_exame, responsavel, telefone")
         .order("nome");
       
-      const { data: vets } = await supabase
+      console.log('DadosExame: Clinics fetched:', clinics, 'Error:', clinicsError);
+      
+      const { data: vets, error: vetsError } = await supabase
         .from("partner_veterinarians")
         .select("id, partner_clinic_id, nome")
         .order("nome");
       
+      console.log('DadosExame: Vets fetched:', vets, 'Error:', vetsError);
+      
       // Buscar membros da equipe (todos os profiles da mesma clínica)
-      const { data: members } = await supabase
+      const { data: members, error: membersError } = await supabase
         .from("profiles")
         .select("id, nome, crmv, uf_crmv, user_id")
         .order("nome");
+      
+      console.log('DadosExame: Team members fetched:', members, 'Error:', membersError);
       
       if (clinics) setPartnerClinics(clinics);
       if (vets) setPartnerVets(vets);
@@ -126,6 +137,7 @@ const [patientData, setPatientData] = useState<PatientData>({
         if (!examInfo.performingVetId && profile) {
           const currentUserMember = members.find(m => m.user_id === user.id);
           if (currentUserMember) {
+            console.log('DadosExame: Pre-selecting current user as performing vet:', currentUserMember);
             setExamInfo(prev => ({
               ...prev,
               performingVetId: currentUserMember.id,
