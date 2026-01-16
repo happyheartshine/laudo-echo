@@ -200,7 +200,7 @@ export default function ClinicasParceiros() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Clínicas & Parceiros</h1>
+            <h1 className="text-2xl font-bold text-foreground">Parceiros</h1>
             <p className="text-muted-foreground">
               Gerencie suas clínicas parceiras e veterinários vinculados
             </p>
