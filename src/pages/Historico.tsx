@@ -61,7 +61,7 @@ export default function Historico() {
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
-  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
   useEffect(() => {
     if (user) {
       fetchExams();
@@ -146,30 +146,34 @@ export default function Historico() {
 
   const handleWhatsApp = async (exam: Exam) => {
     try {
-      setIsSendingWhatsApp(true);
+      setSendingWhatsAppId(exam.id);
       
-      // Find phone number from partner clinic
+      // Find phone number: Priority 1 - Partner Clinic
       let phoneNumber: string | null = null;
+      let phoneSource = "";
       
       if (exam.partner_clinic_id) {
         const partnerClinic = partnerClinics.find(c => c.id === exam.partner_clinic_id);
         if (partnerClinic?.telefone) {
           phoneNumber = partnerClinic.telefone;
+          phoneSource = partnerClinic.nome;
         }
       }
       
-      // Fallback: check content for tutor phone
+      // Fallback: Priority 2 - Tutor phone from exam content
       if (!phoneNumber) {
         const content = exam.content as Record<string, unknown>;
-        if (content?.telefone_tutor && typeof content.telefone_tutor === 'string') {
-          phoneNumber = content.telefone_tutor;
+        const patientData = content?.patientData as Record<string, unknown>;
+        if (patientData?.telefone && typeof patientData.telefone === 'string') {
+          phoneNumber = patientData.telefone;
+          phoneSource = "tutor";
         }
       }
       
       if (!phoneNumber) {
         toast({
           title: "Nenhum telefone cadastrado",
-          description: "Não foi encontrado telefone para esta clínica ou exame.",
+          description: "Cadastre o telefone na aba Parceiros ou nos dados do Tutor.",
           variant: "destructive"
         });
         return;
@@ -178,31 +182,44 @@ export default function Historico() {
       // Clean phone number (remove non-digits)
       const cleanPhone = phoneNumber.replace(/\D/g, '');
       
-      // Generate PDF and upload to storage
-      toast({
-        title: "Preparando laudo...",
-        description: "Gerando PDF para envio."
-      });
+      // Validate phone number
+      if (cleanPhone.length < 10) {
+        toast({
+          title: "Telefone inválido",
+          description: `O telefone ${phoneSource ? `de ${phoneSource}` : ''} parece incompleto.`,
+          variant: "destructive"
+        });
+        return;
+      }
       
+      // Generate PDF silently
       const pdfDoc = await generatePdfFromExam(exam);
       const pdfBlob = pdfDoc.output('blob');
       
-      const safePatientName = exam.patient_name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-      const fileName = `laudo_whatsapp_${safePatientName}_${Date.now()}.pdf`;
+      // Create unique filename
+      const safePatientName = exam.patient_name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "_")
+        .toLowerCase();
+      const fileName = `laudo_${exam.id}_${Date.now()}.pdf`;
       
-      // Upload to storage
+      // Upload to exam-reports bucket
       const { error: uploadError } = await supabase.storage
-        .from('email-pdfs')
+        .from('exam-reports')
         .upload(fileName, pdfBlob, {
           contentType: 'application/pdf',
           upsert: true
         });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
       
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('email-pdfs')
+        .from('exam-reports')
         .getPublicUrl(fileName);
       
       const pdfUrl = urlData.publicUrl;
@@ -211,25 +228,27 @@ export default function Historico() {
       const examDate = new Date(exam.exam_date).toLocaleDateString('pt-BR');
       
       // Build WhatsApp message
-      const message = `Olá! Aqui é ${profile?.sexo === 'feminino' ? 'a Dra.' : 'o Dr.'} ${profile?.nome || 'veterinário(a)'}. Segue o link do laudo do paciente *${exam.patient_name}* realizado em ${examDate}.\n\n📄 ${pdfUrl}`;
+      const doctorTitle = profile?.sexo === 'feminino' ? 'a Dra.' : 'o Dr.';
+      const doctorName = profile?.nome || 'veterinário(a)';
+      const message = `Olá! Aqui é ${doctorTitle} ${doctorName}. Segue o link do laudo do paciente *${exam.patient_name}* realizado em ${examDate}.\n\n📄 ${pdfUrl}`;
       
-      // Open WhatsApp
+      // Open WhatsApp with Brazil country code
       const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
       
       toast({
         title: "WhatsApp aberto!",
-        description: "A mensagem foi preparada para envio."
+        description: "Mensagem e link do laudo prontos para envio."
       });
     } catch (error) {
       console.error("Erro ao preparar WhatsApp:", error);
       toast({
-        title: "Erro",
-        description: "Não foi possível preparar o envio via WhatsApp.",
+        title: "Erro ao preparar envio",
+        description: "Não foi possível gerar o link. Tente novamente.",
         variant: "destructive"
       });
     } finally {
-      setIsSendingWhatsApp(false);
+      setSendingWhatsAppId(null);
     }
   };
   const handleOpenEmailDialog = (exam: Exam) => {
@@ -425,10 +444,17 @@ export default function Historico() {
                             size="sm" 
                             onClick={() => handleWhatsApp(exam)} 
                             title="Enviar via WhatsApp"
-                            disabled={isSendingWhatsApp}
-                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            disabled={sendingWhatsAppId === exam.id}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 min-w-[60px]"
                           >
-                            <MessageCircle className="w-4 h-4" />
+                            {sendingWhatsAppId === exam.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                <span className="text-xs">Link...</span>
+                              </>
+                            ) : (
+                              <MessageCircle className="w-4 h-4" />
+                            )}
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handleOpenEmailDialog(exam)} title="Enviar por email">
                             <Mail className="w-4 h-4" />
