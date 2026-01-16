@@ -564,19 +564,48 @@ export async function generateExamPdf(
   if (hasSystolicData) {
     await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
 
-    // 1. Fração de Encurtamento (FS) com referência e status
+    // Posições de colunas para esta seção
+    const sysCol2X = margin + 68;
+    const sysCol3X = margin + 100;
+    const sysCol4X = margin + 142;
+
+    // 1. Fração de Encurtamento (FS) - apenas valor e status, sem referência
     if (fsValue && fsValue !== '-') {
-      addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+      const fsClassText = getClassificationText('fracaoEncurtamento');
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      pdf.text("Fração de Encurtamento (FS)", margin, yPosition);
+      pdf.text(`${formatNumber(fsValue)}%`, sysCol2X, yPosition);
+      pdf.text("-", sysCol3X, yPosition); // Referência oculta
+      if (fsClassText) pdf.text(fsClassText, sysCol4X, yPosition);
+      yPosition += 5;
     }
 
-    // 2. Fração de Ejeção (FE Teicholz) com referência e status
+    // 2. Fração de Ejeção (FE Teicholz) - apenas valor e status, sem referência
     if (feTeicholzValue && feTeicholzValue !== '-') {
-      addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+      const feClassText = getClassificationText('fracaoEjecaoTeicholz');
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      pdf.text("Fração de Ejeção (FE Teicholz)", margin, yPosition);
+      pdf.text(`${formatNumber(feTeicholzValue)}%`, sysCol2X, yPosition);
+      pdf.text("-", sysCol3X, yPosition); // Referência oculta
+      if (feClassText) pdf.text(feClassText, sysCol4X, yPosition);
+      yPosition += 5;
     }
 
-    // 3. Fração de Ejeção Simpson (se disponível)
+    // 3. Fração de Ejeção Simpson - apenas valor e status, sem referência
     if (funcaoSistolica?.simpson) {
-      addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+      const simpsonClassText = getClassificationText('fracaoEjecaoSimpson');
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      pdf.text("Fração de Ejeção (FE Simpson)", margin, yPosition);
+      pdf.text(`${formatNumber(funcaoSistolica.simpson)}%`, sysCol2X, yPosition);
+      pdf.text("-", sysCol3X, yPosition); // Referência oculta
+      if (simpsonClassText) pdf.text(simpsonClassText, sysCol4X, yPosition);
+      yPosition += 5;
     }
 
     // 4. MAPSE
