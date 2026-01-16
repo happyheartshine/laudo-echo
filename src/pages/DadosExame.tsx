@@ -65,6 +65,8 @@ const [patientData, setPatientData] = useState<PatientData>({
     modoMedicao: "M" as "M" | "B", // Modo M ou B para medidas
     partnerClinicId: "" as string, // ID da clínica parceira selecionada
     partnerVetId: "" as string, // ID do veterinário parceiro selecionado
+    performingVetId: "" as string, // ID do ecocardiografista responsável
+    performingVetName: "" as string, // Nome do ecocardiografista (para exibir no PDF)
   });
 
   // Estados para clínicas e veterinários parceiros
@@ -85,7 +87,17 @@ const [patientData, setPatientData] = useState<PatientData>({
   const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
   const [partnerVets, setPartnerVets] = useState<PartnerVet[]>([]);
   
-  // Buscar clínicas e veterinários parceiros
+  // Estado para membros da equipe (ecocardiografistas)
+  interface TeamMember {
+    id: string;
+    nome: string;
+    crmv: string | null;
+    uf_crmv: string | null;
+    user_id: string;
+  }
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  
+  // Buscar clínicas, veterinários parceiros e membros da equipe
   useEffect(() => {
     const fetchPartnerData = async () => {
       if (!user) return;
@@ -100,12 +112,32 @@ const [patientData, setPatientData] = useState<PatientData>({
         .select("id, partner_clinic_id, nome")
         .order("nome");
       
+      // Buscar membros da equipe (todos os profiles da mesma clínica)
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("id, nome, crmv, uf_crmv, user_id")
+        .order("nome");
+      
       if (clinics) setPartnerClinics(clinics);
       if (vets) setPartnerVets(vets);
+      if (members) {
+        setTeamMembers(members);
+        // Pré-selecionar o usuário logado se ainda não há seleção
+        if (!examInfo.performingVetId && profile) {
+          const currentUserMember = members.find(m => m.user_id === user.id);
+          if (currentUserMember) {
+            setExamInfo(prev => ({
+              ...prev,
+              performingVetId: currentUserMember.id,
+              performingVetName: currentUserMember.nome,
+            }));
+          }
+        }
+      }
     };
     
     fetchPartnerData();
-  }, [user]);
+  }, [user, profile]);
   
   // Veterinários filtrados pela clínica selecionada
   const filteredVets = examInfo.partnerClinicId 
@@ -132,6 +164,16 @@ const [patientData, setPatientData] = useState<PatientData>({
       ...prev,
       partnerVetId: vetId,
       solicitante: selectedVet?.nome || "",
+    }));
+  };
+  
+  // Handler para seleção do ecocardiografista responsável
+  const handlePerformingVetSelect = (memberId: string) => {
+    const selectedMember = teamMembers.find(m => m.id === memberId);
+    setExamInfo(prev => ({
+      ...prev,
+      performingVetId: memberId,
+      performingVetName: selectedMember?.nome || "",
     }));
   };
 
@@ -474,20 +516,23 @@ const [patientData, setPatientData] = useState<PatientData>({
 
 if (content.patientData) setPatientData(content.patientData);
       if (content.examInfo) {
-        // Merge with defaults to handle new fields (partnerClinicId, partnerVetId)
+        // Merge with defaults to handle new fields (partnerClinicId, partnerVetId, performingVetId)
         setExamInfo(prev => ({
           ...prev,
           ...content.examInfo,
           // Also populate from database columns if not in content
           partnerClinicId: content.examInfo?.partnerClinicId || data.partner_clinic_id || "",
           partnerVetId: content.examInfo?.partnerVetId || data.partner_vet_id || "",
+          performingVetId: content.examInfo?.performingVetId || data.performing_vet_id || "",
+          performingVetName: content.examInfo?.performingVetName || "",
         }));
-      } else if (data.partner_clinic_id || data.partner_vet_id) {
+      } else if (data.partner_clinic_id || data.partner_vet_id || data.performing_vet_id) {
         // Fallback: populate from database columns even if examInfo doesn't exist
         setExamInfo(prev => ({
           ...prev,
           partnerClinicId: data.partner_clinic_id || "",
           partnerVetId: data.partner_vet_id || "",
+          performingVetId: data.performing_vet_id || "",
         }));
       }
       if (content.measurementsData) setMeasurementsData((prev) => ({ ...prev, ...content.measurementsData }));
@@ -1527,6 +1572,7 @@ const examData = {
         exam_date: examDate,
         partner_clinic_id: examInfo.partnerClinicId || null,
         partner_vet_id: examInfo.partnerVetId || null,
+        performing_vet_id: examInfo.performingVetId || null,
         content: JSON.parse(JSON.stringify(examContent)),
       };
 
@@ -1732,7 +1778,33 @@ const examData = {
                 )}
               </div>
               
-              {/* 4. Ritmo */}
+              {/* 4. Ecocardiografista Responsável - Dropdown com membros da equipe */}
+              <div>
+                <Label className="label-vitaecor">Ecocardiografista Responsável</Label>
+                <Select 
+                  value={examInfo.performingVetId} 
+                  onValueChange={handlePerformingVetSelect}
+                >
+                  <SelectTrigger className="input-vitaecor">
+                    <SelectValue placeholder="Selecione o ecocardiografista..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.nome}
+                        {member.crmv && member.uf_crmv && ` - CRMV ${member.uf_crmv} ${member.crmv}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {teamMembers.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nenhum membro cadastrado. <a href="/configuracoes" className="text-primary underline">Configurar equipe</a>
+                  </p>
+                )}
+              </div>
+              
+              {/* 5. Ritmo */}
               <div>
                 <Label className="label-vitaecor">Ritmo</Label>
                 <Input
