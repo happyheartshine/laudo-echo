@@ -166,6 +166,14 @@ export async function generateExamPdf(
   const observacoesSecoes: ObservacoesSecoesData = examData.observacoesSecoes || {};
   const observacoesValvas: ObservacoesValvasData = examData.observacoesValvas || {};
 
+  // DEBUG: Log dos valores de FS, FE para verificar persistência
+  console.log("=== DEBUG PDF GENERATION ===");
+  console.log("measurementsData.fracaoEncurtamento:", measurementsData.fracaoEncurtamento);
+  console.log("measurementsData.fracaoEjecaoTeicholz:", measurementsData.fracaoEjecaoTeicholz);
+  console.log("funcaoSistolica.simpson:", funcaoSistolica.simpson);
+  console.log("measurementsData (full):", JSON.stringify(measurementsData, null, 2));
+  console.log("=== END DEBUG ===");
+
   const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -534,9 +542,13 @@ export async function generateExamPdf(
   if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
 
-  // Medidas funcionais (DVEdN)
+  // Medidas funcionais: FS, FE Teicholz, DVEdN
+  if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+  if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+  if (funcaoSistolica?.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+
+  // DVEdN com referência fixa "< 1,70"
   if (dvedNorm && dvedNorm !== '-') {
-    // DVEdN com referência fixa "< 1,70"
     pdf.setFontSize(9);
     pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
     pdf.setFont("helvetica", "normal");
@@ -564,55 +576,43 @@ export async function generateExamPdf(
   if (hasSystolicData) {
     await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
 
-    // Posições de colunas para esta seção
-    const sysCol2X = margin + 68;
-    const sysCol3X = margin + 100;
-    const sysCol4X = margin + 142;
+    // Layout horizontal para índices sistólicos - APENAS VALORES (sem referência, sem status)
+    const hasFs = fsValue && fsValue !== '-';
+    const hasFe = feTeicholzValue && feTeicholzValue !== '-';
+    const hasSimpson = funcaoSistolica?.simpson;
 
-    // 1. Fração de Encurtamento (FS) - apenas valor e status, sem referência
-    if (fsValue && fsValue !== '-') {
-      const fsClassText = getClassificationText('fracaoEncurtamento');
+    // Linha 1: FS | FE Teicholz | FE Simpson (layout horizontal)
+    if (hasFs || hasFe || hasSimpson) {
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      pdf.text("Fração de Encurtamento (FS)", margin, yPosition);
-      pdf.text(`${formatNumber(fsValue)}%`, sysCol2X, yPosition);
-      pdf.text("-", sysCol3X, yPosition); // Referência oculta
-      if (fsClassText) pdf.text(fsClassText, sysCol4X, yPosition);
+      
+      const parts: string[] = [];
+      if (hasFs) parts.push(`FS: ${formatNumber(fsValue)}%`);
+      if (hasFe) parts.push(`FE (Teicholz): ${formatNumber(feTeicholzValue)}%`);
+      if (hasSimpson) parts.push(`FE (Simpson): ${formatNumber(funcaoSistolica.simpson)}%`);
+      
+      const line1 = parts.join("   |   ");
+      pdf.text(line1, margin, yPosition);
       yPosition += 5;
     }
 
-    // 2. Fração de Ejeção (FE Teicholz) - apenas valor e status, sem referência
-    if (feTeicholzValue && feTeicholzValue !== '-') {
-      const feClassText = getClassificationText('fracaoEjecaoTeicholz');
+    // Linha 2: MAPSE | EPSS (layout horizontal)
+    const hasMapse = funcaoSistolica?.mapse;
+    const hasEpss = funcaoSistolica?.epss;
+    if (hasMapse || hasEpss) {
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      pdf.text("Fração de Ejeção (FE Teicholz)", margin, yPosition);
-      pdf.text(`${formatNumber(feTeicholzValue)}%`, sysCol2X, yPosition);
-      pdf.text("-", sysCol3X, yPosition); // Referência oculta
-      if (feClassText) pdf.text(feClassText, sysCol4X, yPosition);
+      
+      const parts2: string[] = [];
+      if (hasMapse) parts2.push(`MAPSE: ${formatNumber(funcaoSistolica.mapse)} cm`);
+      if (hasEpss) parts2.push(`EPSS: ${formatNumber(funcaoSistolica.epss)} cm`);
+      
+      const line2 = parts2.join("   |   ");
+      pdf.text(line2, margin, yPosition);
       yPosition += 5;
     }
-
-    // 3. Fração de Ejeção Simpson - apenas valor e status, sem referência
-    if (funcaoSistolica?.simpson) {
-      const simpsonClassText = getClassificationText('fracaoEjecaoSimpson');
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      pdf.text("Fração de Ejeção (FE Simpson)", margin, yPosition);
-      pdf.text(`${formatNumber(funcaoSistolica.simpson)}%`, sysCol2X, yPosition);
-      pdf.text("-", sysCol3X, yPosition); // Referência oculta
-      if (simpsonClassText) pdf.text(simpsonClassText, sysCol4X, yPosition);
-      yPosition += 5;
-    }
-
-    // 4. MAPSE
-    if (funcaoSistolica?.mapse) addTableRow("MAPSE", `${formatNumber(funcaoSistolica.mapse)} cm`);
-
-    // 5. EPSS
-    if (funcaoSistolica?.epss) addTableRow("EPSS", `${formatNumber(funcaoSistolica.epss)} cm`);
 
     // Status da Função Sistólica
     if (funcaoSistolica?.statusFuncao) {
@@ -624,7 +624,7 @@ export async function generateExamPdf(
       addTableRow("Avaliação", statusText);
     }
 
-    // 6. Observações da Função Sistólica
+    // Linha 3: Observações da Função Sistólica
     if (observacoesSecoes?.funcaoSistolica?.trim()) {
       yPosition += 2;
       pdf.setFontSize(9);
