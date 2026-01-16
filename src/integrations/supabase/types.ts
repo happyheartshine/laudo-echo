@@ -94,6 +94,79 @@ export type Database = {
           },
         ]
       }
+      partner_clinics: {
+        Row: {
+          clinic_id: string | null
+          created_at: string
+          id: string
+          nome: string
+          responsavel: string | null
+          updated_at: string
+          user_id: string
+          valor_exame: number
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          responsavel?: string | null
+          updated_at?: string
+          user_id: string
+          valor_exame?: number
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          responsavel?: string | null
+          updated_at?: string
+          user_id?: string
+          valor_exame?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_clinics_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_veterinarians: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          partner_clinic_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          partner_clinic_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          partner_clinic_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_veterinarians_partner_clinic_id_fkey"
+            columns: ["partner_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           cargo: Database["public"]["Enums"]["user_role"]
