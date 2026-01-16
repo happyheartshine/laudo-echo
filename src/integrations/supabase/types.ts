@@ -53,6 +53,7 @@ export type Database = {
           exam_date: string
           id: string
           owner_name: string | null
+          partner_clinic_id: string | null
           patient_name: string
           species: string | null
           updated_at: string
@@ -66,6 +67,7 @@ export type Database = {
           exam_date?: string
           id?: string
           owner_name?: string | null
+          partner_clinic_id?: string | null
           patient_name: string
           species?: string | null
           updated_at?: string
@@ -79,6 +81,7 @@ export type Database = {
           exam_date?: string
           id?: string
           owner_name?: string | null
+          partner_clinic_id?: string | null
           patient_name?: string
           species?: string | null
           updated_at?: string
@@ -92,6 +95,13 @@ export type Database = {
             referencedRelation: "clinics"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "exams_partner_clinic_id_fkey"
+            columns: ["partner_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
         ]
       }
       partner_clinics: {
@@ -101,6 +111,7 @@ export type Database = {
           id: string
           nome: string
           responsavel: string | null
+          telefone: string | null
           updated_at: string
           user_id: string
           valor_exame: number
@@ -111,6 +122,7 @@ export type Database = {
           id?: string
           nome: string
           responsavel?: string | null
+          telefone?: string | null
           updated_at?: string
           user_id: string
           valor_exame?: number
@@ -121,6 +133,7 @@ export type Database = {
           id?: string
           nome?: string
           responsavel?: string | null
+          telefone?: string | null
           updated_at?: string
           user_id?: string
           valor_exame?: number

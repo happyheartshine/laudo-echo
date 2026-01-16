@@ -36,6 +36,7 @@ interface PartnerClinic {
   nome: string;
   valor_exame: number;
   responsavel: string | null;
+  telefone: string | null;
   created_at: string;
 }
 
@@ -60,6 +61,7 @@ export default function ClinicasParceiros() {
   const [newClinicName, setNewClinicName] = useState("");
   const [newClinicValor, setNewClinicValor] = useState("");
   const [newClinicResponsavel, setNewClinicResponsavel] = useState("");
+  const [newClinicTelefone, setNewClinicTelefone] = useState("");
 
   // New vet form
   const [isVetDialogOpen, setIsVetDialogOpen] = useState(false);
@@ -116,6 +118,7 @@ export default function ClinicasParceiros() {
       nome: newClinicName.trim(),
       valor_exame: valorNumerico,
       responsavel: newClinicResponsavel.trim() || null,
+      telefone: newClinicTelefone.trim() || null,
     });
 
     if (error) {
@@ -126,6 +129,7 @@ export default function ClinicasParceiros() {
       setNewClinicName("");
       setNewClinicValor("");
       setNewClinicResponsavel("");
+      setNewClinicTelefone("");
       setIsClinicDialogOpen(false);
       fetchData();
     }
@@ -244,6 +248,15 @@ export default function ClinicasParceiros() {
                     onChange={(e) => setNewClinicResponsavel(e.target.value)}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-telefone">Telefone / WhatsApp</Label>
+                  <Input
+                    id="clinic-telefone"
+                    placeholder="Ex: 11999998888"
+                    value={newClinicTelefone}
+                    onChange={(e) => setNewClinicTelefone(e.target.value)}
+                  />
+                </div>
                 <Button onClick={handleCreateClinic} className="w-full">
                   Cadastrar Clínica
                 </Button>
@@ -282,6 +295,7 @@ export default function ClinicasParceiros() {
                           <p className="text-sm text-muted-foreground">
                             {formatCurrency(partnerClinic.valor_exame)} por exame
                             {partnerClinic.responsavel && ` • ${partnerClinic.responsavel}`}
+                            {partnerClinic.telefone && ` • ${partnerClinic.telefone}`}
                           </p>
                         </div>
                       </div>
