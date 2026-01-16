@@ -47,8 +47,8 @@ export function AppSidebar() {
 
       {/* Clinic Name */}
       {clinic && <div className="px-4 py-3 border-b border-sidebar-border">
-          <p className="text-xs text-sidebar-foreground/60 uppercase tracking-wider">Clínica</p>
-          <p className="text-sidebar-foreground truncate text-xl font-normal">{clinic.nome_fantasia}</p>
+          <p className="text-xs text-sidebar-foreground/60 uppercase tracking-wider">​</p>
+          <p className="text-sidebar-foreground truncate font-normal text-2xl">{clinic.nome_fantasia}</p>
         </div>}
 
       {/* Navigation */}
