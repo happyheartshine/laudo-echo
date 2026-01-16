@@ -1,0 +1,382 @@
+import { useState, useEffect } from "react";
+import { Layout } from "@/components/Layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Plus, Trash2, UserPlus, Building2, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
+
+interface PartnerClinic {
+  id: string;
+  nome: string;
+  valor_exame: number;
+  responsavel: string | null;
+  created_at: string;
+}
+
+interface PartnerVeterinarian {
+  id: string;
+  partner_clinic_id: string;
+  nome: string;
+  created_at: string;
+}
+
+export default function ClinicasParceiros() {
+  const { user } = useAuth();
+  const { clinic } = useProfile();
+  const { toast } = useToast();
+
+  const [clinics, setClinics] = useState<PartnerClinic[]>([]);
+  const [veterinarians, setVeterinarians] = useState<PartnerVeterinarian[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // New clinic form
+  const [isClinicDialogOpen, setIsClinicDialogOpen] = useState(false);
+  const [newClinicName, setNewClinicName] = useState("");
+  const [newClinicValor, setNewClinicValor] = useState("");
+  const [newClinicResponsavel, setNewClinicResponsavel] = useState("");
+
+  // New vet form
+  const [isVetDialogOpen, setIsVetDialogOpen] = useState(false);
+  const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
+  const [newVetName, setNewVetName] = useState("");
+
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    
+    // Fetch partner clinics
+    const { data: clinicsData, error: clinicsError } = await supabase
+      .from("partner_clinics")
+      .select("*")
+      .order("nome");
+
+    if (clinicsError) {
+      console.error("Error fetching partner clinics:", clinicsError);
+    } else {
+      setClinics(clinicsData || []);
+    }
+
+    // Fetch partner veterinarians
+    const { data: vetsData, error: vetsError } = await supabase
+      .from("partner_veterinarians")
+      .select("*")
+      .order("nome");
+
+    if (vetsError) {
+      console.error("Error fetching partner veterinarians:", vetsError);
+    } else {
+      setVeterinarians(vetsData || []);
+    }
+
+    setLoading(false);
+  };
+
+  const handleCreateClinic = async () => {
+    if (!newClinicName.trim()) {
+      toast({ title: "Erro", description: "Nome da clínica é obrigatório", variant: "destructive" });
+      return;
+    }
+
+    const valorNumerico = parseDecimal(newClinicValor) || 0;
+
+    const { error } = await supabase.from("partner_clinics").insert({
+      user_id: user?.id,
+      clinic_id: clinic?.id || null,
+      nome: newClinicName.trim(),
+      valor_exame: valorNumerico,
+      responsavel: newClinicResponsavel.trim() || null,
+    });
+
+    if (error) {
+      console.error("Error creating partner clinic:", error);
+      toast({ title: "Erro", description: "Erro ao criar clínica parceira", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Clínica parceira cadastrada!" });
+      setNewClinicName("");
+      setNewClinicValor("");
+      setNewClinicResponsavel("");
+      setIsClinicDialogOpen(false);
+      fetchData();
+    }
+  };
+
+  const handleDeleteClinic = async (id: string) => {
+    const { error } = await supabase.from("partner_clinics").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error deleting partner clinic:", error);
+      toast({ title: "Erro", description: "Erro ao excluir clínica", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Clínica excluída!" });
+      fetchData();
+    }
+  };
+
+  const handleOpenVetDialog = (clinicId: string) => {
+    setSelectedClinicId(clinicId);
+    setNewVetName("");
+    setIsVetDialogOpen(true);
+  };
+
+  const handleCreateVet = async () => {
+    if (!newVetName.trim() || !selectedClinicId) {
+      toast({ title: "Erro", description: "Nome do veterinário é obrigatório", variant: "destructive" });
+      return;
+    }
+
+    const { error } = await supabase.from("partner_veterinarians").insert({
+      partner_clinic_id: selectedClinicId,
+      nome: newVetName.trim(),
+    });
+
+    if (error) {
+      console.error("Error creating partner vet:", error);
+      toast({ title: "Erro", description: "Erro ao cadastrar veterinário", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Veterinário cadastrado!" });
+      setNewVetName("");
+      setIsVetDialogOpen(false);
+      fetchData();
+    }
+  };
+
+  const handleDeleteVet = async (id: string) => {
+    const { error } = await supabase.from("partner_veterinarians").delete().eq("id", id);
+
+    if (error) {
+      console.error("Error deleting partner vet:", error);
+      toast({ title: "Erro", description: "Erro ao excluir veterinário", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Veterinário excluído!" });
+      fetchData();
+    }
+  };
+
+  const getVetsForClinic = (clinicId: string) => {
+    return veterinarians.filter((vet) => vet.partner_clinic_id === clinicId);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Clínicas & Parceiros</h1>
+            <p className="text-muted-foreground">
+              Gerencie suas clínicas parceiras e veterinários vinculados
+            </p>
+          </div>
+          <Dialog open={isClinicDialogOpen} onOpenChange={setIsClinicDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Clínica
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cadastrar Clínica Parceira</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-name">Nome da Clínica *</Label>
+                  <Input
+                    id="clinic-name"
+                    placeholder="Ex: Clínica Vet Center"
+                    value={newClinicName}
+                    onChange={(e) => setNewClinicName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-valor">Valor do Exame (R$)</Label>
+                  <Input
+                    id="clinic-valor"
+                    placeholder="Ex: 150,00"
+                    value={formatDecimalForDisplay(newClinicValor)}
+                    onChange={(e) => setNewClinicValor(sanitizeDecimalInput(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-responsavel">Responsável / Contato</Label>
+                  <Input
+                    id="clinic-responsavel"
+                    placeholder="Ex: Dr. João Silva"
+                    value={newClinicResponsavel}
+                    onChange={(e) => setNewClinicResponsavel(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleCreateClinic} className="w-full">
+                  Cadastrar Clínica
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Clinics List */}
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground">Carregando...</div>
+        ) : clinics.length === 0 ? (
+          <div className="text-center py-12 border rounded-lg bg-muted/30">
+            <Building2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Nenhuma clínica parceira cadastrada.</p>
+            <p className="text-sm text-muted-foreground">
+              Clique em "Nova Clínica" para começar.
+            </p>
+          </div>
+        ) : (
+          <Accordion type="multiple" className="space-y-2">
+            {clinics.map((partnerClinic) => {
+              const vets = getVetsForClinic(partnerClinic.id);
+              return (
+                <AccordionItem
+                  key={partnerClinic.id}
+                  value={partnerClinic.id}
+                  className="border rounded-lg px-4 bg-card"
+                >
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium">{partnerClinic.nome}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatCurrency(partnerClinic.valor_exame)} por exame
+                            {partnerClinic.responsavel && ` • ${partnerClinic.responsavel}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="w-4 h-4" />
+                        {vets.length} veterinário{vets.length !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4">
+                    <div className="space-y-4">
+                      {/* Veterinarians Table */}
+                      {vets.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Nome do Veterinário</TableHead>
+                              <TableHead className="w-20">Ações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {vets.map((vet) => (
+                              <TableRow key={vet.id}>
+                                <TableCell>{vet.nome}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteVet(vet.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum veterinário vinculado a esta clínica.
+                        </p>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenVetDialog(partnerClinic.id)}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Adicionar Veterinário
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteClinic(partnerClinic.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Excluir Clínica
+                        </Button>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
+
+        {/* Add Vet Dialog */}
+        <Dialog open={isVetDialogOpen} onOpenChange={setIsVetDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cadastrar Veterinário</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="vet-name">Nome do Veterinário *</Label>
+                <Input
+                  id="vet-name"
+                  placeholder="Ex: Dra. Maria Santos"
+                  value={newVetName}
+                  onChange={(e) => setNewVetName(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleCreateVet} className="w-full">
+                Cadastrar Veterinário
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Layout>
+  );
+}
