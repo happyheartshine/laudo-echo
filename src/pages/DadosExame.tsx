@@ -472,8 +472,24 @@ const [patientData, setPatientData] = useState<PatientData>({
         selectedImages?: number[];
       };
 
-      if (content.patientData) setPatientData(content.patientData);
-      if (content.examInfo) setExamInfo(content.examInfo);
+if (content.patientData) setPatientData(content.patientData);
+      if (content.examInfo) {
+        // Merge with defaults to handle new fields (partnerClinicId, partnerVetId)
+        setExamInfo(prev => ({
+          ...prev,
+          ...content.examInfo,
+          // Also populate from database columns if not in content
+          partnerClinicId: content.examInfo?.partnerClinicId || data.partner_clinic_id || "",
+          partnerVetId: content.examInfo?.partnerVetId || data.partner_vet_id || "",
+        }));
+      } else if (data.partner_clinic_id || data.partner_vet_id) {
+        // Fallback: populate from database columns even if examInfo doesn't exist
+        setExamInfo(prev => ({
+          ...prev,
+          partnerClinicId: data.partner_clinic_id || "",
+          partnerVetId: data.partner_vet_id || "",
+        }));
+      }
       if (content.measurementsData) setMeasurementsData((prev) => ({ ...prev, ...content.measurementsData }));
       if (content.classificationsData) setClassificationsData(content.classificationsData);
       if (content.referencesData) setReferencesData(content.referencesData);
@@ -1510,6 +1526,7 @@ const examData = {
         breed: patientData.raca || null,
         exam_date: examDate,
         partner_clinic_id: examInfo.partnerClinicId || null,
+        partner_vet_id: examInfo.partnerVetId || null,
         content: JSON.parse(JSON.stringify(examContent)),
       };
 
