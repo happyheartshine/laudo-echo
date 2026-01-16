@@ -533,7 +533,8 @@ export async function generateExamPdf(
   if (measurementsData.septoIVs) addVE4ColumnRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
   if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
-  // Medidas funcionais (FS, FE, DVEdN)
+
+  // Medidas funcionais (DVEdN)
   if (dvedNorm && dvedNorm !== '-') {
     // DVEdN com referência fixa "< 1,70"
     pdf.setFontSize(9);
@@ -552,21 +553,37 @@ export async function generateExamPdf(
     if (classText) pdf.text(classText, col4X, yPosition);
     yPosition += 5;
   }
-  if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
-  if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
   yPosition += 3;
 
   // ========== AVALIAÇÃO DA FUNÇÃO SISTÓLICA ==========
-  const hasSystolicData = funcaoSistolica?.mapse || funcaoSistolica?.epss || 
+  const hasSystolicData = (fsValue && fsValue !== '-') || (feTeicholzValue && feTeicholzValue !== '-') ||
+    funcaoSistolica?.mapse || funcaoSistolica?.epss || 
     funcaoSistolica?.simpson || funcaoSistolica?.statusFuncao || 
     funcaoSistolica?.tipoDisfuncao || observacoesSecoes?.funcaoSistolica?.trim();
 
   if (hasSystolicData) {
     await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
 
+    // 1. Fração de Encurtamento (FS) com referência e status
+    if (fsValue && fsValue !== '-') {
+      addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+    }
+
+    // 2. Fração de Ejeção (FE Teicholz) com referência e status
+    if (feTeicholzValue && feTeicholzValue !== '-') {
+      addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+    }
+
+    // 3. Fração de Ejeção Simpson (se disponível)
+    if (funcaoSistolica?.simpson) {
+      addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+    }
+
+    // 4. MAPSE
     if (funcaoSistolica?.mapse) addTableRow("MAPSE", `${formatNumber(funcaoSistolica.mapse)} cm`);
+
+    // 5. EPSS
     if (funcaoSistolica?.epss) addTableRow("EPSS", `${formatNumber(funcaoSistolica.epss)} cm`);
-    if (funcaoSistolica?.simpson) addTableRow("Fração de Ejeção (Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`);
 
     // Status da Função Sistólica
     if (funcaoSistolica?.statusFuncao) {
@@ -578,7 +595,7 @@ export async function generateExamPdf(
       addTableRow("Avaliação", statusText);
     }
 
-    // Observações da Função Sistólica
+    // 6. Observações da Função Sistólica
     if (observacoesSecoes?.funcaoSistolica?.trim()) {
       yPosition += 2;
       pdf.setFontSize(9);
