@@ -1,4 +1,4 @@
-import { PawPrint, User, Phone, Mail } from "lucide-react";
+import { Phone, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -41,9 +41,7 @@ export function PatientSection({
   };
   return <div className="card-vitaecor animate-fade-in">
       {/* Seção do Responsável/Tutor */}
-      <h2 className="section-title">Dados do Responsável<User className="w-5 h-5 text-accent" />
-        Dados do Responsável (Tutor)
-      </h2>
+      <h2 className="section-title">👤 Dados do Responsável</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Nome do Responsável */}
@@ -60,7 +58,7 @@ export function PatientSection({
             <Phone className="w-3.5 h-3.5" />
             Telefone/WhatsApp
           </Label>
-          <Input className="input-vitaecor" placeholder="(DD) 99999-9999" value={data.responsavelTelefone} onChange={e => handlePhoneChange(e.target.value)} />
+          <Input className="input-vitaecor" placeholder="(99) 99999-9999" value={data.responsavelTelefone} onChange={e => handlePhoneChange(e.target.value)} />
         </div>
 
         {/* E-mail */}
@@ -77,9 +75,7 @@ export function PatientSection({
       <Separator className="my-6" />
 
       {/* Seção do Paciente (Animal) */}
-      <h2 className="section-title">Dados do Paciente (<PawPrint className="w-5 h-5 text-accent" />
-        Dados do Paciente (Animal)
-      </h2>
+      <h2 className="section-title">🐾 Dados do Paciente</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Nome do Paciente */}
