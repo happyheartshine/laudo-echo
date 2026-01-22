@@ -13,6 +13,8 @@ import { dicomFileToJpegDataUrl } from "@/lib/dicomRender";
 const defaultPatientData: PatientData = {
   nome: "",
   responsavel: "",
+  responsavelTelefone: "",
+  responsavelEmail: "",
   especie: "",
   raca: "",
   sexo: "",
@@ -32,6 +34,8 @@ export default function NovoExame() {
     setPatientData((prev) => ({
       nome: prev.nome || info.nome,
       responsavel: prev.responsavel || info.responsavel,
+      responsavelTelefone: prev.responsavelTelefone || "",
+      responsavelEmail: prev.responsavelEmail || "",
       especie: prev.especie || info.especie,
       raca: prev.raca || info.raca,
       sexo: prev.sexo || info.sexo,

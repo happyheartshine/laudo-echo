@@ -52,7 +52,9 @@ export type Database = {
           created_at: string
           exam_date: string
           id: string
+          owner_email: string | null
           owner_name: string | null
+          owner_phone: string | null
           partner_clinic_id: string | null
           partner_vet_id: string | null
           patient_name: string
@@ -68,7 +70,9 @@ export type Database = {
           created_at?: string
           exam_date?: string
           id?: string
+          owner_email?: string | null
           owner_name?: string | null
+          owner_phone?: string | null
           partner_clinic_id?: string | null
           partner_vet_id?: string | null
           patient_name: string
@@ -84,7 +88,9 @@ export type Database = {
           created_at?: string
           exam_date?: string
           id?: string
+          owner_email?: string | null
           owner_name?: string | null
+          owner_phone?: string | null
           partner_clinic_id?: string | null
           partner_vet_id?: string | null
           patient_name?: string

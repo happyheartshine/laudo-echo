@@ -49,6 +49,8 @@ export default function DadosExame() {
 const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
     responsavel: "",
+    responsavelTelefone: "",
+    responsavelEmail: "",
     especie: "",
     raca: "",
     sexo: "",
@@ -526,7 +528,16 @@ const [patientData, setPatientData] = useState<PatientData>({
         selectedImages?: number[];
       };
 
-if (content.patientData) setPatientData(content.patientData);
+if (content.patientData) {
+        // Merge with database columns for new fields that might not exist in old content
+        // Cast to access new columns (owner_phone, owner_email) that may not be in types yet
+        const examRecord = data as typeof data & { owner_phone?: string | null; owner_email?: string | null };
+        setPatientData({
+          ...content.patientData,
+          responsavelTelefone: content.patientData.responsavelTelefone || examRecord.owner_phone || "",
+          responsavelEmail: content.patientData.responsavelEmail || examRecord.owner_email || "",
+        });
+      }
       if (content.examInfo) {
         // Merge with defaults to handle new fields (partnerClinicId, partnerVetId, performingVetId)
         setExamInfo(prev => ({
@@ -1579,6 +1590,8 @@ if (content.patientData) setPatientData(content.patientData);
 const examData = {
         patient_name: patientData.nome || "Paciente sem nome",
         owner_name: patientData.responsavel || null,
+        owner_phone: patientData.responsavelTelefone || null,
+        owner_email: patientData.responsavelEmail || null,
         species: patientData.especie || null,
         breed: patientData.raca || null,
         exam_date: examDate,

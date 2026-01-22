@@ -146,7 +146,7 @@ export async function generateExamPdf(
 ): Promise<jsPDF> {
   const { profile, clinic } = options;
   
-  const patientData: PatientData = examData.patientData || { nome: '', responsavel: '', especie: '', raca: '', sexo: '', idade: '', peso: '' };
+  const patientData: PatientData = examData.patientData || { nome: '', responsavel: '', responsavelTelefone: '', responsavelEmail: '', especie: '', raca: '', sexo: '', idade: '', peso: '' };
   const examInfo: ExamInfo = examData.examInfo || {};
   const measurementsData: MeasurementsData = examData.measurementsData || {};
   const classificationsData: ClassificationsData = (examData.classificationsData || {}) as ClassificationsData;
