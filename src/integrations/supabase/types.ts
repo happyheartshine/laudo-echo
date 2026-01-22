@@ -134,6 +134,7 @@ export type Database = {
         Row: {
           clinic_id: string | null
           created_at: string
+          email: string | null
           id: string
           nome: string
           responsavel: string | null
@@ -145,6 +146,7 @@ export type Database = {
         Insert: {
           clinic_id?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           nome: string
           responsavel?: string | null
@@ -156,6 +158,7 @@ export type Database = {
         Update: {
           clinic_id?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           nome?: string
           responsavel?: string | null

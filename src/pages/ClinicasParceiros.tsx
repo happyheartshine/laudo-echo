@@ -37,6 +37,7 @@ interface PartnerClinic {
   valor_exame: number;
   responsavel: string | null;
   telefone: string | null;
+  email: string | null;
   created_at: string;
 }
 
@@ -62,6 +63,7 @@ export default function ClinicasParceiros() {
   const [newClinicValor, setNewClinicValor] = useState("");
   const [newClinicResponsavel, setNewClinicResponsavel] = useState("");
   const [newClinicTelefone, setNewClinicTelefone] = useState("");
+  const [newClinicEmail, setNewClinicEmail] = useState("");
 
   // New vet form
   const [isVetDialogOpen, setIsVetDialogOpen] = useState(false);
@@ -86,7 +88,7 @@ export default function ClinicasParceiros() {
     if (clinicsError) {
       console.error("Error fetching partner clinics:", clinicsError);
     } else {
-      setClinics(clinicsData || []);
+      setClinics((clinicsData || []) as unknown as PartnerClinic[]);
     }
 
     // Fetch partner veterinarians
@@ -119,6 +121,7 @@ export default function ClinicasParceiros() {
       valor_exame: valorNumerico,
       responsavel: newClinicResponsavel.trim() || null,
       telefone: newClinicTelefone.trim() || null,
+      email: newClinicEmail.trim() || null,
     });
 
     if (error) {
@@ -130,6 +133,7 @@ export default function ClinicasParceiros() {
       setNewClinicValor("");
       setNewClinicResponsavel("");
       setNewClinicTelefone("");
+      setNewClinicEmail("");
       setIsClinicDialogOpen(false);
       fetchData();
     }
@@ -255,6 +259,16 @@ export default function ClinicasParceiros() {
                     placeholder="Ex: 11999998888"
                     value={newClinicTelefone}
                     onChange={(e) => setNewClinicTelefone(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clinic-email">E-mail</Label>
+                  <Input
+                    id="clinic-email"
+                    type="email"
+                    placeholder="Ex: contato@clinica.com.br"
+                    value={newClinicEmail}
+                    onChange={(e) => setNewClinicEmail(e.target.value)}
                   />
                 </div>
                 <Button onClick={handleCreateClinic} className="w-full">
