@@ -69,6 +69,8 @@ const [patientData, setPatientData] = useState<PatientData>({
     partnerVetId: "" as string, // ID do veterinário parceiro selecionado
     performingVetId: "" as string, // ID do ecocardiografista responsável
     performingVetName: "" as string, // Nome do ecocardiografista (para exibir no PDF)
+    serviceId: "" as string, // ID do serviço realizado
+    examPrice: "" as string, // Valor do exame (editável)
   });
 
   // Estados para clínicas e veterinários parceiros
@@ -86,8 +88,17 @@ const [patientData, setPatientData] = useState<PatientData>({
     nome: string;
   }
   
+  // Interface para serviços da clínica
+  interface ClinicService {
+    id: string;
+    partner_clinic_id: string;
+    service_name: string;
+    price: number;
+  }
+  
   const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
   const [partnerVets, setPartnerVets] = useState<PartnerVet[]>([]);
+  const [clinicServices, setClinicServices] = useState<ClinicService[]>([]);
   
   // Estado para membros da equipe (ecocardiografistas)
   interface TeamMember {
@@ -158,17 +169,36 @@ const [patientData, setPatientData] = useState<PatientData>({
     ? partnerVets.filter(v => v.partner_clinic_id === examInfo.partnerClinicId)
     : [];
   
-  // Handler para seleção de clínica - atualiza nome e limpa veterinário se mudar
-  const handleClinicSelect = (clinicId: string) => {
+  // Handler para seleção de clínica - atualiza nome, carrega serviços e limpa veterinário se mudar
+  const handleClinicSelect = async (clinicId: string) => {
     const selectedClinic = partnerClinics.find(c => c.id === clinicId);
     setExamInfo(prev => ({
       ...prev,
       partnerClinicId: clinicId,
       clinica: selectedClinic?.nome || "",
-      // Limpa veterinário se mudar de clínica
+      // Limpa veterinário e serviço se mudar de clínica
       partnerVetId: "",
       solicitante: "",
+      serviceId: "",
+      examPrice: "",
     }));
+    
+    // Carrega serviços da clínica selecionada
+    if (clinicId) {
+      const { data: services, error } = await supabase
+        .from("clinic_services")
+        .select("*")
+        .eq("partner_clinic_id", clinicId)
+        .order("service_name");
+      
+      if (!error && services) {
+        setClinicServices(services as ClinicService[]);
+      } else {
+        setClinicServices([]);
+      }
+    } else {
+      setClinicServices([]);
+    }
   };
   
   // Handler para seleção de veterinário
@@ -178,6 +208,16 @@ const [patientData, setPatientData] = useState<PatientData>({
       ...prev,
       partnerVetId: vetId,
       solicitante: selectedVet?.nome || "",
+    }));
+  };
+  
+  // Handler para seleção de serviço - preenche preço automaticamente
+  const handleServiceSelect = (serviceId: string) => {
+    const selectedService = clinicServices.find(s => s.id === serviceId);
+    setExamInfo(prev => ({
+      ...prev,
+      serviceId: serviceId,
+      examPrice: selectedService ? selectedService.price.toString().replace('.', ',') : "",
     }));
   };
   
@@ -1598,6 +1638,8 @@ const examData = {
         partner_clinic_id: examInfo.partnerClinicId || null,
         partner_vet_id: examInfo.partnerVetId || null,
         performing_vet_id: examInfo.performingVetId || null,
+        service_id: examInfo.serviceId || null,
+        exam_price: parseDecimal(examInfo.examPrice) || null,
         content: JSON.parse(JSON.stringify(examContent)),
       };
 
@@ -1803,7 +1845,50 @@ const examData = {
                 )}
               </div>
               
-              {/* 4. Ecocardiografista Responsável - Dropdown com membros da equipe */}
+              {/* 4. Serviço Realizado - Dropdown com serviços da clínica */}
+              <div>
+                <Label className="label-vitaecor">Serviço Realizado</Label>
+                <Select 
+                  value={examInfo.serviceId} 
+                  onValueChange={handleServiceSelect}
+                  disabled={!examInfo.partnerClinicId}
+                >
+                  <SelectTrigger className="input-vitaecor">
+                    <SelectValue placeholder={examInfo.partnerClinicId ? "Selecione o serviço..." : "Selecione uma clínica primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clinicServices.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.service_name} - {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(service.price)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {examInfo.partnerClinicId && clinicServices.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Nenhum serviço cadastrado. <a href="/parceiros" className="text-primary underline">Cadastrar serviços</a>
+                  </p>
+                )}
+              </div>
+              
+              {/* 5. Valor do Exame - Campo editável */}
+              <div>
+                <Label className="label-vitaecor">Valor do Exame (R$)</Label>
+                <Input
+                  className="input-vitaecor"
+                  placeholder="Ex: 150,00"
+                  value={formatDecimalForDisplay(examInfo.examPrice)}
+                  onChange={(e) => setExamInfo(prev => ({
+                    ...prev,
+                    examPrice: sanitizeDecimalInput(e.target.value)
+                  }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  O valor é preenchido automaticamente, mas pode ser alterado manualmente.
+                </p>
+              </div>
+              
+              {/* 6. Ecocardiografista Responsável - Dropdown com membros da equipe */}
               <div>
                 <Label className="label-vitaecor">Ecocardiografista Responsável</Label>
                 <Select 

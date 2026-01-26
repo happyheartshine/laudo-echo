@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      clinic_services: {
+        Row: {
+          created_at: string
+          id: string
+          partner_clinic_id: string
+          price: number
+          service_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          partner_clinic_id: string
+          price?: number
+          service_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          partner_clinic_id?: string
+          price?: number
+          service_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_services_partner_clinic_id_fkey"
+            columns: ["partner_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           created_at: string
@@ -51,6 +86,7 @@ export type Database = {
           content: Json
           created_at: string
           exam_date: string
+          exam_price: number | null
           id: string
           owner_email: string | null
           owner_name: string | null
@@ -59,6 +95,7 @@ export type Database = {
           partner_vet_id: string | null
           patient_name: string
           performing_vet_id: string | null
+          service_id: string | null
           species: string | null
           updated_at: string
           user_id: string
@@ -69,6 +106,7 @@ export type Database = {
           content?: Json
           created_at?: string
           exam_date?: string
+          exam_price?: number | null
           id?: string
           owner_email?: string | null
           owner_name?: string | null
@@ -77,6 +115,7 @@ export type Database = {
           partner_vet_id?: string | null
           patient_name: string
           performing_vet_id?: string | null
+          service_id?: string | null
           species?: string | null
           updated_at?: string
           user_id: string
@@ -87,6 +126,7 @@ export type Database = {
           content?: Json
           created_at?: string
           exam_date?: string
+          exam_price?: number | null
           id?: string
           owner_email?: string | null
           owner_name?: string | null
@@ -95,6 +135,7 @@ export type Database = {
           partner_vet_id?: string | null
           patient_name?: string
           performing_vet_id?: string | null
+          service_id?: string | null
           species?: string | null
           updated_at?: string
           user_id?: string
@@ -126,6 +167,13 @@ export type Database = {
             columns: ["performing_vet_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exams_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "clinic_services"
             referencedColumns: ["id"]
           },
         ]

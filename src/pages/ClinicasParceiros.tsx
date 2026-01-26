@@ -24,11 +24,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Trash2, UserPlus, Building2, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
+import { ClinicServicesSection } from "@/components/partners/ClinicServicesSection";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 interface PartnerClinic {
@@ -320,42 +322,47 @@ export default function ClinicasParceiros() {
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4">
-                    <div className="space-y-4">
-                      {/* Veterinarians Table */}
-                      {vets.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Nome do Veterinário</TableHead>
-                              <TableHead className="w-20">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {vets.map((vet) => (
-                              <TableRow key={vet.id}>
-                                <TableCell>{vet.nome}</TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => handleDeleteVet(vet.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </TableCell>
+                    <Tabs defaultValue="veterinarios" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="veterinarios">Veterinários</TabsTrigger>
+                        <TabsTrigger value="precos">Tabela de Preços</TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="veterinarios" className="space-y-4 mt-4">
+                        {/* Veterinarians Table */}
+                        {vets.length > 0 ? (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Nome do Veterinário</TableHead>
+                                <TableHead className="w-20">Ações</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          Nenhum veterinário vinculado a esta clínica.
-                        </p>
-                      )}
+                            </TableHeader>
+                            <TableBody>
+                              {vets.map((vet) => (
+                                <TableRow key={vet.id}>
+                                  <TableCell>{vet.nome}</TableCell>
+                                  <TableCell>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteVet(vet.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            Nenhum veterinário vinculado a esta clínica.
+                          </p>
+                        )}
 
-                      {/* Actions */}
-                      <div className="flex gap-2 pt-2 border-t">
+                        {/* Add Vet Button */}
                         <Button
                           variant="outline"
                           size="sm"
@@ -364,16 +371,24 @@ export default function ClinicasParceiros() {
                           <UserPlus className="w-4 h-4 mr-2" />
                           Adicionar Veterinário
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteClinic(partnerClinic.id)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir Clínica
-                        </Button>
-                      </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="precos" className="mt-4">
+                        <ClinicServicesSection clinicId={partnerClinic.id} />
+                      </TabsContent>
+                    </Tabs>
+
+                    {/* Delete Clinic Button */}
+                    <div className="flex gap-2 pt-4 border-t mt-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteClinic(partnerClinic.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir Clínica
+                      </Button>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
