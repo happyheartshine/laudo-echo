@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -25,13 +26,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, UserPlus, Building2, Users } from "lucide-react";
+import { Plus, Trash2, UserPlus, Building2, Users, Upload, ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { ClinicServicesSection } from "@/components/partners/ClinicServicesSection";
-import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 interface PartnerClinic {
   id: string;
@@ -40,6 +40,7 @@ interface PartnerClinic {
   responsavel: string | null;
   telefone: string | null;
   email: string | null;
+  logo_url: string | null;
   created_at: string;
 }
 
@@ -62,10 +63,13 @@ export default function ClinicasParceiros() {
   // New clinic form
   const [isClinicDialogOpen, setIsClinicDialogOpen] = useState(false);
   const [newClinicName, setNewClinicName] = useState("");
-  const [newClinicValor, setNewClinicValor] = useState("");
   const [newClinicResponsavel, setNewClinicResponsavel] = useState("");
   const [newClinicTelefone, setNewClinicTelefone] = useState("");
   const [newClinicEmail, setNewClinicEmail] = useState("");
+  const [newClinicLogoFile, setNewClinicLogoFile] = useState<File | null>(null);
+  const [newClinicLogoPreview, setNewClinicLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // New vet form
   const [isVetDialogOpen, setIsVetDialogOpen] = useState(false);
@@ -108,37 +112,98 @@ export default function ClinicasParceiros() {
     setLoading(false);
   };
 
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Erro", description: "Selecione um arquivo de imagem (JPG, PNG)", variant: "destructive" });
+        return;
+      }
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({ title: "Erro", description: "Imagem deve ter no máximo 2MB", variant: "destructive" });
+        return;
+      }
+      setNewClinicLogoFile(file);
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewClinicLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async (clinicId: string): Promise<string | null> => {
+    if (!newClinicLogoFile) return null;
+
+    const fileExt = newClinicLogoFile.name.split('.').pop();
+    const fileName = `partner-${clinicId}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('clinic-logos')
+      .upload(fileName, newClinicLogoFile, { upsert: true });
+
+    if (uploadError) {
+      console.error("Error uploading logo:", uploadError);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('clinic-logos').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
   const handleCreateClinic = async () => {
     if (!newClinicName.trim()) {
       toast({ title: "Erro", description: "Nome da clínica é obrigatório", variant: "destructive" });
       return;
     }
 
-    const valorNumerico = parseDecimal(newClinicValor) || 0;
+    setUploadingLogo(true);
 
-    const { error } = await supabase.from("partner_clinics").insert({
+    // First, insert the clinic to get its ID
+    const { data: insertedClinic, error } = await supabase.from("partner_clinics").insert({
       user_id: user?.id,
       clinic_id: clinic?.id || null,
       nome: newClinicName.trim(),
-      valor_exame: valorNumerico,
+      valor_exame: 0, // Default value, prices are now in clinic_services
       responsavel: newClinicResponsavel.trim() || null,
       telefone: newClinicTelefone.trim() || null,
       email: newClinicEmail.trim() || null,
-    });
+    }).select().single();
 
     if (error) {
       console.error("Error creating partner clinic:", error);
       toast({ title: "Erro", description: "Erro ao criar clínica parceira", variant: "destructive" });
-    } else {
-      toast({ title: "Sucesso", description: "Clínica parceira cadastrada!" });
-      setNewClinicName("");
-      setNewClinicValor("");
-      setNewClinicResponsavel("");
-      setNewClinicTelefone("");
-      setNewClinicEmail("");
-      setIsClinicDialogOpen(false);
-      fetchData();
+      setUploadingLogo(false);
+      return;
     }
+
+    // If there's a logo file, upload it and update the clinic
+    if (newClinicLogoFile && insertedClinic) {
+      const logoUrl = await uploadLogo(insertedClinic.id);
+      if (logoUrl) {
+        await supabase.from("partner_clinics")
+          .update({ logo_url: logoUrl })
+          .eq("id", insertedClinic.id);
+      }
+    }
+
+    toast({ title: "Sucesso", description: "Clínica parceira cadastrada!" });
+    resetClinicForm();
+    setIsClinicDialogOpen(false);
+    fetchData();
+    setUploadingLogo(false);
+  };
+
+  const resetClinicForm = () => {
+    setNewClinicName("");
+    setNewClinicResponsavel("");
+    setNewClinicTelefone("");
+    setNewClinicEmail("");
+    setNewClinicLogoFile(null);
+    setNewClinicLogoPreview(null);
   };
 
   const handleDeleteClinic = async (id: string) => {
@@ -225,8 +290,53 @@ export default function ClinicasParceiros() {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Cadastrar Clínica Parceira</DialogTitle>
+                <DialogDescription>
+                  Cadastre uma nova clínica parceira. Você poderá adicionar serviços e preços após o cadastro.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* Logo Upload */}
+                <div className="space-y-2">
+                  <Label>Logo da Clínica</Label>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      {newClinicLogoPreview ? (
+                        <img
+                          src={newClinicLogoPreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Selecionar imagem
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JPG ou PNG, máx. 2MB
+                      </p>
+                    </div>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg"
+                      className="hidden"
+                      onChange={handleLogoFileChange}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="clinic-name">Nome da Clínica *</Label>
                   <Input
@@ -234,15 +344,6 @@ export default function ClinicasParceiros() {
                     placeholder="Ex: Clínica Vet Center"
                     value={newClinicName}
                     onChange={(e) => setNewClinicName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clinic-valor">Valor do Exame (R$)</Label>
-                  <Input
-                    id="clinic-valor"
-                    placeholder="Ex: 150,00"
-                    value={formatDecimalForDisplay(newClinicValor)}
-                    onChange={(e) => setNewClinicValor(sanitizeDecimalInput(e.target.value))}
                   />
                 </div>
                 <div className="space-y-2">
@@ -273,8 +374,8 @@ export default function ClinicasParceiros() {
                     onChange={(e) => setNewClinicEmail(e.target.value)}
                   />
                 </div>
-                <Button onClick={handleCreateClinic} className="w-full">
-                  Cadastrar Clínica
+                <Button onClick={handleCreateClinic} className="w-full" disabled={uploadingLogo}>
+                  {uploadingLogo ? "Cadastrando..." : "Cadastrar Clínica"}
                 </Button>
               </div>
             </DialogContent>
@@ -305,13 +406,23 @@ export default function ClinicasParceiros() {
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full pr-4">
                       <div className="flex items-center gap-3">
-                        <Building2 className="w-5 h-5 text-primary" />
+                        {partnerClinic.logo_url ? (
+                          <img
+                            src={partnerClinic.logo_url}
+                            alt={partnerClinic.nome}
+                            className="w-10 h-10 rounded-lg object-cover border"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                            <Building2 className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        )}
                         <div className="text-left">
                           <p className="font-medium">{partnerClinic.nome}</p>
                           <p className="text-sm text-muted-foreground">
-                            {formatCurrency(partnerClinic.valor_exame)} por exame
-                            {partnerClinic.responsavel && ` • ${partnerClinic.responsavel}`}
-                            {partnerClinic.telefone && ` • ${partnerClinic.telefone}`}
+                            {partnerClinic.responsavel && `${partnerClinic.responsavel}`}
+                            {partnerClinic.responsavel && partnerClinic.telefone && " • "}
+                            {partnerClinic.telefone && `${partnerClinic.telefone}`}
                           </p>
                         </div>
                       </div>
