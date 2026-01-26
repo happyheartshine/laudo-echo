@@ -16,7 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, Tag } from "lucide-react";
+import { Plus, Trash2, Edit2, Tag, Star } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
@@ -26,6 +27,7 @@ interface ClinicService {
   partner_clinic_id: string;
   service_name: string;
   price: number;
+  is_default: boolean;
 }
 
 interface ClinicServicesSectionProps {
@@ -165,6 +167,32 @@ export function ClinicServicesSection({ clinicId, onServicesChange }: ClinicServ
     }
   };
 
+  // Toggle default service
+  const handleToggleDefault = async (serviceId: string, currentDefault: boolean) => {
+    const { error } = await supabase
+      .from("clinic_services")
+      .update({ is_default: !currentDefault })
+      .eq("id", serviceId);
+
+    if (error) {
+      console.error("Error updating default service:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao definir serviço padrão",
+        variant: "destructive",
+      });
+    } else {
+      toast({ 
+        title: "Sucesso", 
+        description: !currentDefault 
+          ? "Serviço definido como padrão!" 
+          : "Serviço removido como padrão" 
+      });
+      fetchServices();
+      onServicesChange?.();
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -199,6 +227,7 @@ export function ClinicServicesSection({ clinicId, onServicesChange }: ClinicServ
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-16 text-center">Padrão</TableHead>
               <TableHead>Serviço</TableHead>
               <TableHead className="text-right">Preço</TableHead>
               <TableHead className="w-24">Ações</TableHead>
@@ -207,6 +236,18 @@ export function ClinicServicesSection({ clinicId, onServicesChange }: ClinicServ
           <TableBody>
             {services.map((service) => (
               <TableRow key={service.id}>
+                <TableCell className="text-center">
+                  <div className="flex justify-center">
+                    <Checkbox
+                      checked={service.is_default}
+                      onCheckedChange={() => handleToggleDefault(service.id, service.is_default)}
+                      className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    />
+                  </div>
+                  {service.is_default && (
+                    <Star className="w-3 h-3 text-amber-500 mx-auto mt-1" fill="currentColor" />
+                  )}
+                </TableCell>
                 <TableCell>{service.service_name}</TableCell>
                 <TableCell className="text-right">{formatCurrency(service.price)}</TableCell>
                 <TableCell>

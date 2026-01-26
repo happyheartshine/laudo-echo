@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_default: boolean
           partner_clinic_id: string
           price: number
           service_name: string
@@ -26,6 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_default?: boolean
           partner_clinic_id: string
           price?: number
           service_name: string
@@ -34,6 +36,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_default?: boolean
           partner_clinic_id?: string
           price?: number
           service_name?: string
@@ -361,6 +364,10 @@ export type Database = {
     Functions: {
       current_user_clinic_id: { Args: never; Returns: string }
       current_user_is_gestor: { Args: never; Returns: boolean }
+      get_default_service_price: {
+        Args: { clinic_id: string }
+        Returns: number
+      }
     }
     Enums: {
       user_role: "super_admin" | "gestor" | "veterinario"
