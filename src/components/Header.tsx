@@ -1,4 +1,4 @@
-import { Settings, ChevronDown } from "lucide-react";
+import { User, Camera, Lock, LogOut, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import logoVitaecorHorizontal from "@/assets/logo-vitaecor-horizontal.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -64,10 +65,20 @@ export function Header() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => navigate("/configuracoes")}>
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
+              <User className="mr-2 h-4 w-4" />
+              Meu Perfil
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+            <DropdownMenuItem onClick={() => navigate("/configuracoes?tab=foto")}>
+              <Camera className="mr-2 h-4 w-4" />
+              Alterar Foto
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/configuracoes?tab=senha")}>
+              <Lock className="mr-2 h-4 w-4" />
+              Alterar Senha
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
