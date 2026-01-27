@@ -542,12 +542,7 @@ export async function generateExamPdf(
   if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
 
-  // Medidas funcionais: FS, FE Teicholz, DVEdN
-  if (fsValue && fsValue !== '-') addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
-  if (feTeicholzValue && feTeicholzValue !== '-') addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
-  if (funcaoSistolica?.simpson) addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
-
-  // DVEdN com referência fixa "< 1,70"
+  // DVEdN com referência fixa "≤ 1,70" (norma ACVIM)
   if (dvedNorm && dvedNorm !== '-') {
     pdf.setFontSize(9);
     pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
@@ -559,7 +554,7 @@ export async function generateExamPdf(
     pdf.text("VE em diástole NORMALIZADO (DVEdN)", col1X, yPosition);
     pdf.text(formatNumber(dvedNorm), col2X, yPosition);
     pdf.setFontSize(8);
-    pdf.text("< 1,70", col3X, yPosition);
+    pdf.text("≤ 1,70", col3X, yPosition);
     pdf.setFontSize(9);
     const classText = getClassificationText('dvedNormalizado');
     if (classText) pdf.text(classText, col4X, yPosition);
@@ -567,55 +562,63 @@ export async function generateExamPdf(
   }
   yPosition += 3;
 
-  // ========== AVALIAÇÃO DA FUNÇÃO SISTÓLICA ==========
+  // ========== FUNÇÃO SISTÓLICA DO VENTRÍCULO ESQUERDO (NOVA SEÇÃO SEPARADA) ==========
   const hasSystolicData = (fsValue && fsValue !== '-') || (feTeicholzValue && feTeicholzValue !== '-') ||
     funcaoSistolica?.mapse || funcaoSistolica?.epss || 
     funcaoSistolica?.simpson || funcaoSistolica?.statusFuncao || 
     funcaoSistolica?.tipoDisfuncao || observacoesSecoes?.funcaoSistolica?.trim();
 
   if (hasSystolicData) {
-    await addSectionHeader("AVALIAÇÃO DA FUNÇÃO SISTÓLICA");
+    await addSectionHeader("FUNÇÃO SISTÓLICA DO VENTRÍCULO ESQUERDO");
 
-    // Layout horizontal para índices sistólicos - APENAS VALORES (sem referência, sem status)
-    const hasFs = fsValue && fsValue !== '-';
-    const hasFe = feTeicholzValue && feTeicholzValue !== '-';
-    const hasSimpson = funcaoSistolica?.simpson;
+    // Cabeçalho da tabela de função sistólica
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(100, 100, 100);
+    pdf.text("Parâmetro", margin, yPosition);
+    pdf.text("Valor", margin + 68, yPosition);
+    pdf.text("Referência", margin + 100, yPosition);
+    pdf.text("Status", margin + 142, yPosition);
+    yPosition += 6;
 
-    // Linha 1: FS | FE Teicholz | FE Simpson (layout horizontal)
-    if (hasFs || hasFe || hasSimpson) {
+    // FS com tabela de 4 colunas
+    if (fsValue && fsValue !== '-') {
+      addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+    }
+
+    // FE Teicholz com tabela de 4 colunas
+    if (feTeicholzValue && feTeicholzValue !== '-') {
+      addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+    }
+
+    // FE Simpson com tabela de 4 colunas
+    if (funcaoSistolica?.simpson) {
+      addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+    }
+
+    // MAPSE
+    if (funcaoSistolica?.mapse) {
       pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      
-      const parts: string[] = [];
-      if (hasFs) parts.push(`FS: ${formatNumber(fsValue)}%`);
-      if (hasFe) parts.push(`FE (Teicholz): ${formatNumber(feTeicholzValue)}%`);
-      if (hasSimpson) parts.push(`FE (Simpson): ${formatNumber(funcaoSistolica.simpson)}%`);
-      
-      const line1 = parts.join("   |   ");
-      pdf.text(line1, margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("MAPSE", margin, yPosition);
+      pdf.text(`${formatNumber(funcaoSistolica.mapse)} cm`, margin + 68, yPosition);
       yPosition += 5;
     }
 
-    // Linha 2: MAPSE | EPSS (layout horizontal)
-    const hasMapse = funcaoSistolica?.mapse;
-    const hasEpss = funcaoSistolica?.epss;
-    if (hasMapse || hasEpss) {
+    // EPSS
+    if (funcaoSistolica?.epss) {
       pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      
-      const parts2: string[] = [];
-      if (hasMapse) parts2.push(`MAPSE: ${formatNumber(funcaoSistolica.mapse)} cm`);
-      if (hasEpss) parts2.push(`EPSS: ${formatNumber(funcaoSistolica.epss)} cm`);
-      
-      const line2 = parts2.join("   |   ");
-      pdf.text(line2, margin, yPosition);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("EPSS", margin, yPosition);
+      pdf.text(`${formatNumber(funcaoSistolica.epss)} cm`, margin + 68, yPosition);
       yPosition += 5;
     }
 
     // Status da Função Sistólica
     if (funcaoSistolica?.statusFuncao) {
+      yPosition += 2;
       const statusText = funcaoSistolica.statusFuncao === 'normal' 
         ? 'Função sistólica preservada' 
         : funcaoSistolica.statusFuncao === 'disfuncao' 
@@ -624,7 +627,7 @@ export async function generateExamPdf(
       addTableRow("Avaliação", statusText);
     }
 
-    // Linha 3: Observações da Função Sistólica
+    // Observações da Função Sistólica
     if (observacoesSecoes?.funcaoSistolica?.trim()) {
       yPosition += 2;
       pdf.setFontSize(9);
