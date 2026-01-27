@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useMemo, useState, useCallback, memo, useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 export interface MeasurementsData {
@@ -603,17 +604,57 @@ export function MeasurementsSection({
             onClassificationChange={(val) => handleClassificationChange('septoIVd', val)}
           />
           
-          <MeasurementRow
-            label="Ventrículo esquerdo em diástole (VEd)"
-            inputValue={data.dvedDiastole}
-            onInputChange={(val) => handleChange('dvedDiastole', val)}
-            unit="cm"
-            reference={references.dvedDiastole}
-            referenceEditable
-            onReferenceChange={(val) => handleReferenceChange('dvedDiastole', val)}
-            classificationValue={classifications.dvedDiastole}
-            onClassificationChange={(val) => handleClassificationChange('dvedDiastole', val)}
-          />
+          {/* VEd com feedback visual em tempo real */}
+          <div className="grid grid-cols-[1fr_100px_120px_140px] gap-3 items-center py-2 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <Label className="label-vitaecor text-sm">Ventrículo esquerdo em diástole (VEd)</Label>
+              {classifications.dvedDiastole && classifications.dvedDiastole !== "none" && (
+                <Badge 
+                  variant={classifications.dvedDiastole === "normal" ? "default" : "destructive"}
+                  className={`text-[10px] px-1.5 py-0 ${
+                    classifications.dvedDiastole === "normal" 
+                      ? "bg-green-600 hover:bg-green-700" 
+                      : classifications.dvedDiastole === "aumentado"
+                        ? "bg-red-600 hover:bg-red-700"
+                        : "bg-yellow-600 hover:bg-yellow-700"
+                  }`}
+                >
+                  {classifications.dvedDiastole === "normal" ? "Normal" : 
+                   classifications.dvedDiastole === "aumentado" ? "Aumentado" : "Diminuído"}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <StableDecimalInput
+                className="input-vitaecor h-8 text-center"
+                placeholder="0,00"
+                value={data.dvedDiastole}
+                onChange={(val) => handleChange('dvedDiastole', val)}
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+            </div>
+            <Input
+              className="input-vitaecor h-8 text-xs text-center"
+              placeholder=""
+              value={references.dvedDiastole || ""}
+              onChange={(e) => handleReferenceChange('dvedDiastole', e.target.value)}
+            />
+            <Select 
+              value={classifications.dvedDiastole} 
+              onValueChange={(val) => handleClassificationChange('dvedDiastole', val)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Classificação" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border shadow-lg z-50">
+                {CLASSIFICATION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value || "none"}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           
           <MeasurementRow
             label="Parede livre do VE em diástole (PLVEd)"

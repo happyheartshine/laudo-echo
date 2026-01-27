@@ -541,7 +541,6 @@ export async function generateExamPdf(
   if (measurementsData.septoIVs) addVE4ColumnRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
   if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
-
   // DVEdN com referência fixa "≤ 1,70" (norma ACVIM)
   if (dvedNorm && dvedNorm !== '-') {
     pdf.setFontSize(9);
@@ -560,6 +559,19 @@ export async function generateExamPdf(
     if (classText) pdf.text(classText, col4X, yPosition);
     yPosition += 5;
   }
+
+  // ========== ÍNDICES DE FUNÇÃO SISTÓLICA NA TABELA MODO M ==========
+  // FS, FE Teicholz, FE Simpson dentro da mesma tabela (Lugar 1)
+  if (fsValue && fsValue !== '-') {
+    addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+  }
+  if (feTeicholzValue && feTeicholzValue !== '-') {
+    addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+  }
+  if (funcaoSistolica?.simpson) {
+    addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+  }
+
   yPosition += 3;
 
   // ========== FUNÇÃO SISTÓLICA DO VENTRÍCULO ESQUERDO (NOVA SEÇÃO SEPARADA) ==========
