@@ -56,8 +56,8 @@ export function Header() {
                 {getInitials(displayName)}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium text-foreground hidden sm:block">
-              {firstName}
+            <span className="text-sm font-medium text-foreground hidden sm:block whitespace-nowrap">
+              {firstName} | VitaeCor
             </span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </DropdownMenuTrigger>
