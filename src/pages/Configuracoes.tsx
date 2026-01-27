@@ -30,6 +30,10 @@ export default function Configuracoes() {
   const [sexo, setSexo] = useState<"masculino" | "feminino">("masculino");
   const [savingProfile, setSavingProfile] = useState(false);
   
+  // Avatar state
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
   // Clinic state
   const [nomeClinica, setNomeClinica] = useState("");
   const [enderecoClinica, setEnderecoClinica] = useState("");
@@ -52,6 +56,7 @@ export default function Configuracoes() {
       setEspecialidade(profile.especialidade || "");
       setSexo(profile.sexo || "masculino");
       setSignaturePreview(profile.signature_url || null);
+      setAvatarPreview((profile as any).avatar_url || null);
     }
   }, [profile]);
 
@@ -100,6 +105,51 @@ export default function Configuracoes() {
       });
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.user_id}/avatar.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+      setAvatarPreview(urlWithCacheBuster);
+
+      // Save URL to profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("user_id", profile.user_id);
+
+      if (updateError) throw updateError;
+      
+      toast({
+        title: "Foto atualizada",
+        description: "Sua foto de perfil foi enviada com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao enviar foto",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -262,6 +312,51 @@ export default function Configuracoes() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Avatar Upload */}
+                <div className="space-y-4 pb-4 border-b">
+                  <Label>Foto do Profissional</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Esta foto será exibida no cabeçalho do sistema e identificará seu perfil.
+                  </p>
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 border-2 border-dashed border-border rounded-full flex items-center justify-center bg-muted/50 overflow-hidden">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Foto de perfil"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-10 h-10 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="avatar-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md cursor-pointer hover:bg-secondary/80 transition-colors"
+                      >
+                        {uploadingAvatar ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {uploadingAvatar ? "Enviando..." : "Enviar Foto"}
+                      </Label>
+                      <input
+                        id="avatar-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        JPG, PNG ou WebP. Recomendado: 200x200px
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="nome">Nome Completo</Label>

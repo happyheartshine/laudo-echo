@@ -265,6 +265,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           cargo: Database["public"]["Enums"]["user_role"]
           clinic_id: string | null
           created_at: string
@@ -280,6 +281,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           cargo?: Database["public"]["Enums"]["user_role"]
           clinic_id?: string | null
           created_at?: string
@@ -295,6 +297,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           cargo?: Database["public"]["Enums"]["user_role"]
           clinic_id?: string | null
           created_at?: string

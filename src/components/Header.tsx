@@ -48,7 +48,10 @@ export function Header() {
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-3 hover:bg-muted rounded-lg px-3 py-2 transition-colors outline-none">
             <Avatar className="h-9 w-9">
-              <AvatarImage src="" alt={displayName} />
+              <AvatarImage 
+                src={(profile as any)?.avatar_url || ""} 
+                alt={displayName} 
+              />
               <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
                 {getInitials(displayName)}
               </AvatarFallback>
