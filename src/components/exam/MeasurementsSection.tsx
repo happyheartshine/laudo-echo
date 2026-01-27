@@ -708,7 +708,7 @@ export function MeasurementsSection({
             <MeasurementRow
               label="VE em diástole NORMALIZADO (DVEdN)"
               calculatedValue={dvedNormalizado}
-              reference="Ref: ≤ 1,70"
+              reference="Ref: < 1,70"
               classificationValue={classifications.dvedNormalizado}
               onClassificationChange={(val) => handleClassificationChange('dvedNormalizado', val)}
               isCalculated

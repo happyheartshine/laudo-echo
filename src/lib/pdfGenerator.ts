@@ -553,7 +553,7 @@ export async function generateExamPdf(
     pdf.text("VE em diástole NORMALIZADO (DVEdN)", col1X, yPosition);
     pdf.text(formatNumber(dvedNorm), col2X, yPosition);
     pdf.setFontSize(8);
-    pdf.text("≤ 1,70", col3X, yPosition);
+    pdf.text("< 1,70", col3X, yPosition);
     pdf.setFontSize(9);
     const classText = getClassificationText('dvedNormalizado');
     if (classText) pdf.text(classText, col4X, yPosition);
