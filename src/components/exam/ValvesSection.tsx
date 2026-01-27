@@ -40,9 +40,9 @@ interface ValvesSectionProps {
 // Apenas opções de fluxo/regurgitação
 const valveOptions = [
   { value: "normal", label: "Normal" },
-  { value: "insuficiencia-discreta", label: "Insuficiência Discreta (Leve)" },
+  { value: "insuficiencia-discreta", label: "Insuficiência Discreta" },
   { value: "insuficiencia-moderada", label: "Insuficiência Moderada" },
-  { value: "insuficiencia-grave", label: "Insuficiência Importante (Grave)" },
+  { value: "insuficiencia-grave", label: "Insuficiência Importante" },
 ];
 
 // Verifica se é uma opção de insuficiência
