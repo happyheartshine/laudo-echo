@@ -574,6 +574,37 @@ export async function generateExamPdf(
 
   yPosition += 3;
 
+  // ========== ÁTRIO ESQUERDO E AORTA (MOVIDO PARA CÁ - ANTES DA FUNÇÃO SISTÓLICA) ==========
+  if (measurementsData.aorta || measurementsData.atrioEsquerdo) {
+    await addSectionHeader("ÁTRIO ESQUERDO / AORTA (MODO B)");
+    const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta
+      ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2)
+      : '';
+    if (measurementsData.aorta) addTableRow("Aorta", `${formatNumber(measurementsData.aorta)} cm`);
+    if (measurementsData.atrioEsquerdo) addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo)} cm`);
+    if (aeAo) {
+      const aeAoClass = (classificationsData as unknown as Record<string, string>)?.relacaoAEAo
+        ? ((classificationsData as unknown as Record<string, string>).relacaoAEAo === 'normal' ? 'Normal' : 'Aumentado')
+        : '';
+      const aeAoDisplay = aeAoClass ? `${formatNumber(aeAo)} (${aeAoClass})` : formatNumber(aeAo);
+      addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
+    }
+    // Observações da seção Átrio Esquerdo/Aorta
+    if (observacoesSecoes?.atrioEsquerdoAorta?.trim()) {
+      yPosition += 2;
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      const obsLines = pdf.splitTextToSize(observacoesSecoes.atrioEsquerdoAorta, pageWidth - 2 * margin);
+      for (const line of obsLines) {
+        await checkPageBreak(5);
+        pdf.text(line, margin, yPosition);
+        yPosition += 5;
+      }
+    }
+    yPosition += 3;
+  }
+
   // ========== FUNÇÃO SISTÓLICA DO VENTRÍCULO ESQUERDO (NOVA SEÇÃO SEPARADA) ==========
   const hasSystolicData = (fsValue && fsValue !== '-') || (feTeicholzValue && feTeicholzValue !== '-') ||
     funcaoSistolica?.mapse || funcaoSistolica?.epss || 
@@ -646,37 +677,6 @@ export async function generateExamPdf(
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
       const obsLines = pdf.splitTextToSize(observacoesSecoes.funcaoSistolica, pageWidth - 2 * margin);
-      for (const line of obsLines) {
-        await checkPageBreak(5);
-        pdf.text(line, margin, yPosition);
-        yPosition += 5;
-      }
-    }
-    yPosition += 3;
-  }
-
-  // Átrio Esquerdo e Aorta
-  if (measurementsData.aorta || measurementsData.atrioEsquerdo) {
-    await addSectionHeader("ÁTRIO ESQUERDO / AORTA (MODO B)");
-    const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta
-      ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2)
-      : '';
-    if (measurementsData.aorta) addTableRow("Aorta", `${formatNumber(measurementsData.aorta)} cm`);
-    if (measurementsData.atrioEsquerdo) addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo)} cm`);
-    if (aeAo) {
-      const aeAoClass = (classificationsData as unknown as Record<string, string>)?.relacaoAEAo
-        ? ((classificationsData as unknown as Record<string, string>).relacaoAEAo === 'normal' ? 'Normal' : 'Aumentado')
-        : '';
-      const aeAoDisplay = aeAoClass ? `${formatNumber(aeAo)} (${aeAoClass})` : formatNumber(aeAo);
-      addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
-    }
-    // Observações da seção Átrio Esquerdo/Aorta
-    if (observacoesSecoes?.atrioEsquerdoAorta?.trim()) {
-      yPosition += 2;
-      pdf.setFontSize(9);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
-      const obsLines = pdf.splitTextToSize(observacoesSecoes.atrioEsquerdoAorta, pageWidth - 2 * margin);
       for (const line of obsLines) {
         await checkPageBreak(5);
         pdf.text(line, margin, yPosition);
