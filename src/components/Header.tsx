@@ -14,7 +14,7 @@ import {
 export function Header() {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, clinic } = useProfile();
 
   const handleLogout = async () => {
     await signOut();
@@ -31,6 +31,7 @@ export function Header() {
 
   const displayName = profile?.nome || user?.email || "Usuário";
   const firstName = displayName.split(" ")[0];
+  const companyName = clinic?.nome_fantasia || "VitaeCor";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-card border-b border-border shadow-sm">
@@ -57,7 +58,7 @@ export function Header() {
               </AvatarFallback>
             </Avatar>
             <span className="text-sm font-medium text-foreground hidden sm:block whitespace-nowrap">
-              {firstName} | VitaeCor
+              {firstName} | {companyName}
             </span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </DropdownMenuTrigger>
