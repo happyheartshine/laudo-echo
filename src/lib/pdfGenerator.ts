@@ -329,8 +329,10 @@ export async function generateExamPdf(
     return isNaN(num) ? "-" : num.toFixed(1).replace(".", ",");
   };
 
-  const addTableRow = (label: string, value: string, col2Label?: string, col2Value?: string) => {
+  const addTableRow = async (label: string, value: string, col2Label?: string, col2Value?: string) => {
     if (isEmpty(value) && (!col2Value || isEmpty(col2Value))) return;
+    // Verifica espaço antes de cada linha da tabela (5mm por linha)
+    await checkPageBreak(6);
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
@@ -365,13 +367,15 @@ export async function generateExamPdf(
     return cornellReferences[key] ? formatNumber(cornellReferences[key]) : "";
   };
 
-  const addVE4ColumnRow = (
+  const addVE4ColumnRow = async (
     label: string,
     value: string,
     referenceKey?: string,
     classificationKey?: string
   ) => {
     if (isEmpty(value)) return;
+    // Verifica espaço antes de cada linha da tabela de 4 colunas (5mm)
+    await checkPageBreak(6);
     pdf.setFontSize(9);
     pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
     pdf.setFont("helvetica", "normal");
@@ -503,7 +507,7 @@ export async function generateExamPdf(
   // Parâmetros Observados
   if (examInfo.ritmo || examInfo.frequenciaCardiaca) {
     await addSectionHeader("PARÂMETROS OBSERVADOS");
-    addTableRow("Ritmo", examInfo.ritmo || "", "Frequência Cardíaca", examInfo.frequenciaCardiaca ? `${examInfo.frequenciaCardiaca} bpm` : "");
+    await addTableRow("Ritmo", examInfo.ritmo || "", "Frequência Cardíaca", examInfo.frequenciaCardiaca ? `${examInfo.frequenciaCardiaca} bpm` : "");
     yPosition += 5;
   }
 
@@ -534,15 +538,16 @@ export async function generateExamPdf(
     : calculatedValues.fracaoEjecaoTeicholz;
 
   // Medidas com referência Cornell
-  if (measurementsData.septoIVd) addVE4ColumnRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm`, 'septoIVd', 'septoIVd');
-  if (measurementsData.dvedDiastole) addVE4ColumnRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm`, 'dvedDiastole', 'dvedDiastole');
-  if (measurementsData.paredeLVd) addVE4ColumnRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm`, 'paredeLVd', 'paredeLVd');
-  if (measurementsData.dvedSistole) addVE4ColumnRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm`, 'dvedSistole', 'dvedSistole');
-  if (measurementsData.septoIVs) addVE4ColumnRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
-  if (measurementsData.paredeLVs) addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
+  if (measurementsData.septoIVd) await addVE4ColumnRow("Septo interventricular em diástole (SIVd)", `${formatNumber(measurementsData.septoIVd)} cm`, 'septoIVd', 'septoIVd');
+  if (measurementsData.dvedDiastole) await addVE4ColumnRow("Ventrículo esquerdo em diástole (VEd)", `${formatNumber(measurementsData.dvedDiastole)} cm`, 'dvedDiastole', 'dvedDiastole');
+  if (measurementsData.paredeLVd) await addVE4ColumnRow("Parede livre do VE em diástole (PLVEd)", `${formatNumber(measurementsData.paredeLVd)} cm`, 'paredeLVd', 'paredeLVd');
+  if (measurementsData.dvedSistole) await addVE4ColumnRow("Ventrículo esquerdo em sístole (VEs)", `${formatNumber(measurementsData.dvedSistole)} cm`, 'dvedSistole', 'dvedSistole');
+  if (measurementsData.septoIVs) await addVE4ColumnRow("Septo interventricular em sístole (SIVs)", `${formatNumber(measurementsData.septoIVs)} cm`, 'septoIVs', 'septoIVs');
+  if (measurementsData.paredeLVs) await addVE4ColumnRow("Parede livre do VE em sístole (PLVEs)", `${formatNumber(measurementsData.paredeLVs)} cm`, 'paredeLVs', 'paredeLVs');
 
   // DVEdN com referência fixa "≤ 1,70" (norma ACVIM)
   if (dvedNorm && dvedNorm !== '-') {
+    await checkPageBreak(6);
     pdf.setFontSize(9);
     pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
     pdf.setFont("helvetica", "normal");
@@ -563,13 +568,13 @@ export async function generateExamPdf(
   // ========== ÍNDICES DE FUNÇÃO SISTÓLICA NA TABELA MODO M ==========
   // FS, FE Teicholz, FE Simpson dentro da mesma tabela (Lugar 1)
   if (fsValue && fsValue !== '-') {
-    addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+    await addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
   }
   if (feTeicholzValue && feTeicholzValue !== '-') {
-    addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+    await addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
   }
   if (funcaoSistolica?.simpson) {
-    addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+    await addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
   }
 
   yPosition += 3;
@@ -580,14 +585,14 @@ export async function generateExamPdf(
     const aeAo = measurementsData.atrioEsquerdo && measurementsData.aorta
       ? (parseFloat(measurementsData.atrioEsquerdo) / parseFloat(measurementsData.aorta)).toFixed(2)
       : '';
-    if (measurementsData.aorta) addTableRow("Aorta", `${formatNumber(measurementsData.aorta)} cm`);
-    if (measurementsData.atrioEsquerdo) addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo)} cm`);
+    if (measurementsData.aorta) await addTableRow("Aorta", `${formatNumber(measurementsData.aorta)} cm`);
+    if (measurementsData.atrioEsquerdo) await addTableRow("Átrio esquerdo", `${formatNumber(measurementsData.atrioEsquerdo)} cm`);
     if (aeAo) {
       const aeAoClass = (classificationsData as unknown as Record<string, string>)?.relacaoAEAo
         ? ((classificationsData as unknown as Record<string, string>).relacaoAEAo === 'normal' ? 'Normal' : 'Aumentado')
         : '';
       const aeAoDisplay = aeAoClass ? `${formatNumber(aeAo)} (${aeAoClass})` : formatNumber(aeAo);
-      addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
+      await addTableRow("Relação Átrio esquerdo/Aorta", aeAoDisplay);
     }
     // Observações da seção Átrio Esquerdo/Aorta
     if (observacoesSecoes?.atrioEsquerdoAorta?.trim()) {
@@ -626,21 +631,22 @@ export async function generateExamPdf(
 
     // FS com tabela de 4 colunas
     if (fsValue && fsValue !== '-') {
-      addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
+      await addVE4ColumnRow("Fração de Encurtamento (FS)", `${formatNumber(fsValue)}%`, 'fracaoEncurtamento', 'fracaoEncurtamento');
     }
 
     // FE Teicholz com tabela de 4 colunas
     if (feTeicholzValue && feTeicholzValue !== '-') {
-      addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
+      await addVE4ColumnRow("Fração de Ejeção (FE Teicholz)", `${formatNumber(feTeicholzValue)}%`, 'fracaoEjecaoTeicholz', 'fracaoEjecaoTeicholz');
     }
 
     // FE Simpson com tabela de 4 colunas
     if (funcaoSistolica?.simpson) {
-      addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
+      await addVE4ColumnRow("Fração de Ejeção (FE Simpson)", `${formatNumber(funcaoSistolica.simpson)}%`, 'fracaoEjecaoSimpson', 'fracaoEjecaoSimpson');
     }
 
     // MAPSE
     if (funcaoSistolica?.mapse) {
+      await checkPageBreak(6);
       pdf.setFontSize(9);
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
       pdf.setFont("helvetica", "normal");
@@ -651,6 +657,7 @@ export async function generateExamPdf(
 
     // EPSS
     if (funcaoSistolica?.epss) {
+      await checkPageBreak(6);
       pdf.setFontSize(9);
       pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
       pdf.setFont("helvetica", "normal");
@@ -667,7 +674,7 @@ export async function generateExamPdf(
         : funcaoSistolica.statusFuncao === 'disfuncao' 
           ? `Disfunção sistólica${funcaoSistolica.tipoDisfuncao ? ` ${funcaoSistolica.tipoDisfuncao}` : ''}`
           : funcaoSistolica.statusFuncao;
-      addTableRow("Avaliação", statusText);
+      await addTableRow("Avaliação", statusText);
     }
 
     // Observações da Função Sistólica
@@ -694,15 +701,23 @@ export async function generateExamPdf(
     await addSectionHeader("FUNÇÃO DIASTÓLICA DO VENTRÍCULO ESQUERDO");
 
     // Dados do Doppler Mitral
-    if (funcaoDiastolica?.ondaE) addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
-    if (funcaoDiastolica?.ondaA) addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
-    if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
-    if (funcaoDiastolica?.tempoDesaceleracao) addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
-    if (funcaoDiastolica?.triv) addTableRow("Tempo de Relaxamento Isovolumétrico (TRIV)", `${formatNumber(funcaoDiastolica.triv)} ms`);
-    if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
+    if (funcaoDiastolica?.ondaE) await addTableRow("Velocidade da onda E", `${formatNumber(funcaoDiastolica.ondaE)} cm/s`);
+    if (funcaoDiastolica?.ondaA) await addTableRow("Velocidade da onda A", `${formatNumber(funcaoDiastolica.ondaA)} cm/s`);
+    if (calculatedValues.relacaoEA && calculatedValues.relacaoEA !== '-') await addTableRow("Relação onda E/A", formatNumber(calculatedValues.relacaoEA));
+    if (funcaoDiastolica?.tempoDesaceleracao) await addTableRow("Tempo de desaceleração da onda E", `${formatNumber(funcaoDiastolica.tempoDesaceleracao)} ms`);
+    if (funcaoDiastolica?.triv) await addTableRow("Tempo de Relaxamento Isovolumétrico (TRIV)", `${formatNumber(funcaoDiastolica.triv)} ms`);
+    if (calculatedValues.eTRIV && calculatedValues.eTRIV !== '-') await addTableRow("E/TRIV", formatNumber(calculatedValues.eTRIV));
 
     // ========== SUBSEÇÃO TDI (OBRIGATÓRIA) ==========
     if (hasTdiData) {
+      // Estima altura total do bloco TDI para decidir se precisa nova página
+      const tdiBlockHeight = 8 + // Título TDI
+        ((tdiLivre?.s || tdiLivre?.e || tdiLivre?.a) ? 14 : 0) + // Parede Livre: label + valores
+        ((tdiSeptal?.s || tdiSeptal?.e || tdiSeptal?.a) ? 14 : 0) + // Parede Septal: label + valores
+        ((calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') ? 7 : 0); // Média E/e'
+      
+      await checkPageBreak(tdiBlockHeight);
+      
       yPosition += 3;
       pdf.setFontSize(9);
       pdf.setFont("helvetica", "bold");
@@ -714,6 +729,9 @@ export async function generateExamPdf(
 
       // TDI Parede Livre
       if (tdiLivre?.s || tdiLivre?.e || tdiLivre?.a) {
+        // Verifica espaço antes de Parede Livre (título 4mm + valores 5mm = ~9mm)
+        await checkPageBreak(12);
+        
         pdf.setFontSize(8);
         pdf.setFont("helvetica", "italic");
         pdf.text("Parede Livre:", margin, yPosition);
@@ -734,6 +752,9 @@ export async function generateExamPdf(
 
       // TDI Parede Septal
       if (tdiSeptal?.s || tdiSeptal?.e || tdiSeptal?.a) {
+        // Verifica espaço antes de Parede Septal (título 4mm + valores 5mm = ~9mm)
+        await checkPageBreak(12);
+        
         pdf.setFontSize(8);
         pdf.setFont("helvetica", "italic");
         pdf.text("Parede Septal:", margin, yPosition);
@@ -754,6 +775,7 @@ export async function generateExamPdf(
 
       // Média E/e'
       if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+        await checkPageBreak(7);
         pdf.setFont("helvetica", "bold");
         pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
         pdf.setFont("helvetica", "normal");
@@ -819,7 +841,7 @@ export async function generateExamPdf(
       pdf.text(title, margin, yPosition);
       yPosition += 5;
       for (const row of filledRows) {
-        addTableRow(row.label, row.value);
+        await addTableRow(row.label, row.value);
       }
       yPosition += 3;
     };
@@ -897,14 +919,14 @@ export async function generateExamPdf(
   if (hasRightVentricleData) {
     await addSectionHeader("VENTRÍCULO DIREITO");
     if (ventriculoDireito?.atrioDireito && ventriculoDireito.atrioDireito !== "none") {
-      addTableRow("Átrio Direito", ventriculoDireito.atrioDireito);
+      await addTableRow("Átrio Direito", ventriculoDireito.atrioDireito);
     }
     if (ventriculoDireito?.ventriculoDireito && ventriculoDireito.ventriculoDireito !== "none") {
-      addTableRow("Ventrículo Direito", ventriculoDireito.ventriculoDireito);
+      await addTableRow("Ventrículo Direito", ventriculoDireito.ventriculoDireito);
     }
-    if (ventriculoDireito?.tapse) addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} cm`);
-    if (ventriculoDireito?.fac) addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
-    if (ventriculoDireito?.tdiS) addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
+    if (ventriculoDireito?.tapse) await addTableRow("TAPSE", `${formatNumber(ventriculoDireito.tapse)} cm`);
+    if (ventriculoDireito?.fac) await addTableRow("FAC", `${formatNumber(ventriculoDireito.fac)}%`);
+    if (ventriculoDireito?.tdiS) await addTableRow("TDI: s'", `${formatNumber(ventriculoDireito.tdiS)} cm/s`);
     if (observacoesSecoes?.ventriculoDireito?.trim()) {
       yPosition += 2;
       pdf.setFontSize(9);
@@ -918,8 +940,8 @@ export async function generateExamPdf(
 
   // Outros
   await addSectionHeader("OUTROS");
-  addTableRow("Septos", outros?.septos || "interventricular e interatrial íntegros");
-  addTableRow("Pericárdio", outros?.pericardio || "normal, sem derrame");
+  await addTableRow("Septos", outros?.septos || "interventricular e interatrial íntegros");
+  await addTableRow("Pericárdio", outros?.pericardio || "normal, sem derrame");
   if (outros?.observacoes?.trim()) {
     yPosition += 2;
     pdf.setFontSize(9);
