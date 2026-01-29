@@ -86,6 +86,7 @@ export type Database = {
         Row: {
           breed: string | null
           clinic_id: string | null
+          clinic_name: string | null
           content: Json
           created_at: string
           exam_date: string
@@ -106,6 +107,7 @@ export type Database = {
         Insert: {
           breed?: string | null
           clinic_id?: string | null
+          clinic_name?: string | null
           content?: Json
           created_at?: string
           exam_date?: string
@@ -126,6 +128,7 @@ export type Database = {
         Update: {
           breed?: string | null
           clinic_id?: string | null
+          clinic_name?: string | null
           content?: Json
           created_at?: string
           exam_date?: string

@@ -57,6 +57,7 @@ const [patientData, setPatientData] = useState<PatientData>({
     sexo: "",
     idade: "",
     peso: "",
+    clinicName: "",
   });
 
   const [examInfo, setExamInfo] = useState({
@@ -803,6 +804,7 @@ const examData = {
         owner_email: patientData.responsavelEmail || null,
         species: patientData.especie || null,
         breed: patientData.raca || null,
+        clinic_name: patientData.clinicName || null, // Local do Exame
         exam_date: examDate,
         partner_clinic_id: examInfo.partnerClinicId || null,
         partner_vet_id: examInfo.partnerVetId || null,

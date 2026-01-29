@@ -20,6 +20,7 @@ const defaultPatientData: PatientData = {
   sexo: "",
   idade: "",
   peso: "",
+  clinicName: "",
 };
 
 export default function NovoExame() {
@@ -41,6 +42,7 @@ export default function NovoExame() {
       sexo: prev.sexo || info.sexo,
       idade: prev.idade || info.idade,
       peso: prev.peso || info.peso,
+      clinicName: prev.clinicName || "",
     }));
     toast({
       title: "Dados extraídos do arquivo",

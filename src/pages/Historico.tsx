@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2, Loader2, MessageCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, FileDown, Calendar, User, Stethoscope, Pencil, Mail, Trash2, Loader2, MessageCircle, MapPin, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -12,6 +13,7 @@ import jsPDF from "jspdf";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { deleteExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 import { generateExamPdf, PdfExamData } from "@/lib/pdfGenerator";
 
@@ -31,6 +33,7 @@ interface Exam {
   content: unknown;
   created_at: string;
   partner_clinic_id: string | null;
+  clinic_name: string | null; // Local do Exame
 }
 
 // Função utilitária para formatar números no padrão BR
@@ -54,6 +57,7 @@ export default function Historico() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [clinicFilter, setClinicFilter] = useState<string>("all"); // Filtro de clínica
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [selectedExamForEmail, setSelectedExamForEmail] = useState<Exam | null>(null);
@@ -62,6 +66,14 @@ export default function Historico() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
+  
+  // Lista de clínicas únicas dos exames (para o filtro)
+  const uniqueClinicNames = useMemo(() => {
+    const names = exams
+      .map(e => e.clinic_name)
+      .filter((name): name is string => !!name && name.trim() !== "");
+    return [...new Set(names)].sort();
+  }, [exams]);
   useEffect(() => {
     if (user) {
       fetchExams();
@@ -100,7 +112,19 @@ export default function Historico() {
       setPartnerClinics(data);
     }
   };
-  const filteredExams = exams.filter(exam => exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) || exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Filtra exames por busca de texto E por clínica selecionada
+  const filteredExams = useMemo(() => {
+    return exams.filter(exam => {
+      // Filtro de texto (nome do paciente ou tutor)
+      const matchesSearch = exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Filtro de clínica
+      const matchesClinic = clinicFilter === "all" || exam.clinic_name === clinicFilter;
+      
+      return matchesSearch && matchesClinic;
+    });
+  }, [exams, searchTerm, clinicFilter]);
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
@@ -390,11 +414,36 @@ export default function Historico() {
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search and Filter */}
         <div className="card-vitaecor mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input placeholder="Buscar por nome do paciente ou tutor..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Busca por texto */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input placeholder="Buscar por nome do paciente ou tutor..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+            
+            {/* Filtro por Clínica */}
+            {uniqueClinicNames.length > 0 && (
+              <div className="w-full md:w-64">
+                <Select value={clinicFilter} onValueChange={setClinicFilter}>
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filtrar por clínica" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Clínicas</SelectItem>
+                    {uniqueClinicNames.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -425,6 +474,12 @@ export default function Historico() {
                       </div>
                     </th>
                     <th className="text-left py-3 px-4 font-semibold text-muted-foreground">Espécie</th>
+                    <th className="text-left py-3 px-4 font-semibold text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Local
+                      </div>
+                    </th>
                     <th className="text-right py-3 px-4 font-semibold text-muted-foreground">Ações</th>
                   </tr>
                 </thead>
@@ -434,6 +489,15 @@ export default function Historico() {
                       <td className="py-3 px-4 font-medium text-foreground">{exam.patient_name}</td>
                       <td className="py-3 px-4 text-muted-foreground">{exam.owner_name || "-"}</td>
                       <td className="py-3 px-4 text-muted-foreground">{exam.species || "-"}</td>
+                      <td className="py-3 px-4">
+                        {exam.clinic_name ? (
+                          <Badge variant="secondary" className="text-xs font-normal">
+                            {exam.clinic_name}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleEdit(exam)} title="Editar exame">
