@@ -26,7 +26,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2, UserPlus, Building2, Users, Upload, ImageIcon } from "lucide-react";
+import { Plus, Trash2, UserPlus, Building2, Users, Upload, ImageIcon, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -75,6 +75,18 @@ export default function ClinicasParceiros() {
   const [isVetDialogOpen, setIsVetDialogOpen] = useState(false);
   const [selectedClinicId, setSelectedClinicId] = useState<string | null>(null);
   const [newVetName, setNewVetName] = useState("");
+
+  // Edit clinic form
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingClinic, setEditingClinic] = useState<PartnerClinic | null>(null);
+  const [editClinicName, setEditClinicName] = useState("");
+  const [editClinicResponsavel, setEditClinicResponsavel] = useState("");
+  const [editClinicTelefone, setEditClinicTelefone] = useState("");
+  const [editClinicEmail, setEditClinicEmail] = useState("");
+  const [editClinicLogoFile, setEditClinicLogoFile] = useState<File | null>(null);
+  const [editClinicLogoPreview, setEditClinicLogoPreview] = useState<string | null>(null);
+  const [updatingClinic, setUpdatingClinic] = useState(false);
+  const editLogoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -204,6 +216,99 @@ export default function ClinicasParceiros() {
     setNewClinicEmail("");
     setNewClinicLogoFile(null);
     setNewClinicLogoPreview(null);
+  };
+
+  // ========== Edit Clinic Functions ==========
+  const handleOpenEditDialog = (clinic: PartnerClinic) => {
+    setEditingClinic(clinic);
+    setEditClinicName(clinic.nome);
+    setEditClinicResponsavel(clinic.responsavel || "");
+    setEditClinicTelefone(clinic.telefone || "");
+    setEditClinicEmail(clinic.email || "");
+    setEditClinicLogoFile(null);
+    setEditClinicLogoPreview(clinic.logo_url || null);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Erro", description: "Selecione um arquivo de imagem (JPG, PNG)", variant: "destructive" });
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        toast({ title: "Erro", description: "Imagem deve ter no máximo 2MB", variant: "destructive" });
+        return;
+      }
+      setEditClinicLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditClinicLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadEditLogo = async (clinicId: string): Promise<string | null> => {
+    if (!editClinicLogoFile) return null;
+
+    const fileExt = editClinicLogoFile.name.split('.').pop();
+    const fileName = `partner-${clinicId}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('clinic-logos')
+      .upload(fileName, editClinicLogoFile, { upsert: true });
+
+    if (uploadError) {
+      console.error("Error uploading logo:", uploadError);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('clinic-logos').getPublicUrl(fileName);
+    return data.publicUrl;
+  };
+
+  const handleUpdateClinic = async () => {
+    if (!editingClinic || !editClinicName.trim()) {
+      toast({ title: "Erro", description: "Nome da clínica é obrigatório", variant: "destructive" });
+      return;
+    }
+
+    setUpdatingClinic(true);
+
+    let logoUrl = editingClinic.logo_url;
+
+    // If there's a new logo file, upload it
+    if (editClinicLogoFile) {
+      const newLogoUrl = await uploadEditLogo(editingClinic.id);
+      if (newLogoUrl) {
+        logoUrl = newLogoUrl;
+      }
+    }
+
+    const { error } = await supabase
+      .from("partner_clinics")
+      .update({
+        nome: editClinicName.trim(),
+        responsavel: editClinicResponsavel.trim() || null,
+        telefone: editClinicTelefone.trim() || null,
+        email: editClinicEmail.trim() || null,
+        logo_url: logoUrl,
+      })
+      .eq("id", editingClinic.id);
+
+    if (error) {
+      console.error("Error updating partner clinic:", error);
+      toast({ title: "Erro", description: "Erro ao atualizar clínica parceira", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Clínica atualizada com sucesso!" });
+      setIsEditDialogOpen(false);
+      setEditingClinic(null);
+      fetchData();
+    }
+
+    setUpdatingClinic(false);
   };
 
   const handleDeleteClinic = async (id: string) => {
@@ -489,8 +594,16 @@ export default function ClinicasParceiros() {
                       </TabsContent>
                     </Tabs>
 
-                    {/* Delete Clinic Button */}
+                    {/* Clinic Actions */}
                     <div className="flex gap-2 pt-4 border-t mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEditDialog(partnerClinic)}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Editar Clínica
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -526,6 +639,102 @@ export default function ClinicasParceiros() {
               </div>
               <Button onClick={handleCreateVet} className="w-full">
                 Cadastrar Veterinário
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Clinic Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Clínica Parceira</DialogTitle>
+              <DialogDescription>
+                Atualize os dados da clínica. Você pode alterar a logo ou adicionar uma se ainda não houver.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Logo Upload */}
+              <div className="space-y-2">
+                <Label>Logo da Clínica</Label>
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden"
+                    onClick={() => editLogoInputRef.current?.click()}
+                  >
+                    {editClinicLogoPreview ? (
+                      <img
+                        src={editClinicLogoPreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => editLogoInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {editClinicLogoPreview ? "Alterar imagem" : "Adicionar imagem"}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      JPG ou PNG, máx. 2MB
+                    </p>
+                  </div>
+                  <input
+                    ref={editLogoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/jpg"
+                    className="hidden"
+                    onChange={handleEditLogoFileChange}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-clinic-name">Nome da Clínica *</Label>
+                <Input
+                  id="edit-clinic-name"
+                  placeholder="Ex: Clínica Vet Center"
+                  value={editClinicName}
+                  onChange={(e) => setEditClinicName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-clinic-responsavel">Responsável / Contato</Label>
+                <Input
+                  id="edit-clinic-responsavel"
+                  placeholder="Ex: Dr. João Silva"
+                  value={editClinicResponsavel}
+                  onChange={(e) => setEditClinicResponsavel(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-clinic-telefone">Telefone / WhatsApp</Label>
+                <Input
+                  id="edit-clinic-telefone"
+                  placeholder="Ex: 11999998888"
+                  value={editClinicTelefone}
+                  onChange={(e) => setEditClinicTelefone(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-clinic-email">E-mail</Label>
+                <Input
+                  id="edit-clinic-email"
+                  type="email"
+                  placeholder="Ex: contato@clinica.com.br"
+                  value={editClinicEmail}
+                  onChange={(e) => setEditClinicEmail(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleUpdateClinic} className="w-full" disabled={updatingClinic}>
+                {updatingClinic ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>
           </DialogContent>
