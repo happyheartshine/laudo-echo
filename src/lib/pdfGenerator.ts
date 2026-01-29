@@ -964,82 +964,108 @@ export async function generateExamPdf(
   }
   yPosition += 5;
 
-  // Achados Ecocardiográficos - Texto justificado
+  // Achados Ecocardiográficos - Renderização inteligente por parágrafo
   if (achados) {
     await addSectionHeader("ACHADOS ECOCARDIOGRÁFICOS");
     pdf.setTextColor(60, 60, 60);
-    pdf.setFontSize(9);
+    pdf.setFontSize(10); // Tamanho padrão do corpo
     pdf.setFont("helvetica", "normal");
     
-    // Usa texto justificado com maxWidth para ocupar toda a largura da página
-    const maxTextWidth = pageWidth - 2 * margin;
-    const lines = pdf.splitTextToSize(achados, maxTextWidth);
+    // Largura útil da página (menos margens)
+    const maxWidth = pageWidth - 2 * margin; // ~180mm para A4
     
-    // Estima altura total do texto para verificação de página
-    const lineHeight = 4.5; // Line-height padrão para texto corrido
-    const totalTextHeight = lines.length * lineHeight;
+    // Divide o texto em parágrafos (por quebra de linha ou ponto final seguido de maiúscula)
+    const paragraphs = achados
+      .split(/\n+/)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
     
-    // Verifica se precisa de nova página antes de começar
-    await printAutoPage(Math.min(totalTextHeight, 30));
-    
-    // Imprime o texto justificado (jsPDF justify alinha nas duas margens)
-    pdf.text(lines.join('\n'), margin, yPosition, { 
-      align: 'justify',
-      maxWidth: maxTextWidth,
-      lineHeightFactor: 1.3
-    });
-    
-    yPosition += totalTextHeight + 3;
-    
-    // Verifica se passou do limite após escrever
-    if (yPosition > BOTTOM_LIMIT) {
-      await printAutoPage(5);
+    // Itera sobre cada parágrafo para renderização inteligente
+    for (const paragraph of paragraphs) {
+      // Calcula altura real do texto usando getTextDimensions
+      const textDimensions = pdf.getTextDimensions(paragraph, { maxWidth });
+      const textHeight = textDimensions.h;
+      
+      // Verificação de quebra de página ANTES de imprimir
+      // Se não couber, pula para próxima página
+      if (yPosition + textHeight > BOTTOM_LIMIT) {
+        pdf.addPage();
+        await addHeader();
+        yPosition = contentStartY;
+      }
+      
+      // Imprime o parágrafo justificado
+      pdf.text(paragraph, margin, yPosition, { 
+        maxWidth, 
+        align: 'justify' 
+      });
+      
+      // Atualiza cursor baseado na altura real + espaçamento pequeno (5mm)
+      yPosition += textHeight + 5;
     }
   }
 
-  // Impressão Diagnóstica - Texto justificado
+  // Impressão Diagnóstica - Renderização inteligente por parágrafo
   if (conclusoes) {
     await addSectionHeader("IMPRESSÃO DIAGNÓSTICA");
     pdf.setTextColor(60, 60, 60);
-    pdf.setFontSize(9);
+    pdf.setFontSize(10); // Tamanho padrão do corpo
     pdf.setFont("helvetica", "normal");
     
-    const maxTextWidth = pageWidth - 2 * margin;
-    const lines = pdf.splitTextToSize(conclusoes, maxTextWidth);
-    const lineHeight = 4.5;
-    const totalTextHeight = lines.length * lineHeight;
+    const maxWidth = pageWidth - 2 * margin;
     
-    await printAutoPage(Math.min(totalTextHeight, 30));
+    // Divide em parágrafos
+    const paragraphs = conclusoes
+      .split(/\n+/)
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
     
-    pdf.text(lines.join('\n'), margin, yPosition, { 
-      align: 'justify',
-      maxWidth: maxTextWidth,
-      lineHeightFactor: 1.3
-    });
-    
-    yPosition += totalTextHeight + 3;
-    
-    // Verifica limite após escrever
-    if (yPosition > BOTTOM_LIMIT) {
-      await printAutoPage(5);
+    for (const paragraph of paragraphs) {
+      const textDimensions = pdf.getTextDimensions(paragraph, { maxWidth });
+      const textHeight = textDimensions.h;
+      
+      if (yPosition + textHeight > BOTTOM_LIMIT) {
+        pdf.addPage();
+        await addHeader();
+        yPosition = contentStartY;
+      }
+      
+      pdf.text(paragraph, margin, yPosition, { 
+        maxWidth, 
+        align: 'justify' 
+      });
+      
+      yPosition += textHeight + 5;
     }
     
     // Comentários Adicionais (em negrito, justificado)
     if (comentariosAdicionais) {
-      yPosition += 6;
+      yPosition += 3; // Espaçamento extra antes dos comentários
       pdf.setFont("helvetica", "bold");
-      const commentLines = pdf.splitTextToSize(comentariosAdicionais, maxTextWidth);
-      const commentHeight = commentLines.length * lineHeight;
       
-      await printAutoPage(Math.min(commentHeight, 25));
+      const commentParagraphs = comentariosAdicionais
+        .split(/\n+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
       
-      pdf.text(commentLines.join('\n'), margin, yPosition, { 
-        align: 'justify',
-        maxWidth: maxTextWidth,
-        lineHeightFactor: 1.3
-      });
+      for (const paragraph of commentParagraphs) {
+        const textDimensions = pdf.getTextDimensions(paragraph, { maxWidth });
+        const textHeight = textDimensions.h;
+        
+        if (yPosition + textHeight > BOTTOM_LIMIT) {
+          pdf.addPage();
+          await addHeader();
+          yPosition = contentStartY;
+        }
+        
+        pdf.text(paragraph, margin, yPosition, { 
+          maxWidth, 
+          align: 'justify' 
+        });
+        
+        yPosition += textHeight + 5;
+      }
       
-      yPosition += commentHeight;
       pdf.setFont("helvetica", "normal");
     }
   }
