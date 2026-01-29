@@ -180,7 +180,8 @@ export async function generateExamPdf(
   const margin = 16;
   const headerHeight = 25;
   const contentStartY = headerHeight + 10;
-  const bottomSafeArea = 20;
+  // Margem de segurança global: 20mm do rodapé (BOTTOM_LIMIT)
+  const BOTTOM_LIMIT = pageHeight - 20;
   let yPosition = margin;
 
   const navyBlue = [26, 42, 82];
@@ -292,8 +293,16 @@ export async function generateExamPdf(
     if (profile?.telefone) pdf.text(profile.telefone, pageWidth - 15, 21, { align: "right" });
   };
 
-  const checkPageBreak = async (neededHeight: number) => {
-    if (yPosition + neededHeight > pageHeight - bottomSafeArea) {
+  /**
+   * printAutoPage: Função auxiliar robusta para escrita inteligente com paginação automática.
+   * SEMPRE verifica se há espaço suficiente antes de escrever qualquer conteúdo.
+   * Se não houver espaço, força nova página e reinicializa header.
+   * 
+   * @param neededHeight - altura estimada em mm do bloco a ser escrito
+   * @returns true se uma nova página foi criada
+   */
+  const printAutoPage = async (neededHeight: number): Promise<boolean> => {
+    if (yPosition + neededHeight > BOTTOM_LIMIT) {
       pdf.addPage();
       await addHeader();
       yPosition = contentStartY;
@@ -301,6 +310,9 @@ export async function generateExamPdf(
     }
     return false;
   };
+
+  // Alias para compatibilidade - checkPageBreak agora usa printAutoPage
+  const checkPageBreak = printAutoPage;
 
   const addSectionHeader = async (title: string, minContentHeight: number = 25) => {
     // Verifica se há espaço para o título + conteúdo mínimo (evita títulos órfãos)
@@ -952,44 +964,82 @@ export async function generateExamPdf(
   }
   yPosition += 5;
 
-  // Achados
+  // Achados Ecocardiográficos - Texto justificado
   if (achados) {
     await addSectionHeader("ACHADOS ECOCARDIOGRÁFICOS");
     pdf.setTextColor(60, 60, 60);
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    const lines = pdf.splitTextToSize(achados, pageWidth - 2 * margin);
-    for (const line of lines) {
-      await checkPageBreak(5);
-      pdf.text(line, margin, yPosition);
-      yPosition += 5;
+    
+    // Usa texto justificado com maxWidth para ocupar toda a largura da página
+    const maxTextWidth = pageWidth - 2 * margin;
+    const lines = pdf.splitTextToSize(achados, maxTextWidth);
+    
+    // Estima altura total do texto para verificação de página
+    const lineHeight = 4.5; // Line-height padrão para texto corrido
+    const totalTextHeight = lines.length * lineHeight;
+    
+    // Verifica se precisa de nova página antes de começar
+    await printAutoPage(Math.min(totalTextHeight, 30));
+    
+    // Imprime o texto justificado (jsPDF justify alinha nas duas margens)
+    pdf.text(lines.join('\n'), margin, yPosition, { 
+      align: 'justify',
+      maxWidth: maxTextWidth,
+      lineHeightFactor: 1.3
+    });
+    
+    yPosition += totalTextHeight + 3;
+    
+    // Verifica se passou do limite após escrever
+    if (yPosition > BOTTOM_LIMIT) {
+      await printAutoPage(5);
     }
-    yPosition += 3;
   }
 
-  // Impressão Diagnóstica
+  // Impressão Diagnóstica - Texto justificado
   if (conclusoes) {
     await addSectionHeader("IMPRESSÃO DIAGNÓSTICA");
     pdf.setTextColor(60, 60, 60);
     pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    const lines = pdf.splitTextToSize(conclusoes, pageWidth - 2 * margin);
-    for (const line of lines) {
-      await checkPageBreak(5);
-      pdf.text(line, margin, yPosition);
-      yPosition += 5;
+    
+    const maxTextWidth = pageWidth - 2 * margin;
+    const lines = pdf.splitTextToSize(conclusoes, maxTextWidth);
+    const lineHeight = 4.5;
+    const totalTextHeight = lines.length * lineHeight;
+    
+    await printAutoPage(Math.min(totalTextHeight, 30));
+    
+    pdf.text(lines.join('\n'), margin, yPosition, { 
+      align: 'justify',
+      maxWidth: maxTextWidth,
+      lineHeightFactor: 1.3
+    });
+    
+    yPosition += totalTextHeight + 3;
+    
+    // Verifica limite após escrever
+    if (yPosition > BOTTOM_LIMIT) {
+      await printAutoPage(5);
     }
     
-    // Comentários Adicionais (em negrito, sem rótulo)
+    // Comentários Adicionais (em negrito, justificado)
     if (comentariosAdicionais) {
-      yPosition += 6; // Espaçamento equivalente a ~2 quebras de linha / margin-top: 20px
+      yPosition += 6;
       pdf.setFont("helvetica", "bold");
-      const commentLines = pdf.splitTextToSize(comentariosAdicionais, pageWidth - 2 * margin);
-      for (const line of commentLines) {
-        await checkPageBreak(5);
-        pdf.text(line, margin, yPosition);
-        yPosition += 5;
-      }
+      const commentLines = pdf.splitTextToSize(comentariosAdicionais, maxTextWidth);
+      const commentHeight = commentLines.length * lineHeight;
+      
+      await printAutoPage(Math.min(commentHeight, 25));
+      
+      pdf.text(commentLines.join('\n'), margin, yPosition, { 
+        align: 'justify',
+        maxWidth: maxTextWidth,
+        lineHeightFactor: 1.3
+      });
+      
+      yPosition += commentHeight;
       pdf.setFont("helvetica", "normal");
     }
   }
