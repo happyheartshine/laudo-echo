@@ -216,14 +216,12 @@ export async function generateExamPdf(
       if (!e || isNaN(e)) return "-";
       const hasLivre = ePrimeLivre && !isNaN(ePrimeLivre);
       const hasSeptal = ePrimeSeptal && !isNaN(ePrimeSeptal);
+      // CORREÇÃO: Só calcula média se AMBOS os valores de E' estiverem preenchidos
       if (hasLivre && hasSeptal) {
         const mediaEPrime = (ePrimeLivre + ePrimeSeptal) / 2;
         return (e / mediaEPrime).toFixed(2);
-      } else if (hasLivre) {
-        return (e / ePrimeLivre).toFixed(2);
-      } else if (hasSeptal) {
-        return (e / ePrimeSeptal).toFixed(2);
       }
+      // Se faltar um deles, oculta a média (retorna "-")
       return "-";
     })(),
     fracaoEncurtamento: (() => {
@@ -678,18 +676,7 @@ export async function generateExamPdf(
       yPosition += 5;
     }
 
-    // Status da Função Sistólica
-    if (funcaoSistolica?.statusFuncao) {
-      yPosition += 2;
-      const statusText = funcaoSistolica.statusFuncao === 'normal' 
-        ? 'Função sistólica preservada' 
-        : funcaoSistolica.statusFuncao === 'disfuncao' 
-          ? `Disfunção sistólica${funcaoSistolica.tipoDisfuncao ? ` ${funcaoSistolica.tipoDisfuncao}` : ''}`
-          : funcaoSistolica.statusFuncao;
-      await addTableRow("Avaliação", statusText);
-    }
-
-    // Observações da Função Sistólica
+    // 1. Observações / Outros Índices (antes do status)
     if (observacoesSecoes?.funcaoSistolica?.trim()) {
       yPosition += 2;
       pdf.setFontSize(9);
@@ -701,6 +688,35 @@ export async function generateExamPdf(
         pdf.text(line, margin, yPosition);
         yPosition += 5;
       }
+    }
+
+    // 2. Status da Função Sistólica + Tipo de Disfunção (na mesma linha ou logo abaixo)
+    if (funcaoSistolica?.statusFuncao) {
+      yPosition += 2;
+      await checkPageBreak(6);
+      pdf.setFontSize(9);
+      pdf.setTextColor(normalGray[0], normalGray[1], normalGray[2]);
+      
+      // Monta texto do status
+      const statusLabel = funcaoSistolica.statusFuncao === 'normal' 
+        ? 'Função sistólica preservada' 
+        : funcaoSistolica.statusFuncao === 'disfuncao' 
+          ? 'Disfunção sistólica'
+          : funcaoSistolica.statusFuncao;
+      
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Avaliação: ", margin, yPosition);
+      const labelWidth = pdf.getTextWidth("Avaliação: ");
+      pdf.setFont("helvetica", "normal");
+      pdf.text(statusLabel, margin + labelWidth, yPosition);
+      
+      // 3. Tipo de Disfunção (imediatamente após, na mesma linha se couber)
+      if (funcaoSistolica?.tipoDisfuncao && funcaoSistolica.statusFuncao === 'disfuncao') {
+        const statusWidth = pdf.getTextWidth(statusLabel);
+        const separator = "  –  ";
+        pdf.text(separator + funcaoSistolica.tipoDisfuncao, margin + labelWidth + statusWidth, yPosition);
+      }
+      yPosition += 5;
     }
     yPosition += 3;
   }
@@ -762,7 +778,7 @@ export async function generateExamPdf(
         yPosition += 5;
       }
 
-      // TDI Parede Septal
+      // TDI Parede Septal (com Média E/e' à direita se ambos E' estiverem preenchidos)
       if (tdiSeptal?.s || tdiSeptal?.e || tdiSeptal?.a) {
         // Verifica espaço antes de Parede Septal (título 4mm + valores 5mm = ~9mm)
         await checkPageBreak(12);
@@ -782,16 +798,25 @@ export async function generateExamPdf(
           tdiSeptalValues.push(`E/e': ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`);
         }
         pdf.text(tdiSeptalValues.join("   |   "), margin + 2, yPosition);
+        
+        // Média E/e' posicionada à DIREITA (coluna invisível) - só se AMBOS os E' preenchidos
+        if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+          pdf.setFont("helvetica", "bold");
+          const rightColumnX = pageWidth - margin - 35; // Alinha à direita
+          pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, rightColumnX, yPosition);
+          pdf.setFont("helvetica", "normal");
+        }
         yPosition += 5;
-      }
-
-      // Média E/e'
-      if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
-        await checkPageBreak(7);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, margin, yPosition);
-        pdf.setFont("helvetica", "normal");
-        yPosition += 5;
+      } else {
+        // Se só tiver Parede Livre, mas tiver média (não vai acontecer com a nova lógica, mas por segurança)
+        if (calculatedValues.mediaEePrime && calculatedValues.mediaEePrime !== '-') {
+          await checkPageBreak(7);
+          pdf.setFont("helvetica", "bold");
+          const rightColumnX = pageWidth - margin - 35;
+          pdf.text(`Média E/e': ${formatNumber(calculatedValues.mediaEePrime)}`, rightColumnX, yPosition);
+          pdf.setFont("helvetica", "normal");
+          yPosition += 5;
+        }
       }
     }
 
