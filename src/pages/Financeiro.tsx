@@ -73,6 +73,9 @@ interface FinancialTransaction {
   status: string;
   partner_clinic_id: string | null;
   exam_id: string | null;
+  service_id: string | null;
+  patient_name: string | null;
+  owner_name: string | null;
   partner_clinics: PartnerClinic | null;
 }
 
@@ -164,6 +167,9 @@ export default function Financeiro() {
         status,
         partner_clinic_id,
         exam_id,
+        service_id,
+        patient_name,
+        owner_name,
         partner_clinics (
           id,
           nome,
@@ -191,6 +197,9 @@ export default function Financeiro() {
     date: string;
     status: string;
     partnerClinicId: string;
+    serviceId?: string;
+    patientName: string;
+    ownerName: string;
   }) => {
     if (!user) return;
 
@@ -202,6 +211,9 @@ export default function Financeiro() {
       transaction_date: data.date,
       amount: data.amount,
       status: data.status,
+      service_id: data.serviceId || null,
+      patient_name: data.patientName || null,
+      owner_name: data.ownerName || null,
     });
 
     if (error) {
@@ -743,7 +755,8 @@ export default function Financeiro() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Data</TableHead>
-                            <TableHead>Descrição</TableHead>
+                            <TableHead>Serviço</TableHead>
+                            <TableHead>Paciente / Tutor</TableHead>
                             {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
@@ -754,6 +767,14 @@ export default function Financeiro() {
                             <TableRow key={tx.id}>
                               <TableCell>{formatDate(tx.transaction_date)}</TableCell>
                               <TableCell className="font-medium">{tx.description}</TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{tx.patient_name || "-"}</span>
+                                  {tx.owner_name && (
+                                    <span className="text-xs text-muted-foreground">{tx.owner_name}</span>
+                                  )}
+                                </div>
+                              </TableCell>
                               {selectedClinicId === "all" && (
                                 <TableCell>
                                   <Badge variant="secondary">
