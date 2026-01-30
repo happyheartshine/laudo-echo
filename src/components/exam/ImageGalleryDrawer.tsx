@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, useDragControls, useMotionValue } from "framer-motion";
+import { motion, useDragControls, useMotionValue, PanInfo } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Images, X, ZoomIn, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +18,7 @@ interface ImageGalleryDrawerProps {
 
 const STORAGE_KEY = "imageGalleryPosition";
 const DEFAULT_MARGIN = 30;
+const CLICK_THRESHOLD = 3; // pixels - movement below this is considered a click
 
 type XY = { x: number; y: number };
 
@@ -51,7 +52,6 @@ function readSavedPosition(): XY | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !isFiniteNumber(parsed.x) || !isFiniteNumber(parsed.y)) return null;
-    // NOTE: further clamping happens after we know the widget size
     return { x: parsed.x, y: parsed.y };
   } catch {
     return null;
@@ -69,15 +69,15 @@ function savePosition(pos: XY) {
 export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDrawerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<number | null>(null);
-
-  // Hydration guard + initial placement (prevents flicker)
   const [isReady, setIsReady] = useState(false);
 
-  // The draggable container is rendered in a portal; constraints are the viewport.
+  // Track if drag exceeded threshold to distinguish click from drag
+  const dragStartPos = useRef<XY | null>(null);
+  const wasDragged = useRef(false);
+
   const constraintsRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<HTMLDivElement | null>(null);
 
-  // Using motion values avoids fighting between drag transforms and state.
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
@@ -88,7 +88,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     [images, selectedIndices],
   );
 
-  // Initial position: bottom-right FAB (and fallback if saved position invalid)
+  // Initial position: bottom-right FAB
   useLayoutEffect(() => {
     if (selectedImages.length === 0) return;
     if (!widgetRef.current) return;
@@ -120,6 +120,19 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     return () => window.removeEventListener("resize", onResize);
   }, [isReady, x, y]);
 
+  const handleDragStart = () => {
+    dragStartPos.current = { x: x.get(), y: y.get() };
+    wasDragged.current = false;
+  };
+
+  const handleDrag = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    // Check if movement exceeds threshold
+    const distance = Math.sqrt(info.offset.x ** 2 + info.offset.y ** 2);
+    if (distance > CLICK_THRESHOLD) {
+      wasDragged.current = true;
+    }
+  };
+
   const handleDragEnd = () => {
     if (!widgetRef.current) return;
     const rect = widgetRef.current.getBoundingClientRect();
@@ -129,25 +142,54 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     y.set(clamped.y);
     savePosition(clamped);
   };
-  
+
+  // Handle button click - only toggle if it was a clean click (not a drag)
+  const handleButtonClick = () => {
+    if (wasDragged.current) {
+      wasDragged.current = false;
+      return; // Was a drag, not a click
+    }
+    setIsExpanded(!isExpanded);
+  };
+
+  // Keyboard navigation in lightbox
+  useEffect(() => {
+    if (zoomedImage === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setZoomedImage((prev) => 
+          prev !== null ? (prev > 0 ? prev - 1 : selectedImages.length - 1) : null
+        );
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setZoomedImage((prev) => 
+          prev !== null ? (prev < selectedImages.length - 1 ? prev + 1 : 0) : null
+        );
+      } else if (e.key === "Escape") {
+        setZoomedImage(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [zoomedImage, selectedImages.length]);
+
+  const handlePrevImage = useCallback(() => {
+    if (zoomedImage === null) return;
+    setZoomedImage(zoomedImage > 0 ? zoomedImage - 1 : selectedImages.length - 1);
+  }, [zoomedImage, selectedImages.length]);
+
+  const handleNextImage = useCallback(() => {
+    if (zoomedImage === null) return;
+    setZoomedImage(zoomedImage < selectedImages.length - 1 ? zoomedImage + 1 : 0);
+  }, [zoomedImage, selectedImages.length]);
+
   // Don't render if no images
   if (selectedImages.length === 0) {
     return null;
   }
-
-  const handlePrevImage = () => {
-    if (zoomedImage === null) return;
-    setZoomedImage(zoomedImage > 0 ? zoomedImage - 1 : selectedImages.length - 1);
-  };
-
-  const handleNextImage = () => {
-    if (zoomedImage === null) return;
-    setZoomedImage(zoomedImage < selectedImages.length - 1 ? zoomedImage + 1 : 0);
-  };
-
-  const handleButtonClick = () => {
-    setIsExpanded(!isExpanded);
-  };
 
   // Render in a Portal to avoid being clipped by any parent overflow
   if (typeof document === "undefined") return null;
@@ -165,6 +207,8 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
         dragConstraints={constraintsRef}
         dragMomentum={false}
         dragElastic={0.25}
+        onDragStart={handleDragStart}
+        onDrag={handleDrag}
         onDragEnd={handleDragEnd}
         style={{
           position: "fixed",
@@ -252,12 +296,13 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
         )}
       </motion.div>
 
-      {/* Zoom Dialog */}
+      {/* Zoom Dialog / Lightbox */}
       <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-black/95">
           <button
             onClick={() => setZoomedImage(null)}
             className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+            aria-label="Fechar"
           >
             <X className="w-5 h-5" />
           </button>
@@ -266,15 +311,17 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
             <>
               <button
                 onClick={handlePrevImage}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                aria-label="Imagem anterior"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <ChevronLeft className="w-8 h-8" />
               </button>
               <button
                 onClick={handleNextImage}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-50 p-3 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                aria-label="Próxima imagem"
               >
-                <ChevronRight className="w-6 h-6" />
+                <ChevronRight className="w-8 h-8" />
               </button>
             </>
           )}
@@ -290,8 +337,9 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
           )}
 
           {zoomedImage !== null && selectedImages.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
-              {zoomedImage + 1} / {selectedImages.length}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm flex items-center gap-3">
+              <span className="text-muted-foreground text-xs">← →</span>
+              <span>{zoomedImage + 1} / {selectedImages.length}</span>
             </div>
           )}
         </DialogContent>
