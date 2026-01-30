@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadAllExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 import { BillingConfirmationModal } from "@/components/financial/BillingConfirmationModal";
+import { ImageGalleryDrawer } from "@/components/exam/ImageGalleryDrawer";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -1532,6 +1533,12 @@ if (content.patientData) {
         </div>
 
       </div>
+      
+      {/* Image Gallery Drawer - Floating Button */}
+      <ImageGalleryDrawer 
+        images={storedImages} 
+        selectedIndices={selectedImages}
+      />
       
       {/* Billing Confirmation Modal */}
       {pendingBillingData && (
