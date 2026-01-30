@@ -37,13 +37,16 @@ import {
   Download,
   X,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { ManualTransactionModal } from "@/components/financial/ManualTransactionModal";
 
 interface PartnerClinic {
   id: string;
@@ -62,6 +65,17 @@ interface ExamRecord {
   partner_clinics: PartnerClinic | null;
 }
 
+interface FinancialTransaction {
+  id: string;
+  description: string;
+  transaction_date: string;
+  amount: number;
+  status: string;
+  partner_clinic_id: string | null;
+  exam_id: string | null;
+  partner_clinics: PartnerClinic | null;
+}
+
 interface ClinicSummary {
   id: string;
   nome: string;
@@ -74,9 +88,11 @@ interface ClinicSummary {
 
 export default function Financeiro() {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { toast } = useToast();
   
   const [allExams, setAllExams] = useState<ExamRecord[]>([]);
+  const [manualTransactions, setManualTransactions] = useState<FinancialTransaction[]>([]);
   const [partnerClinics, setPartnerClinics] = useState<PartnerClinic[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,6 +101,9 @@ export default function Financeiro() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(endOfMonth(new Date()));
   const [showReport, setShowReport] = useState(false);
+
+  // Manual transaction modal
+  const [showManualModal, setShowManualModal] = useState(false);
 
   // Sharing states
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
@@ -134,7 +153,72 @@ export default function Financeiro() {
       setAllExams((examsData || []) as unknown as ExamRecord[]);
     }
 
+    // Fetch manual transactions (without exam_id linked)
+    const { data: transactionsData, error: transactionsError } = await supabase
+      .from("financial_transactions")
+      .select(`
+        id,
+        description,
+        transaction_date,
+        amount,
+        status,
+        partner_clinic_id,
+        exam_id,
+        partner_clinics (
+          id,
+          nome,
+          telefone,
+          email,
+          logo_url
+        )
+      `)
+      .is("exam_id", null)
+      .order("transaction_date", { ascending: false });
+
+    if (transactionsError) {
+      console.error("Error fetching transactions:", transactionsError);
+    } else {
+      setManualTransactions((transactionsData || []) as unknown as FinancialTransaction[]);
+    }
+
     setLoading(false);
+  };
+
+  // Handle manual transaction save
+  const handleManualTransactionSave = async (data: {
+    description: string;
+    amount: number;
+    date: string;
+    status: string;
+    partnerClinicId: string;
+  }) => {
+    if (!user) return;
+
+    const { error } = await supabase.from("financial_transactions").insert({
+      user_id: user.id,
+      clinic_id: profile?.clinic_id || null,
+      partner_clinic_id: data.partnerClinicId,
+      description: data.description,
+      transaction_date: data.date,
+      amount: data.amount,
+      status: data.status,
+    });
+
+    if (error) {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o lançamento.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+
+    toast({
+      title: "Lançamento registrado!",
+      description: "O lançamento manual foi salvo com sucesso.",
+    });
+
+    fetchData(); // Refresh data
   };
 
   // Filter exams based on selected filters
@@ -157,10 +241,31 @@ export default function Financeiro() {
     });
   }, [allExams, selectedClinicId, dateFrom, dateTo]);
 
-  // Calculate summary by clinic
+  // Filter manual transactions based on selected filters
+  const filteredManualTransactions = useMemo(() => {
+    return manualTransactions.filter((tx) => {
+      // Filter by clinic
+      if (selectedClinicId !== "all" && tx.partner_clinic_id !== selectedClinicId) {
+        return false;
+      }
+
+      // Filter by date range
+      if (dateFrom && tx.transaction_date < format(dateFrom, "yyyy-MM-dd")) {
+        return false;
+      }
+      if (dateTo && tx.transaction_date > format(dateTo, "yyyy-MM-dd")) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [manualTransactions, selectedClinicId, dateFrom, dateTo]);
+
+  // Calculate summary by clinic (exams + manual transactions)
   const clinicsSummary = useMemo(() => {
     const clinicMap = new Map<string, ClinicSummary>();
 
+    // Add exams
     filteredExams.forEach((exam) => {
       if (!exam.partner_clinic_id || !exam.partner_clinics) return;
 
@@ -184,12 +289,36 @@ export default function Financeiro() {
       clinic.total_devido += price;
     });
 
+    // Add manual transactions
+    filteredManualTransactions.forEach((tx) => {
+      if (!tx.partner_clinic_id || !tx.partner_clinics) return;
+
+      const clinicId = tx.partner_clinic_id;
+      const amount = Number(tx.amount) || 0;
+
+      if (!clinicMap.has(clinicId)) {
+        clinicMap.set(clinicId, {
+          id: clinicId,
+          nome: tx.partner_clinics.nome,
+          telefone: tx.partner_clinics.telefone,
+          email: tx.partner_clinics.email,
+          logo_url: tx.partner_clinics.logo_url,
+          total_exames: 0,
+          total_devido: 0,
+        });
+      }
+
+      const clinic = clinicMap.get(clinicId)!;
+      clinic.total_devido += amount;
+    });
+
     return Array.from(clinicMap.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [filteredExams]);
+  }, [filteredExams, filteredManualTransactions]);
 
   // Calculate totals
   const totalAReceber = useMemo(() => {
-    return clinicsSummary.reduce((acc, c) => acc + c.total_devido, 0);
+    const examTotal = clinicsSummary.reduce((acc, c) => acc + c.total_devido, 0);
+    return examTotal;
   }, [clinicsSummary]);
 
   const totalExames = useMemo(() => {
@@ -525,7 +654,11 @@ export default function Financeiro() {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={() => setShowReport(true)}>
+              <Button onClick={() => setShowManualModal(true)} variant="default">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Lançamento
+              </Button>
+              <Button onClick={() => setShowReport(true)} variant="outline">
                 <FileText className="w-4 h-4 mr-2" />
                 Gerar Extrato
               </Button>
@@ -567,34 +700,89 @@ export default function Financeiro() {
                 </div>
               ) : (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Paciente</TableHead>
-                        {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
-                        <TableHead className="text-right">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredExams.map((exam) => (
-                        <TableRow key={exam.id}>
-                          <TableCell>{formatDate(exam.exam_date)}</TableCell>
-                          <TableCell className="font-medium">{exam.patient_name}</TableCell>
-                          {selectedClinicId === "all" && (
-                            <TableCell>
-                              <Badge variant="secondary">
-                                {exam.partner_clinics?.nome}
-                              </Badge>
-                            </TableCell>
-                          )}
-                          <TableCell className="text-right">
-                            {formatCurrency(Number(exam.exam_price) || 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  {/* Exams Table */}
+                  {filteredExams.length > 0 && (
+                    <>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Exames</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Paciente</TableHead>
+                            {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
+                            <TableHead className="text-right">Valor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredExams.map((exam) => (
+                            <TableRow key={exam.id}>
+                              <TableCell>{formatDate(exam.exam_date)}</TableCell>
+                              <TableCell className="font-medium">{exam.patient_name}</TableCell>
+                              {selectedClinicId === "all" && (
+                                <TableCell>
+                                  <Badge variant="secondary">
+                                    {exam.partner_clinics?.nome}
+                                  </Badge>
+                                </TableCell>
+                              )}
+                              <TableCell className="text-right">
+                                {formatCurrency(Number(exam.exam_price) || 0)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </>
+                  )}
+
+                  {/* Manual Transactions Table */}
+                  {filteredManualTransactions.length > 0 && (
+                    <>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Outros Lançamentos</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredManualTransactions.map((tx) => (
+                            <TableRow key={tx.id}>
+                              <TableCell>{formatDate(tx.transaction_date)}</TableCell>
+                              <TableCell className="font-medium">{tx.description}</TableCell>
+                              {selectedClinicId === "all" && (
+                                <TableCell>
+                                  <Badge variant="secondary">
+                                    {tx.partner_clinics?.nome}
+                                  </Badge>
+                                </TableCell>
+                              )}
+                              <TableCell>
+                                <Badge 
+                                  variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "destructive" : "outline"}
+                                >
+                                  {tx.status === "a_receber" ? "A Receber" : tx.status === "pago" ? "Pago" : "Cancelado"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {formatCurrency(Number(tx.amount) || 0)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </>
+                  )}
+
+                  {filteredExams.length === 0 && filteredManualTransactions.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhum registro encontrado no período selecionado.
+                    </div>
+                  )}
 
                   {/* Totals */}
                   <div className="mt-6 p-4 bg-muted/50 rounded-lg">
@@ -602,6 +790,11 @@ export default function Financeiro() {
                       <div>
                         <p className="text-sm text-muted-foreground">Total de Exames</p>
                         <p className="text-xl font-bold">{totalExames}</p>
+                        {filteredManualTransactions.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            + {filteredManualTransactions.length} lançamento(s) manual(is)
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Valor Total</p>
@@ -733,12 +926,22 @@ export default function Financeiro() {
           <p className="font-medium mb-1">💡 Como funciona</p>
           <p>
             Os valores são calculados automaticamente com base nos exames cadastrados
-            e seus respectivos preços. Para definir preços por serviço, acesse a página
+            e seus respectivos preços. Use o botão "Novo Lançamento" para registrar serviços 
+            avulsos. Para definir preços por serviço, acesse a página
             de <a href="/parceiros" className="text-primary underline">Parceiros</a> e
             configure a Tabela de Preços de cada clínica.
           </p>
         </div>
       </div>
+
+      {/* Manual Transaction Modal */}
+      <ManualTransactionModal
+        open={showManualModal}
+        onOpenChange={setShowManualModal}
+        partnerClinics={partnerClinics}
+        selectedClinicId={selectedClinicId !== "all" ? selectedClinicId : undefined}
+        onSave={handleManualTransactionSave}
+      />
     </Layout>
   );
 }
