@@ -15,27 +15,48 @@ interface ImageGalleryDrawerProps {
   selectedIndices: number[];
 }
 
+// Safe default position
+const DEFAULT_POSITION = { x: 20, y: 150 };
+
+// Validate position is within viewport
+const validatePosition = (pos: { x: number; y: number }): { x: number; y: number } => {
+  if (
+    typeof pos.x !== "number" ||
+    typeof pos.y !== "number" ||
+    isNaN(pos.x) ||
+    isNaN(pos.y) ||
+    pos.x < 0 ||
+    pos.y < 80 ||
+    pos.x > window.innerWidth - 100 ||
+    pos.y > window.innerHeight - 100
+  ) {
+    return DEFAULT_POSITION;
+  }
+  return pos;
+};
+
 export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDrawerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<number | null>(null);
-  const [position, setPosition] = useState({ x: 20, y: 200 });
-  const constraintsRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState(DEFAULT_POSITION);
+  const [isReady, setIsReady] = useState(false);
   const dragControls = useDragControls();
   
   // Get only selected images
   const selectedImages = images.filter((_, index) => selectedIndices.includes(index));
   
-  // Save position to localStorage
+  // Load position from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem("imageGalleryPosition");
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem("imageGalleryPosition");
+      if (saved) {
         const parsed = JSON.parse(saved);
-        setPosition(parsed);
-      } catch {
-        // ignore
+        setPosition(validatePosition(parsed));
       }
+    } catch {
+      setPosition(DEFAULT_POSITION);
     }
+    setIsReady(true);
   }, []);
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -44,15 +65,22 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
       y: position.y + info.offset.y,
     };
     
-    // Clamp to viewport
-    const clampedX = Math.max(0, Math.min(window.innerWidth - 300, newPos.x));
+    // Clamp to viewport with safe margins
+    const clampedX = Math.max(10, Math.min(window.innerWidth - 320, newPos.x));
     const clampedY = Math.max(80, Math.min(window.innerHeight - 100, newPos.y));
     
-    setPosition({ x: clampedX, y: clampedY });
-    localStorage.setItem("imageGalleryPosition", JSON.stringify({ x: clampedX, y: clampedY }));
+    const finalPos = { x: clampedX, y: clampedY };
+    setPosition(finalPos);
+    
+    try {
+      localStorage.setItem("imageGalleryPosition", JSON.stringify(finalPos));
+    } catch {
+      // Ignore storage errors
+    }
   };
   
-  if (selectedImages.length === 0) {
+  // Don't render if no images or not ready
+  if (selectedImages.length === 0 || !isReady) {
     return null;
   }
 
@@ -72,24 +100,21 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
 
   return (
     <>
-      {/* Invisible constraints container */}
-      <div 
-        ref={constraintsRef} 
-        className="fixed inset-0 pointer-events-none z-40"
-        style={{ top: 64 }} // Below header
-      />
-      
-      {/* Draggable floating widget */}
+      {/* Draggable floating widget - FIXED position with high z-index */}
       <motion.div
         drag
         dragControls={dragControls}
         dragMomentum={false}
         dragElastic={0.1}
         onDragEnd={handleDragEnd}
-        initial={{ x: position.x, y: position.y }}
-        animate={{ x: position.x, y: position.y }}
-        className="fixed z-50 select-none"
-        style={{ touchAction: "none" }}
+        style={{ 
+          position: "fixed",
+          left: position.x,
+          top: position.y,
+          zIndex: 9999,
+          touchAction: "none",
+        }}
+        className="select-none"
       >
         {/* Collapsed state - just the button */}
         {!isExpanded && (
