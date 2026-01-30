@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { useState, useRef, useEffect } from "react";
+import { motion, useDragControls, PanInfo } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Images, X, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
+import { Images, X, ZoomIn, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface StoredImageData {
@@ -17,11 +16,41 @@ interface ImageGalleryDrawerProps {
 }
 
 export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDrawerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<number | null>(null);
+  const [position, setPosition] = useState({ x: 20, y: 200 });
+  const constraintsRef = useRef<HTMLDivElement>(null);
+  const dragControls = useDragControls();
   
   // Get only selected images
   const selectedImages = images.filter((_, index) => selectedIndices.includes(index));
+  
+  // Save position to localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("imageGalleryPosition");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setPosition(parsed);
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const newPos = {
+      x: position.x + info.offset.x,
+      y: position.y + info.offset.y,
+    };
+    
+    // Clamp to viewport
+    const clampedX = Math.max(0, Math.min(window.innerWidth - 300, newPos.x));
+    const clampedY = Math.max(80, Math.min(window.innerHeight - 100, newPos.y));
+    
+    setPosition({ x: clampedX, y: clampedY });
+    localStorage.setItem("imageGalleryPosition", JSON.stringify({ x: clampedX, y: clampedY }));
+  };
   
   if (selectedImages.length === 0) {
     return null;
@@ -37,62 +66,105 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     setZoomedImage(zoomedImage < selectedImages.length - 1 ? zoomedImage + 1 : 0);
   };
 
+  const handleButtonClick = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="fixed right-6 bottom-24 z-40 shadow-lg bg-background hover:bg-accent gap-2"
+      {/* Invisible constraints container */}
+      <div 
+        ref={constraintsRef} 
+        className="fixed inset-0 pointer-events-none z-40"
+        style={{ top: 64 }} // Below header
+      />
+      
+      {/* Draggable floating widget */}
+      <motion.div
+        drag
+        dragControls={dragControls}
+        dragMomentum={false}
+        dragElastic={0.1}
+        onDragEnd={handleDragEnd}
+        initial={{ x: position.x, y: position.y }}
+        animate={{ x: position.x, y: position.y }}
+        className="fixed z-50 select-none"
+        style={{ touchAction: "none" }}
+      >
+        {/* Collapsed state - just the button */}
+        {!isExpanded && (
+          <motion.button
+            onClick={handleButtonClick}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-background border border-border hover:bg-accent transition-colors cursor-grab active:cursor-grabbing"
           >
-            <Images className="w-4 h-4" />
-            <span className="hidden sm:inline">Ver Imagens</span>
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+            <Images className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Imagens</span>
             <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-primary text-primary-foreground">
               {selectedImages.length}
             </span>
-          </Button>
-        </SheetTrigger>
-        
-        <SheetContent 
-          side="right" 
-          className="w-[350px] sm:w-[400px] p-0"
-        >
-          <SheetHeader className="p-4 border-b">
-            <SheetTitle className="flex items-center gap-2">
-              <Images className="w-5 h-5 text-primary" />
-              Galeria de Imagens
-              <span className="text-sm font-normal text-muted-foreground">
-                ({selectedImages.length} selecionada{selectedImages.length > 1 ? "s" : ""})
-              </span>
-            </SheetTitle>
-          </SheetHeader>
-          
-          <ScrollArea className="h-[calc(100vh-80px)]">
-            <div className="p-4 grid grid-cols-2 gap-3">
-              {selectedImages.map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setZoomedImage(index)}
-                  className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                >
-                  <img
-                    src={image.dataUrl}
-                    alt={image.name || `Imagem ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                  <span className="absolute bottom-1 left-1 text-xs bg-black/60 text-white px-1.5 py-0.5 rounded">
-                    {index + 1}
-                  </span>
-                </button>
-              ))}
+          </motion.button>
+        )}
+
+        {/* Expanded state - gallery panel */}
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="bg-background border border-border rounded-lg shadow-xl overflow-hidden"
+            style={{ width: 280 }}
+          >
+            {/* Header - draggable area */}
+            <div 
+              className="flex items-center justify-between p-3 border-b bg-muted/50 cursor-grab active:cursor-grabbing"
+              onPointerDown={(e) => dragControls.start(e)}
+            >
+              <div className="flex items-center gap-2">
+                <GripVertical className="w-4 h-4 text-muted-foreground" />
+                <Images className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">Galeria</span>
+                <span className="text-xs text-muted-foreground">
+                  ({selectedImages.length})
+                </span>
+              </div>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-1 rounded hover:bg-accent transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
+            
+            {/* Thumbnails grid */}
+            <ScrollArea className="h-[300px]">
+              <div className="p-2 grid grid-cols-2 gap-2">
+                {selectedImages.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setZoomedImage(index)}
+                    className="group relative aspect-square rounded-md overflow-hidden border border-border bg-muted hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <img
+                      src={image.dataUrl}
+                      alt={image.name || `Imagem ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                      <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">
+                      {index + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </motion.div>
+        )}
+      </motion.div>
 
       {/* Zoom Dialog */}
       <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
