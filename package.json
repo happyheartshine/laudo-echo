@@ -50,6 +50,7 @@
     "dicom-parser": "^1.8.21",
     "dwv": "^0.33.0",
     "embla-carousel-react": "^8.6.0",
+    "framer-motion": "^12.29.2",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
