@@ -192,7 +192,10 @@ export type Database = {
           description: string
           exam_id: string | null
           id: string
+          owner_name: string | null
           partner_clinic_id: string | null
+          patient_name: string | null
+          service_id: string | null
           status: string
           transaction_date: string
           updated_at: string
@@ -205,7 +208,10 @@ export type Database = {
           description: string
           exam_id?: string | null
           id?: string
+          owner_name?: string | null
           partner_clinic_id?: string | null
+          patient_name?: string | null
+          service_id?: string | null
           status?: string
           transaction_date?: string
           updated_at?: string
@@ -218,7 +224,10 @@ export type Database = {
           description?: string
           exam_id?: string | null
           id?: string
+          owner_name?: string | null
           partner_clinic_id?: string | null
+          patient_name?: string | null
+          service_id?: string | null
           status?: string
           transaction_date?: string
           updated_at?: string
@@ -244,6 +253,13 @@ export type Database = {
             columns: ["partner_clinic_id"]
             isOneToOne: false
             referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "clinic_services"
             referencedColumns: ["id"]
           },
         ]

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +18,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 
 interface PartnerClinic {
   id: string;
   nome: string;
+}
+
+interface ClinicService {
+  id: string;
+  service_name: string;
+  price: number;
 }
 
 interface ManualTransactionModalProps {
@@ -35,6 +43,9 @@ interface ManualTransactionModalProps {
     date: string;
     status: string;
     partnerClinicId: string;
+    serviceId?: string;
+    patientName: string;
+    ownerName: string;
   }) => Promise<void>;
 }
 
@@ -45,58 +56,127 @@ export function ManualTransactionModal({
   selectedClinicId,
   onSave,
 }: ManualTransactionModalProps) {
-  const [description, setDescription] = useState("");
+  const [clinicId, setClinicId] = useState(selectedClinicId || "");
+  const [services, setServices] = useState<ClinicService[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [customDescription, setCustomDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [status, setStatus] = useState("a_receber");
-  const [clinicId, setClinicId] = useState(selectedClinicId || "");
+  const [patientName, setPatientName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [loadingServices, setLoadingServices] = useState(false);
 
-  const resetForm = () => {
-    setDescription("");
-    setAmount("");
-    setDate(new Date().toISOString().split("T")[0]);
-    setStatus("a_receber");
-    setClinicId(selectedClinicId || "");
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      setClinicId(selectedClinicId || "");
+      setSelectedServiceId("");
+      setCustomDescription("");
+      setAmount("");
+      setDate(new Date().toISOString().split("T")[0]);
+      setStatus("a_receber");
+      setPatientName("");
+      setOwnerName("");
+      setServices([]);
+    }
+  }, [open, selectedClinicId]);
+
+  // Fetch services when clinic changes
+  useEffect(() => {
+    if (clinicId) {
+      fetchServicesForClinic(clinicId);
+    } else {
+      setServices([]);
+      setSelectedServiceId("");
+    }
+  }, [clinicId]);
+
+  const fetchServicesForClinic = async (partnerClinicId: string) => {
+    setLoadingServices(true);
+    const { data, error } = await supabase
+      .from("clinic_services")
+      .select("id, service_name, price")
+      .eq("partner_clinic_id", partnerClinicId)
+      .order("service_name");
+
+    if (error) {
+      console.error("Error fetching services:", error);
+    } else {
+      setServices(data || []);
+    }
+    setLoadingServices(false);
+  };
+
+  // Auto-fill price when service is selected
+  const handleServiceChange = (serviceId: string) => {
+    setSelectedServiceId(serviceId);
+    
+    if (serviceId === "other") {
+      // Custom service, clear amount for manual input
+      setAmount("");
+      setCustomDescription("");
+    } else {
+      const service = services.find((s) => s.id === serviceId);
+      if (service) {
+        setAmount(formatDecimalForDisplay(service.price.toString()));
+        setCustomDescription("");
+      }
+    }
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9,\.]/g, "");
-    setAmount(value);
+    setAmount(sanitizeDecimalInput(e.target.value));
   };
 
   const handleSubmit = async () => {
-    if (!description.trim() || !clinicId) return;
+    if (!clinicId || !patientName.trim()) return;
 
     setIsSaving(true);
     try {
-      const parsedAmount = parseFloat(amount.replace(",", ".")) || 0;
+      const parsedAmount = parseDecimal(amount) || 0;
+      
+      // Determine description
+      let description = "";
+      if (selectedServiceId === "other") {
+        description = customDescription.trim() || "Serviço Avulso";
+      } else if (selectedServiceId) {
+        const service = services.find((s) => s.id === selectedServiceId);
+        description = service?.service_name || "Serviço";
+      } else {
+        description = customDescription.trim() || "Serviço Avulso";
+      }
+
       await onSave({
-        description: description.trim(),
+        description,
         amount: parsedAmount,
         date,
         status,
         partnerClinicId: clinicId,
+        serviceId: selectedServiceId && selectedServiceId !== "other" ? selectedServiceId : undefined,
+        patientName: patientName.trim(),
+        ownerName: ownerName.trim(),
       });
-      resetForm();
       onOpenChange(false);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const canSubmit = description.trim() && clinicId;
+  const canSubmit = clinicId && patientName.trim();
+  const showCustomDescription = selectedServiceId === "other" || !selectedServiceId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="w-5 h-5 text-primary" />
             Novo Lançamento Manual
           </DialogTitle>
           <DialogDescription>
-            Registre um serviço avulso que não está vinculado a um laudo
+            Registre um serviço avulso vinculado a um paciente e clínica parceira
           </DialogDescription>
         </DialogHeader>
 
@@ -118,14 +198,67 @@ export function ManualTransactionModal({
             </Select>
           </div>
 
-          {/* Description */}
+          {/* Service Type - Only show if clinic is selected */}
+          {clinicId && (
+            <div className="space-y-2">
+              <Label htmlFor="service">Tipo de Serviço</Label>
+              <Select 
+                value={selectedServiceId} 
+                onValueChange={handleServiceChange}
+                disabled={loadingServices}
+              >
+                <SelectTrigger id="service">
+                  <SelectValue placeholder={loadingServices ? "Carregando..." : "Selecione o serviço"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map((service) => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.service_name} - R$ {service.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="other">Outro (especificar)</SelectItem>
+                </SelectContent>
+              </Select>
+              {services.length === 0 && !loadingServices && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum serviço cadastrado. Cadastre na aba Parceiros → Tabela de Preços.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Custom Description - Show when "other" or no service selected */}
+          {showCustomDescription && (
+            <div className="space-y-2">
+              <Label htmlFor="description">Descrição do Serviço</Label>
+              <Input
+                id="description"
+                value={customDescription}
+                onChange={(e) => setCustomDescription(e.target.value)}
+                placeholder="Ex: Consultoria, Exame Extra, Revisão..."
+              />
+            </div>
+          )}
+
+          {/* Patient Name */}
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição do Serviço *</Label>
+            <Label htmlFor="patient">Nome do Paciente *</Label>
             <Input
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Consultoria, Exame Extra, Revisão..."
+              id="patient"
+              value={patientName}
+              onChange={(e) => setPatientName(e.target.value)}
+              placeholder="Nome do animal"
+            />
+          </div>
+
+          {/* Owner Name */}
+          <div className="space-y-2">
+            <Label htmlFor="owner">Nome do Responsável (Tutor)</Label>
+            <Input
+              id="owner"
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              placeholder="Nome do tutor/proprietário"
             />
           </div>
 
@@ -139,7 +272,7 @@ export function ManualTransactionModal({
               <Input
                 id="amount"
                 type="text"
-                value={amount}
+                value={formatDecimalForDisplay(amount)}
                 onChange={handleAmountChange}
                 className="pl-10"
                 placeholder="0,00"
