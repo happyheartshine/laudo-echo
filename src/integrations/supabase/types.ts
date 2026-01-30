@@ -184,6 +184,70 @@ export type Database = {
           },
         ]
       }
+      financial_transactions: {
+        Row: {
+          amount: number
+          clinic_id: string | null
+          created_at: string
+          description: string
+          exam_id: string | null
+          id: string
+          partner_clinic_id: string | null
+          status: string
+          transaction_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          clinic_id?: string | null
+          created_at?: string
+          description: string
+          exam_id?: string | null
+          id?: string
+          partner_clinic_id?: string | null
+          status?: string
+          transaction_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          clinic_id?: string | null
+          created_at?: string
+          description?: string
+          exam_id?: string | null
+          id?: string
+          partner_clinic_id?: string | null
+          status?: string
+          transaction_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_transactions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_exam_id_fkey"
+            columns: ["exam_id"]
+            isOneToOne: false
+            referencedRelation: "exams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_partner_clinic_id_fkey"
+            columns: ["partner_clinic_id"]
+            isOneToOne: false
+            referencedRelation: "partner_clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_clinics: {
         Row: {
           clinic_id: string | null

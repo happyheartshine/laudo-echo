@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadAllExamImages, imageUrlToBase64, StoredImageData } from "@/lib/examImageUpload";
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
+import { BillingConfirmationModal } from "@/components/financial/BillingConfirmationModal";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -46,6 +47,15 @@ export default function DadosExame() {
   const [isLoading, setIsLoading] = useState(false);
   // Track current exam ID to avoid duplicates (INSERT once, then UPDATE)
   const [currentExamId, setCurrentExamId] = useState<string | null>(examId || null);
+  
+  // Billing confirmation modal state
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const [pendingBillingData, setPendingBillingData] = useState<{
+    examId: string;
+    clinicName: string;
+    clinicId: string;
+    suggestedAmount: number;
+  } | null>(null);
 
 const [patientData, setPatientData] = useState<PatientData>({
     nome: "",
@@ -628,7 +638,77 @@ if (content.patientData) {
     const activeEl = document.activeElement as HTMLElement | null;
     activeEl?.blur();
     await new Promise((resolve) => setTimeout(resolve, 50));
-    await saveExam();
+    
+    const success = await saveExam();
+    
+    // Se salvou com sucesso e tem parceiro vinculado, mostra modal de confirmação de lançamento
+    if (success && examInfo.partnerClinicId && currentExamId) {
+      const selectedClinic = partnerClinics.find(c => c.id === examInfo.partnerClinicId);
+      
+      // Buscar preço sugerido do serviço padrão
+      const { data: defaultService } = await supabase
+        .from("clinic_services")
+        .select("price")
+        .eq("partner_clinic_id", examInfo.partnerClinicId)
+        .eq("is_default", true)
+        .maybeSingle();
+      
+      const suggestedAmount = defaultService?.price || 0;
+      
+      setPendingBillingData({
+        examId: currentExamId,
+        clinicName: selectedClinic?.nome || "Clínica Parceira",
+        clinicId: examInfo.partnerClinicId,
+        suggestedAmount: Number(suggestedAmount),
+      });
+      setShowBillingModal(true);
+    }
+  };
+
+  // Callback para confirmar lançamento financeiro
+  const handleBillingConfirm = async (amount: number) => {
+    if (!pendingBillingData || !user) return;
+    
+    try {
+      // Atualiza o exam_price no exame
+      await supabase
+        .from("exams")
+        .update({ exam_price: amount })
+        .eq("id", pendingBillingData.examId);
+      
+      // Cria transação financeira vinculada ao exame
+      await supabase.from("financial_transactions").insert({
+        user_id: user.id,
+        clinic_id: profile?.clinic_id || null,
+        partner_clinic_id: pendingBillingData.clinicId,
+        exam_id: pendingBillingData.examId,
+        description: `Exame Ecocardiográfico - ${patientData.nome}`,
+        transaction_date: examInfo.data || new Date().toISOString().split("T")[0],
+        amount: amount,
+        status: "a_receber",
+      });
+      
+      toast({
+        title: "Lançamento registrado!",
+        description: `Cobrança de R$ ${amount.toFixed(2).replace(".", ",")} registrada para ${pendingBillingData.clinicName}`,
+      });
+    } catch (error) {
+      console.error("Erro ao registrar lançamento:", error);
+      toast({
+        title: "Erro ao registrar",
+        description: "Não foi possível registrar o lançamento financeiro.",
+        variant: "destructive",
+      });
+    } finally {
+      setShowBillingModal(false);
+      setPendingBillingData(null);
+    }
+  };
+
+  // Callback para pular lançamento
+  const handleBillingSkip = () => {
+    setShowBillingModal(false);
+    setPendingBillingData(null);
   };
 
   // Função unificada de geração de PDF - usa o mesmo gerador do Histórico
@@ -1452,6 +1532,18 @@ if (content.patientData) {
         </div>
 
       </div>
+      
+      {/* Billing Confirmation Modal */}
+      {pendingBillingData && (
+        <BillingConfirmationModal
+          open={showBillingModal}
+          onOpenChange={setShowBillingModal}
+          partnerClinicName={pendingBillingData.clinicName}
+          suggestedAmount={pendingBillingData.suggestedAmount}
+          onConfirm={handleBillingConfirm}
+          onSkip={handleBillingSkip}
+        />
+      )}
     </Layout>
   );
 }
