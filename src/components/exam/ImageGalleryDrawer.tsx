@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import { motion, useDragControls, PanInfo } from "framer-motion";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion, useDragControls, useMotionValue } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Images, X, ZoomIn, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,72 +16,122 @@ interface ImageGalleryDrawerProps {
   selectedIndices: number[];
 }
 
-// Safe default position
-const DEFAULT_POSITION = { x: 20, y: 150 };
+const STORAGE_KEY = "imageGalleryPosition";
+const DEFAULT_MARGIN = 30;
 
-// Validate position is within viewport
-const validatePosition = (pos: { x: number; y: number }): { x: number; y: number } => {
-  if (
-    typeof pos.x !== "number" ||
-    typeof pos.y !== "number" ||
-    isNaN(pos.x) ||
-    isNaN(pos.y) ||
-    pos.x < 0 ||
-    pos.y < 80 ||
-    pos.x > window.innerWidth - 100 ||
-    pos.y > window.innerHeight - 100
-  ) {
-    return DEFAULT_POSITION;
+type XY = { x: number; y: number };
+
+const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+function clampToViewport(pos: XY, size: { width: number; height: number }, margin = 10): XY {
+  const maxX = Math.max(margin, window.innerWidth - size.width - margin);
+  const maxY = Math.max(margin, window.innerHeight - size.height - margin);
+  return {
+    x: clamp(pos.x, margin, maxX),
+    y: clamp(pos.y, margin, maxY),
+  };
+}
+
+function getDefaultFabPosition(size: { width: number; height: number }): XY {
+  return clampToViewport(
+    {
+      x: window.innerWidth - size.width - DEFAULT_MARGIN,
+      y: window.innerHeight - size.height - DEFAULT_MARGIN,
+    },
+    size,
+    10,
+  );
+}
+
+function readSavedPosition(): XY | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !isFiniteNumber(parsed.x) || !isFiniteNumber(parsed.y)) return null;
+    // NOTE: further clamping happens after we know the widget size
+    return { x: parsed.x, y: parsed.y };
+  } catch {
+    return null;
   }
-  return pos;
-};
+}
+
+function savePosition(pos: XY) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
+  } catch {
+    // ignore
+  }
+}
 
 export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDrawerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<number | null>(null);
-  const [position, setPosition] = useState(DEFAULT_POSITION);
-  const [isReady, setIsReady] = useState(false);
-  const dragControls = useDragControls();
-  
-  // Get only selected images
-  const selectedImages = images.filter((_, index) => selectedIndices.includes(index));
-  
-  // Load position from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("imageGalleryPosition");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setPosition(validatePosition(parsed));
-      }
-    } catch {
-      setPosition(DEFAULT_POSITION);
-    }
-    setIsReady(true);
-  }, []);
 
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const newPos = {
-      x: position.x + info.offset.x,
-      y: position.y + info.offset.y,
+  // Hydration guard + initial placement (prevents flicker)
+  const [isReady, setIsReady] = useState(false);
+
+  // The draggable container is rendered in a portal; constraints are the viewport.
+  const constraintsRef = useRef<HTMLDivElement | null>(null);
+  const widgetRef = useRef<HTMLDivElement | null>(null);
+
+  // Using motion values avoids fighting between drag transforms and state.
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const dragControls = useDragControls();
+
+  const selectedImages = useMemo(
+    () => images.filter((_, index) => selectedIndices.includes(index)),
+    [images, selectedIndices],
+  );
+
+  // Initial position: bottom-right FAB (and fallback if saved position invalid)
+  useLayoutEffect(() => {
+    if (selectedImages.length === 0) return;
+    if (!widgetRef.current) return;
+
+    const rect = widgetRef.current.getBoundingClientRect();
+    const size = { width: rect.width || 160, height: rect.height || 44 };
+
+    const saved = readSavedPosition();
+    const initial = saved ? clampToViewport(saved, size, 10) : getDefaultFabPosition(size);
+
+    x.set(initial.x);
+    y.set(initial.y);
+    setIsReady(true);
+  }, [selectedImages.length, x, y]);
+
+  // Keep position inside viewport when resizing
+  useEffect(() => {
+    if (!isReady) return;
+    const onResize = () => {
+      if (!widgetRef.current) return;
+      const rect = widgetRef.current.getBoundingClientRect();
+      const size = { width: rect.width || 160, height: rect.height || 44 };
+      const clamped = clampToViewport({ x: x.get(), y: y.get() }, size, 10);
+      x.set(clamped.x);
+      y.set(clamped.y);
+      savePosition(clamped);
     };
-    
-    // Clamp to viewport with safe margins
-    const clampedX = Math.max(10, Math.min(window.innerWidth - 320, newPos.x));
-    const clampedY = Math.max(80, Math.min(window.innerHeight - 100, newPos.y));
-    
-    const finalPos = { x: clampedX, y: clampedY };
-    setPosition(finalPos);
-    
-    try {
-      localStorage.setItem("imageGalleryPosition", JSON.stringify(finalPos));
-    } catch {
-      // Ignore storage errors
-    }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [isReady, x, y]);
+
+  const handleDragEnd = () => {
+    if (!widgetRef.current) return;
+    const rect = widgetRef.current.getBoundingClientRect();
+    const size = { width: rect.width || 160, height: rect.height || 44 };
+    const clamped = clampToViewport({ x: x.get(), y: y.get() }, size, 10);
+    x.set(clamped.x);
+    y.set(clamped.y);
+    savePosition(clamped);
   };
   
-  // Don't render if no images or not ready
-  if (selectedImages.length === 0 || !isReady) {
+  // Don't render if no images
+  if (selectedImages.length === 0) {
     return null;
   }
 
@@ -98,21 +149,33 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     setIsExpanded(!isExpanded);
   };
 
-  return (
+  // Render in a Portal to avoid being clipped by any parent overflow
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <>
-      {/* Draggable floating widget - FIXED position with high z-index */}
+      {/* Full-viewport constraints layer (no pointer events) */}
+      <div ref={constraintsRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: 9998 }} />
+
+      {/* Draggable floating widget */}
       <motion.div
+        ref={widgetRef}
         drag
         dragControls={dragControls}
+        dragConstraints={constraintsRef}
         dragMomentum={false}
-        dragElastic={0.1}
+        dragElastic={0.25}
         onDragEnd={handleDragEnd}
-        style={{ 
+        style={{
           position: "fixed",
-          left: position.x,
-          top: position.y,
+          top: 0,
+          left: 0,
           zIndex: 9999,
           touchAction: "none",
+          x,
+          y,
+          opacity: isReady ? 1 : 0,
+          pointerEvents: isReady ? "auto" : "none",
         }}
         className="select-none"
       >
@@ -143,7 +206,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
             style={{ width: 280 }}
           >
             {/* Header - draggable area */}
-            <div 
+            <div
               className="flex items-center justify-between p-3 border-b bg-muted/50 cursor-grab active:cursor-grabbing"
               onPointerDown={(e) => dragControls.start(e)}
             >
@@ -151,9 +214,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
                 <GripVertical className="w-4 h-4 text-muted-foreground" />
                 <Images className="w-4 h-4 text-primary" />
                 <span className="text-sm font-semibold">Galeria</span>
-                <span className="text-xs text-muted-foreground">
-                  ({selectedImages.length})
-                </span>
+                <span className="text-xs text-muted-foreground">({selectedImages.length})</span>
               </div>
               <button
                 onClick={() => setIsExpanded(false)}
@@ -162,7 +223,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             {/* Thumbnails grid */}
             <ScrollArea className="h-[300px]">
               <div className="p-2 grid grid-cols-2 gap-2">
@@ -200,7 +261,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
           >
             <X className="w-5 h-5" />
           </button>
-          
+
           {selectedImages.length > 1 && (
             <>
               <button
@@ -217,7 +278,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
               </button>
             </>
           )}
-          
+
           {zoomedImage !== null && selectedImages[zoomedImage] && (
             <div className="flex items-center justify-center w-full h-full min-h-[60vh]">
               <img
@@ -227,7 +288,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
               />
             </div>
           )}
-          
+
           {zoomedImage !== null && selectedImages.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
               {zoomedImage + 1} / {selectedImages.length}
@@ -235,6 +296,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </>,
+    document.body,
   );
 }
