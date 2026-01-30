@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, useDragControls, useMotionValue, PanInfo } from "framer-motion";
+import { motion, useDragControls, useMotionValue, PanInfo, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Images, X, ZoomIn, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 interface StoredImageData {
   name: string;
@@ -16,9 +17,12 @@ interface ImageGalleryDrawerProps {
   selectedIndices: number[];
 }
 
-const STORAGE_KEY = "imageGalleryPosition";
+// NEW key to force reset of old positions
+const STORAGE_KEY = "gallery_pos_v2";
 const DEFAULT_MARGIN = 30;
-const CLICK_THRESHOLD = 3; // pixels - movement below this is considered a click
+const CLICK_THRESHOLD = 3;
+const FAB_WIDTH = 140;
+const FAB_HEIGHT = 44;
 
 type XY = { x: number; y: number };
 
@@ -35,15 +39,12 @@ function clampToViewport(pos: XY, size: { width: number; height: number }, margi
   };
 }
 
-function getDefaultFabPosition(size: { width: number; height: number }): XY {
-  return clampToViewport(
-    {
-      x: window.innerWidth - size.width - DEFAULT_MARGIN,
-      y: window.innerHeight - size.height - DEFAULT_MARGIN,
-    },
-    size,
-    10,
-  );
+// Get default bottom-right FAB position
+function getDefaultFabPosition(): XY {
+  return {
+    x: window.innerWidth - FAB_WIDTH - DEFAULT_MARGIN,
+    y: window.innerHeight - FAB_HEIGHT - DEFAULT_MARGIN,
+  };
 }
 
 function readSavedPosition(): XY | null {
@@ -52,6 +53,8 @@ function readSavedPosition(): XY | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !isFiniteNumber(parsed.x) || !isFiniteNumber(parsed.y)) return null;
+    // Validate position is within reasonable bounds
+    if (parsed.x < 0 || parsed.y < 0 || parsed.x > 5000 || parsed.y > 5000) return null;
     return { x: parsed.x, y: parsed.y };
   } catch {
     return null;
@@ -88,16 +91,13 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
     [images, selectedIndices],
   );
 
-  // Initial position: bottom-right FAB
+  // Initial position: bottom-right FAB (fixed position)
   useLayoutEffect(() => {
     if (selectedImages.length === 0) return;
-    if (!widgetRef.current) return;
 
-    const rect = widgetRef.current.getBoundingClientRect();
-    const size = { width: rect.width || 160, height: rect.height || 44 };
-
+    const size = { width: FAB_WIDTH, height: FAB_HEIGHT };
     const saved = readSavedPosition();
-    const initial = saved ? clampToViewport(saved, size, 10) : getDefaultFabPosition(size);
+    const initial = saved ? clampToViewport(saved, size, 10) : getDefaultFabPosition();
 
     x.set(initial.x);
     y.set(initial.y);
@@ -108,9 +108,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
   useEffect(() => {
     if (!isReady) return;
     const onResize = () => {
-      if (!widgetRef.current) return;
-      const rect = widgetRef.current.getBoundingClientRect();
-      const size = { width: rect.width || 160, height: rect.height || 44 };
+      const size = { width: FAB_WIDTH, height: FAB_HEIGHT };
       const clamped = clampToViewport({ x: x.get(), y: y.get() }, size, 10);
       x.set(clamped.x);
       y.set(clamped.y);
@@ -134,9 +132,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
   };
 
   const handleDragEnd = () => {
-    if (!widgetRef.current) return;
-    const rect = widgetRef.current.getBoundingClientRect();
-    const size = { width: rect.width || 160, height: rect.height || 44 };
+    const size = { width: FAB_WIDTH, height: FAB_HEIGHT };
     const clamped = clampToViewport({ x: x.get(), y: y.get() }, size, 10);
     x.set(clamped.x);
     y.set(clamped.y);
@@ -147,9 +143,9 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
   const handleButtonClick = () => {
     if (wasDragged.current) {
       wasDragged.current = false;
-      return; // Was a drag, not a click
+      return;
     }
-    setIsExpanded(!isExpanded);
+    setIsExpanded(true);
   };
 
   // Keyboard navigation in lightbox
@@ -199,102 +195,94 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
       {/* Full-viewport constraints layer (no pointer events) */}
       <div ref={constraintsRef} className="fixed inset-0 pointer-events-none" style={{ zIndex: 9998 }} />
 
-      {/* Draggable floating widget */}
-      <motion.div
-        ref={widgetRef}
-        drag
-        dragControls={dragControls}
-        dragConstraints={constraintsRef}
-        dragMomentum={false}
-        dragElastic={0.25}
-        onDragStart={handleDragStart}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          zIndex: 9999,
-          touchAction: "none",
-          x,
-          y,
-          opacity: isReady ? 1 : 0,
-          pointerEvents: isReady ? "auto" : "none",
-        }}
-        className="select-none"
-      >
-        {/* Collapsed state - just the button */}
+      {/* Draggable floating button (FAB) - only shows when gallery is closed */}
+      <AnimatePresence>
         {!isExpanded && (
-          <motion.button
-            onClick={handleButtonClick}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-background border border-border hover:bg-accent transition-colors cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="w-4 h-4 text-muted-foreground" />
-            <Images className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium">Imagens</span>
-            <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-primary text-primary-foreground">
-              {selectedImages.length}
-            </span>
-          </motion.button>
-        )}
-
-        {/* Expanded state - gallery panel */}
-        {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="bg-background border border-border rounded-lg shadow-xl overflow-hidden"
-            style={{ width: 280 }}
+            ref={widgetRef}
+            drag
+            dragControls={dragControls}
+            dragConstraints={constraintsRef}
+            dragMomentum={false}
+            dragElastic={0.25}
+            onDragStart={handleDragStart}
+            onDrag={handleDrag}
+            onDragEnd={handleDragEnd}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: isReady ? 1 : 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              zIndex: 9999,
+              touchAction: "none",
+              x,
+              y,
+              pointerEvents: isReady ? "auto" : "none",
+            }}
+            className="select-none"
           >
-            {/* Header - draggable area */}
-            <div
-              className="flex items-center justify-between p-3 border-b bg-muted/50 cursor-grab active:cursor-grabbing"
-              onPointerDown={(e) => dragControls.start(e)}
+            <motion.button
+              onClick={handleButtonClick}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg bg-background border border-border hover:bg-accent transition-colors cursor-grab active:cursor-grabbing"
             >
-              <div className="flex items-center gap-2">
-                <GripVertical className="w-4 h-4 text-muted-foreground" />
-                <Images className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold">Galeria</span>
-                <span className="text-xs text-muted-foreground">({selectedImages.length})</span>
-              </div>
-              <button
-                onClick={() => setIsExpanded(false)}
-                className="p-1 rounded hover:bg-accent transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Thumbnails grid */}
-            <ScrollArea className="h-[300px]">
-              <div className="p-2 grid grid-cols-2 gap-2">
-                {selectedImages.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setZoomedImage(index)}
-                    className="group relative aspect-square rounded-md overflow-hidden border border-border bg-muted hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <img
-                      src={image.dataUrl}
-                      alt={image.name || `Imagem ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                      <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">
-                      {index + 1}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+              <Images className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Imagens</span>
+              <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium rounded-full bg-primary text-primary-foreground">
+                {selectedImages.length}
+              </span>
+            </motion.button>
           </motion.div>
         )}
-      </motion.div>
+      </AnimatePresence>
+
+      {/* Fixed sidebar gallery panel - 100% height on the right side */}
+      <Sheet open={isExpanded} onOpenChange={setIsExpanded}>
+        <SheetContent side="right" className="w-[320px] sm:w-[380px] p-0 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Images className="w-5 h-5 text-primary" />
+              <span className="text-base font-semibold">Galeria de Imagens</span>
+              <span className="text-sm text-muted-foreground">({selectedImages.length})</span>
+            </div>
+          </div>
+
+          {/* Thumbnails grid - scrollable area */}
+          <ScrollArea className="flex-1">
+            <div className="p-4 grid grid-cols-2 gap-3">
+              {selectedImages.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setZoomedImage(index)}
+                  className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted hover:border-primary transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <img
+                    src={image.dataUrl}
+                    alt={image.name || `Imagem ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                    <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <span className="absolute bottom-1 left-1 text-xs bg-black/70 text-white px-1.5 py-0.5 rounded">
+                    {index + 1}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+
+          {/* Footer hint */}
+          <div className="p-3 border-t bg-muted/20 text-center">
+            <span className="text-xs text-muted-foreground">Clique em uma imagem para ampliar</span>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Zoom Dialog / Lightbox */}
       <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
