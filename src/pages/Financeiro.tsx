@@ -124,6 +124,7 @@ export default function Financeiro() {
     const { data: clinicsData } = await supabase
       .from("partner_clinics")
       .select("id, nome, telefone, email, logo_url")
+      .eq("active", true)
       .order("nome");
 
     if (clinicsData) {

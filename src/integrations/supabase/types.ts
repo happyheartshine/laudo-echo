@@ -266,6 +266,7 @@ export type Database = {
       }
       partner_clinics: {
         Row: {
+          active: boolean
           clinic_id: string | null
           created_at: string
           email: string | null
@@ -279,6 +280,7 @@ export type Database = {
           valor_exame: number
         }
         Insert: {
+          active?: boolean
           clinic_id?: string | null
           created_at?: string
           email?: string | null
@@ -292,6 +294,7 @@ export type Database = {
           valor_exame?: number
         }
         Update: {
+          active?: boolean
           clinic_id?: string | null
           created_at?: string
           email?: string | null
@@ -316,6 +319,7 @@ export type Database = {
       }
       partner_veterinarians: {
         Row: {
+          active: boolean
           created_at: string
           id: string
           nome: string
@@ -323,6 +327,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
           id?: string
           nome: string
@@ -330,6 +335,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
           id?: string
           nome?: string

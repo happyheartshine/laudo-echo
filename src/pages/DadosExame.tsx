@@ -124,6 +124,7 @@ const [patientData, setPatientData] = useState<PatientData>({
       const { data: clinics, error: clinicsError } = await supabase
         .from("partner_clinics")
         .select("id, nome, valor_exame, responsavel, telefone")
+        .eq("active", true)
         .order("nome");
       
       console.log('DadosExame: Clinics fetched:', clinics, 'Error:', clinicsError);
