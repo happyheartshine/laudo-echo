@@ -387,10 +387,9 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
     const count = group.transactions.length;
     if (count === 1) return group.descriptions[0] || "Serviço Avulso";
 
-    const descs = group.descriptions;
-    if (descs.length <= 2) return descs.join(", ");
-
-    return `${count} serviços realizados`;
+    const first = group.descriptions[0] || "Serviço";
+    if (count === 2) return `${first} + 1 outro`;
+    return `${first} + ${count - 1} outros`;
   };
 
   return (
@@ -559,67 +558,60 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
                       </TableCell>
                     </TableRow>
 
-                    {/* Expanded sub-rows */}
-                    {isMulti && isExpanded && group.transactions.map((tx) => (
-                      <TableRow
-                        key={tx.id}
-                        className={`bg-muted/20 ${
-                          tx.status === "pago"
-                            ? "opacity-60"
-                            : tx.status === "cancelado"
-                            ? "opacity-40 line-through"
-                            : ""
-                        }`}
-                      >
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell></TableCell>
-                        <TableCell className="text-sm pl-4">
-                          <span className="text-muted-foreground">↳</span> {tx.description}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">{formatCurrency(Number(tx.amount))}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "secondary" : "outline"}
-                            className={`text-xs ${
-                              tx.status === "pago"
-                                ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
-                                : tx.status === "a_receber"
-                                ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
-                                : ""
-                            }`}
-                          >
-                            {statusLabel(tx.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {tx.status !== "cancelado" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title={tx.status === "pago" ? "Reabrir" : "Dar Baixa"}
-                                onClick={() => handleToggleStatus(tx)}
+                    {/* Expanded sub-items */}
+                    {isMulti && isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="p-0 border-b">
+                          <div className="bg-muted/30 px-6 py-3 space-y-1.5">
+                            {group.transactions.map((tx) => (
+                              <div
+                                key={tx.id}
+                                className={`flex items-center justify-between gap-4 py-1.5 px-3 rounded-md text-sm ${
+                                  tx.status === "pago"
+                                    ? "opacity-60"
+                                    : tx.status === "cancelado"
+                                    ? "opacity-40 line-through"
+                                    : "bg-background/60"
+                                }`}
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(tx)}>
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(tx.id)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className="text-muted-foreground text-xs">1×</span>
+                                  <span className="truncate">{tx.description}</span>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="font-medium w-24 text-right">{formatCurrency(Number(tx.amount))}</span>
+                                  <Badge
+                                    variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "secondary" : "outline"}
+                                    className={`text-xs w-20 justify-center ${
+                                      tx.status === "pago"
+                                        ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/30"
+                                        : tx.status === "a_receber"
+                                        ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                                        : ""
+                                    }`}
+                                  >
+                                    {statusLabel(tx.status)}
+                                  </Badge>
+                                  <div className="flex gap-0.5">
+                                    {tx.status !== "cancelado" && (
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" title={tx.status === "pago" ? "Reabrir" : "Dar Baixa"} onClick={() => handleToggleStatus(tx)}>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    )}
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(tx)}>
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(tx.id)}>
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </Fragment>
                 );
               })}
