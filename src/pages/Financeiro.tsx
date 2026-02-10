@@ -115,6 +115,7 @@ export default function Financeiro() {
 
   // Manual transaction modal
   const [showManualModal, setShowManualModal] = useState(false);
+  const [batchPrefill, setBatchPrefill] = useState<{ patientName?: string; ownerName?: string; date?: string } | undefined>(undefined);
 
   // Sharing states
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
@@ -745,7 +746,7 @@ export default function Financeiro() {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={() => setShowManualModal(true)} variant="default">
+              <Button onClick={() => { setBatchPrefill(undefined); setShowManualModal(true); }} variant="default">
                 <Plus className="w-4 h-4 mr-2" />
                 Novo Lançamento
               </Button>
@@ -835,11 +836,13 @@ export default function Financeiro() {
                           <TableRow>
                             <TableHead className="w-8"></TableHead>
                             <TableHead>Data</TableHead>
+                            <TableHead>Responsável</TableHead>
+                            <TableHead>Paciente</TableHead>
                             <TableHead>Serviço</TableHead>
-                            <TableHead>Paciente / Tutor</TableHead>
                             {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
-                            <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-12">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -861,6 +864,14 @@ export default function Financeiro() {
                                     )}
                                   </TableCell>
                                   <TableCell>{formatDate(group.date)}</TableCell>
+                                  <TableCell>
+                                    {group.ownerName && (
+                                      <span className="text-sm">{group.ownerName}</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="font-medium">{group.patientName}</span>
+                                  </TableCell>
                                   <TableCell className="font-medium">
                                     {isMulti ? (
                                       <Tooltip>
@@ -882,29 +893,39 @@ export default function Financeiro() {
                                       group.transactions[0].description
                                     )}
                                   </TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{group.patientName}</span>
-                                      {group.ownerName && (
-                                        <span className="text-xs text-muted-foreground">{group.ownerName}</span>
-                                      )}
-                                    </div>
-                                  </TableCell>
                                   {selectedClinicId === "all" && (
                                     <TableCell>
                                       {group.clinicName && <Badge variant="secondary">{group.clinicName}</Badge>}
                                     </TableCell>
                                   )}
-                                  <TableCell>{getGroupStatusBadge(group)}</TableCell>
                                   <TableCell className="text-right font-medium">
                                     {formatCurrency(group.totalAmount)}
+                                  </TableCell>
+                                  <TableCell>{getGroupStatusBadge(group)}</TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      title="Adicionar Serviço"
+                                      onClick={() => {
+                                        setBatchPrefill({
+                                          patientName: group.patientName !== "—" ? group.patientName : "",
+                                          ownerName: group.ownerName || "",
+                                          date: group.date,
+                                        });
+                                        setShowManualModal(true);
+                                      }}
+                                      className="text-primary hover:text-primary"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
                                   </TableCell>
                                 </TableRow>
 
                                 {/* Expanded sub-items */}
                                 {isMulti && isExpanded && (
                                   <TableRow>
-                                    <TableCell colSpan={selectedClinicId === "all" ? 7 : 6} className="p-0 border-b">
+                                    <TableCell colSpan={selectedClinicId === "all" ? 10 : 9} className="p-0 border-b">
                                       <div className="bg-muted/30 px-6 py-3 space-y-1.5">
                                         {group.transactions.map((tx) => (
                                           <div
@@ -1101,6 +1122,7 @@ export default function Financeiro() {
         open={showManualModal}
         onOpenChange={setShowManualModal}
         partnerClinics={partnerClinics}
+        prefill={batchPrefill}
         onSave={handleBatchTransactionSave}
       />
     </Layout>

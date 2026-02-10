@@ -510,7 +510,7 @@ export async function generateExamPdf(
   addCompactRow("Paciente:", patientData.nome || '-', "Espécie:", patientData.especie || '-');
   addCompactRow("Raça:", patientData.raca || '-', "Sexo:", patientData.sexo || '-');
   addCompactRow("Idade:", patientData.idade || '-', "Peso:", patientData.peso ? `${formatNumber(patientData.peso)} kg` : '-');
-  addCompactRow("Tutor(a):", patientData.responsavel || '-', "Data:", formatDateForPdf(examInfo.data));
+  addCompactRow("Responsável:", patientData.responsavel || '-', "Data:", formatDateForPdf(examInfo.data));
   addCompactRow("Solicitante:", examInfo.solicitante || '-', "Clínica/Hospital:", examInfo.clinica || '-');
   yPosition += 6;
 
