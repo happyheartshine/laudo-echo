@@ -142,11 +142,12 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
     patientName: string;
     ownerName: string;
     serviceId?: string;
+    partnerClinicId: string;
   }[]) => {
     const rows = items.map((item) => ({
       user_id: user?.id,
       clinic_id: clinic?.id || null,
-      partner_clinic_id: clinicId,
+      partner_clinic_id: item.partnerClinicId,
       description: item.description,
       amount: item.amount,
       transaction_date: item.date,
@@ -396,6 +397,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
         open={isBatchOpen}
         onOpenChange={setIsBatchOpen}
         services={services}
+        partnerClinicId={clinicId}
         onSave={handleBatchSave}
       />
 
