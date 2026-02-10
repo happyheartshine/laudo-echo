@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,15 @@ import {
   X,
   Loader2,
   Plus,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -110,6 +118,9 @@ export default function Financeiro() {
 
   // Sharing states
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+
+  // Expanded groups for manual transactions
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -267,7 +278,80 @@ export default function Financeiro() {
     });
   }, [manualTransactions, selectedClinicId, dateFrom, dateTo]);
 
-  // Calculate summary by clinic (exams + manual transactions)
+  // Group manual transactions by date + patient + clinic
+  interface TxGroup {
+    key: string;
+    date: string;
+    patientName: string;
+    ownerName: string | null;
+    clinicName: string | null;
+    partnerId: string | null;
+    transactions: FinancialTransaction[];
+    totalAmount: number;
+    descriptions: string[];
+    allPago: boolean;
+    allAReceber: boolean;
+  }
+
+  const groupedManualTransactions = useMemo(() => {
+    const map = new Map<string, TxGroup>();
+
+    for (const tx of filteredManualTransactions) {
+      const key = `${tx.transaction_date}__${(tx.patient_name || "").toLowerCase().trim()}__${tx.partner_clinic_id || ""}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          date: tx.transaction_date,
+          patientName: tx.patient_name || "—",
+          ownerName: tx.owner_name,
+          clinicName: tx.partner_clinics?.nome || null,
+          partnerId: tx.partner_clinic_id,
+          transactions: [],
+          totalAmount: 0,
+          descriptions: [],
+          allPago: true,
+          allAReceber: true,
+        });
+      }
+
+      const group = map.get(key)!;
+      group.transactions.push(tx);
+      group.totalAmount += Number(tx.amount);
+      if (tx.description && !group.descriptions.includes(tx.description)) {
+        group.descriptions.push(tx.description);
+      }
+      if (!group.ownerName && tx.owner_name) group.ownerName = tx.owner_name;
+      if (tx.status !== "pago") group.allPago = false;
+      if (tx.status !== "a_receber") group.allAReceber = false;
+    }
+
+    return Array.from(map.values());
+  }, [filteredManualTransactions]);
+
+  const toggleTxGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const getGroupServiceSummary = (group: TxGroup) => {
+    const count = group.transactions.length;
+    if (count === 1) return group.descriptions[0] || "Serviço Avulso";
+    const first = group.descriptions[0] || "Serviço";
+    if (count === 2) return `${first} + 1 outro`;
+    return `${first} + ${count - 1} outros`;
+  };
+
+  const getGroupStatusBadge = (group: TxGroup) => {
+    if (group.allPago) return <Badge variant="default">Pago</Badge>;
+    if (group.allAReceber) return <Badge variant="outline">A Receber</Badge>;
+    return <Badge variant="outline" className="bg-blue-500/15 text-blue-700 border-blue-500/30">Parcial</Badge>;
+  };
+
   const clinicsSummary = useMemo(() => {
     const clinicMap = new Map<string, ClinicSummary>();
 
@@ -469,6 +553,7 @@ export default function Financeiro() {
   };
 
   return (
+    <TooltipProvider>
     <Layout>
       <div className="space-y-6">
         {/* Header */}
@@ -741,13 +826,14 @@ export default function Financeiro() {
                     </>
                   )}
 
-                  {/* Manual Transactions Table */}
-                  {filteredManualTransactions.length > 0 && (
+                  {/* Manual Transactions Table - Grouped */}
+                  {groupedManualTransactions.length > 0 && (
                     <>
                       <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Outros Lançamentos</h4>
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-8"></TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Serviço</TableHead>
                             <TableHead>Paciente / Tutor</TableHead>
@@ -757,37 +843,98 @@ export default function Financeiro() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredManualTransactions.map((tx) => (
-                            <TableRow key={tx.id}>
-                              <TableCell>{formatDate(tx.transaction_date)}</TableCell>
-                              <TableCell className="font-medium">{tx.description}</TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{tx.patient_name || "-"}</span>
-                                  {tx.owner_name && (
-                                    <span className="text-xs text-muted-foreground">{tx.owner_name}</span>
-                                  )}
-                                </div>
-                              </TableCell>
-                              {selectedClinicId === "all" && (
-                                <TableCell>
-                                  <Badge variant="secondary">
-                                    {tx.partner_clinics?.nome}
-                                  </Badge>
-                                </TableCell>
-                              )}
-                              <TableCell>
-                                <Badge 
-                                  variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "destructive" : "outline"}
+                          {groupedManualTransactions.map((group) => {
+                            const isMulti = group.transactions.length > 1;
+                            const isExpanded = expandedGroups.has(group.key);
+
+                            return (
+                              <Fragment key={group.key}>
+                                <TableRow
+                                  className={`${group.allPago ? "opacity-60" : ""} ${isMulti ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                                  onClick={isMulti ? () => toggleTxGroup(group.key) : undefined}
                                 >
-                                  {tx.status === "a_receber" ? "A Receber" : tx.status === "pago" ? "Pago" : "Cancelado"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {formatCurrency(Number(tx.amount) || 0)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                                  <TableCell className="px-2">
+                                    {isMulti && (
+                                      isExpanded
+                                        ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                        : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{formatDate(group.date)}</TableCell>
+                                  <TableCell className="font-medium">
+                                    {isMulti ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="cursor-default">{getGroupServiceSummary(group)}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" align="start" className="max-w-xs">
+                                          <ul className="text-xs space-y-1">
+                                            {group.transactions.map((tx) => (
+                                              <li key={tx.id} className="flex justify-between gap-4">
+                                                <span>{tx.description}</span>
+                                                <span className="font-medium whitespace-nowrap">{formatCurrency(Number(tx.amount))}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      group.transactions[0].description
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{group.patientName}</span>
+                                      {group.ownerName && (
+                                        <span className="text-xs text-muted-foreground">{group.ownerName}</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  {selectedClinicId === "all" && (
+                                    <TableCell>
+                                      {group.clinicName && <Badge variant="secondary">{group.clinicName}</Badge>}
+                                    </TableCell>
+                                  )}
+                                  <TableCell>{getGroupStatusBadge(group)}</TableCell>
+                                  <TableCell className="text-right font-medium">
+                                    {formatCurrency(group.totalAmount)}
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* Expanded sub-items */}
+                                {isMulti && isExpanded && (
+                                  <TableRow>
+                                    <TableCell colSpan={selectedClinicId === "all" ? 7 : 6} className="p-0 border-b">
+                                      <div className="bg-muted/30 px-6 py-3 space-y-1.5">
+                                        {group.transactions.map((tx) => (
+                                          <div
+                                            key={tx.id}
+                                            className={`flex items-center justify-between gap-4 py-1.5 px-3 rounded-md text-sm ${
+                                              tx.status === "pago" ? "opacity-60" : tx.status === "cancelado" ? "opacity-40 line-through" : "bg-background/60"
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                              <span className="text-muted-foreground text-xs">1×</span>
+                                              <span className="truncate">{tx.description}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                              <span className="font-medium">{formatCurrency(Number(tx.amount))}</span>
+                                              <Badge
+                                                variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "destructive" : "outline"}
+                                                className="text-xs"
+                                              >
+                                                {tx.status === "a_receber" ? "A Receber" : tx.status === "pago" ? "Pago" : "Cancelado"}
+                                              </Badge>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </Fragment>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </>
@@ -957,5 +1104,6 @@ export default function Financeiro() {
         onSave={handleBatchTransactionSave}
       />
     </Layout>
+    </TooltipProvider>
   );
 }
