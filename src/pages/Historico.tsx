@@ -106,7 +106,8 @@ export default function Historico() {
   const fetchPartnerClinics = async () => {
     const { data, error } = await supabase
       .from("partner_clinics")
-      .select("id, nome, telefone");
+      .select("id, nome, telefone")
+      .eq("active", true);
     
     if (!error && data) {
       setPartnerClinics(data);

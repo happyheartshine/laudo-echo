@@ -101,6 +101,7 @@ export default function ClinicasParceiros() {
     const { data: clinicsData, error: clinicsError } = await supabase
       .from("partner_clinics")
       .select("*")
+      .eq("active", true)
       .order("nome");
 
     if (clinicsError) {
@@ -312,13 +313,16 @@ export default function ClinicasParceiros() {
   };
 
   const handleDeleteClinic = async (id: string) => {
-    const { error } = await supabase.from("partner_clinics").delete().eq("id", id);
+    const { error } = await supabase
+      .from("partner_clinics")
+      .update({ active: false })
+      .eq("id", id);
 
     if (error) {
-      console.error("Error deleting partner clinic:", error);
-      toast({ title: "Erro", description: "Erro ao excluir clínica", variant: "destructive" });
+      console.error("Error archiving partner clinic:", error);
+      toast({ title: "Erro", description: "Erro ao arquivar clínica", variant: "destructive" });
     } else {
-      toast({ title: "Sucesso", description: "Clínica excluída!" });
+      toast({ title: "Sucesso", description: "Parceiro arquivado com sucesso." });
       fetchData();
     }
   };
