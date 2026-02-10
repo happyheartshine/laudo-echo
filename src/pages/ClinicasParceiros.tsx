@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { ClinicServicesSection } from "@/components/partners/ClinicServicesSection";
+import { PartnerFinanceSection } from "@/components/partners/PartnerFinanceSection";
 
 interface PartnerClinic {
   id: string;
@@ -543,9 +544,10 @@ export default function ClinicasParceiros() {
                   </AccordionTrigger>
                   <AccordionContent className="pt-4">
                     <Tabs defaultValue="veterinarios" className="w-full">
-                      <TabsList className="grid w-full grid-cols-2">
+                      <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="veterinarios">Veterinários</TabsTrigger>
                         <TabsTrigger value="precos">Tabela de Preços</TabsTrigger>
+                        <TabsTrigger value="financeiro">Financeiro</TabsTrigger>
                       </TabsList>
                       
                       <TabsContent value="veterinarios" className="space-y-4 mt-4">
@@ -595,6 +597,10 @@ export default function ClinicasParceiros() {
                       
                       <TabsContent value="precos" className="mt-4">
                         <ClinicServicesSection clinicId={partnerClinic.id} />
+                      </TabsContent>
+
+                      <TabsContent value="financeiro" className="mt-4">
+                        <PartnerFinanceSection clinicId={partnerClinic.id} />
                       </TabsContent>
                     </Tabs>
 
