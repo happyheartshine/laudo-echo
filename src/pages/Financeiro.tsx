@@ -46,7 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { ManualTransactionModal } from "@/components/financial/ManualTransactionModal";
+import { BatchTransactionModal, type BatchSaveItem } from "@/components/partners/BatchTransactionModal";
 
 interface PartnerClinic {
   id: string;
@@ -191,47 +191,40 @@ export default function Financeiro() {
     setLoading(false);
   };
 
-  // Handle manual transaction save
-  const handleManualTransactionSave = async (data: {
-    description: string;
-    amount: number;
-    date: string;
-    status: string;
-    partnerClinicId: string;
-    serviceId?: string;
-    patientName: string;
-    ownerName: string;
-  }) => {
+  // Handle batch transaction save from global modal
+  const handleBatchTransactionSave = async (items: BatchSaveItem[]) => {
     if (!user) return;
 
-    const { error } = await supabase.from("financial_transactions").insert({
+    const rows = items.map((item) => ({
       user_id: user.id,
       clinic_id: profile?.clinic_id || null,
-      partner_clinic_id: data.partnerClinicId,
-      description: data.description,
-      transaction_date: data.date,
-      amount: data.amount,
-      status: data.status,
-      service_id: data.serviceId || null,
-      patient_name: data.patientName || null,
-      owner_name: data.ownerName || null,
-    });
+      partner_clinic_id: item.partnerClinicId,
+      description: item.description,
+      transaction_date: item.date,
+      amount: item.amount,
+      status: "a_receber" as const,
+      service_id: item.serviceId || null,
+      patient_name: item.patientName || null,
+      owner_name: item.ownerName || null,
+    }));
+
+    const { error } = await supabase.from("financial_transactions").insert(rows);
 
     if (error) {
       toast({
         title: "Erro ao salvar",
-        description: "Não foi possível salvar o lançamento.",
+        description: "Não foi possível salvar o(s) lançamento(s).",
         variant: "destructive",
       });
       throw error;
     }
 
     toast({
-      title: "Lançamento registrado!",
-      description: "O lançamento manual foi salvo com sucesso.",
+      title: "Lançamento(s) registrado(s)!",
+      description: `${items.length} lançamento(s) salvo(s) com sucesso.`,
     });
 
-    fetchData(); // Refresh data
+    fetchData();
   };
 
   // Filter exams based on selected filters
@@ -956,13 +949,12 @@ export default function Financeiro() {
         </div>
       </div>
 
-      {/* Manual Transaction Modal */}
-      <ManualTransactionModal
+      {/* Batch Transaction Modal */}
+      <BatchTransactionModal
         open={showManualModal}
         onOpenChange={setShowManualModal}
         partnerClinics={partnerClinics}
-        selectedClinicId={selectedClinicId !== "all" ? selectedClinicId : undefined}
-        onSave={handleManualTransactionSave}
+        onSave={handleBatchTransactionSave}
       />
     </Layout>
   );
