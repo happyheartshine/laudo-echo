@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { BatchTransactionModal } from "./BatchTransactionModal";
 import {
   Table,
   TableBody,
@@ -74,7 +75,10 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
   const [services, setServices] = useState<ClinicService[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Dialog state
+  // Batch modal state
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+
+  // Edit dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [txDescription, setTxDescription] = useState("");
@@ -129,17 +133,38 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
   };
 
   // ---- Dialog ----
-  const openNewDialog = () => {
-    setEditingTx(null);
-    setTxDescription("");
-    setTxAmount("");
-    setTxDate(new Date().toISOString().split("T")[0]);
-    setTxStatus("a_receber");
-    setTxPatientName("");
-    setTxOwnerName("");
-    setTxServiceId("");
-    setIsDialogOpen(true);
+  const openNewDialog = () => setIsBatchOpen(true);
+
+  const handleBatchSave = async (items: {
+    description: string;
+    amount: number;
+    date: string;
+    patientName: string;
+    ownerName: string;
+    serviceId?: string;
+  }[]) => {
+    const rows = items.map((item) => ({
+      user_id: user?.id,
+      clinic_id: clinic?.id || null,
+      partner_clinic_id: clinicId,
+      description: item.description,
+      amount: item.amount,
+      transaction_date: item.date,
+      status: "a_receber" as const,
+      patient_name: item.patientName,
+      owner_name: item.ownerName || null,
+      service_id: item.serviceId || null,
+    }));
+
+    const { error } = await supabase.from("financial_transactions").insert(rows);
+    if (error) {
+      toast({ title: "Erro", description: "Erro ao criar lançamentos", variant: "destructive" });
+      throw error;
+    }
+    toast({ title: "Sucesso", description: `${items.length} lançamento(s) criado(s)!` });
+    fetchData();
   };
+
 
   const openEditDialog = (tx: Transaction) => {
     setEditingTx(tx);
@@ -165,7 +190,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
   };
 
   const handleSave = async () => {
-    if (!txPatientName.trim()) {
+    if (!editingTx || !txPatientName.trim()) {
       toast({ title: "Erro", description: "Nome do paciente é obrigatório", variant: "destructive" });
       return;
     }
@@ -173,32 +198,9 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
     const amount = parseDecimal(txAmount) || 0;
     const description = txDescription.trim() || "Serviço Avulso";
 
-    if (editingTx) {
-      const { error } = await supabase
-        .from("financial_transactions")
-        .update({
-          description,
-          amount,
-          transaction_date: txDate,
-          status: txStatus,
-          patient_name: txPatientName.trim(),
-          owner_name: txOwnerName.trim() || null,
-          service_id: txServiceId && txServiceId !== "other" ? txServiceId : null,
-        })
-        .eq("id", editingTx.id);
-
-      if (error) {
-        toast({ title: "Erro", description: "Erro ao atualizar lançamento", variant: "destructive" });
-      } else {
-        toast({ title: "Sucesso", description: "Lançamento atualizado!" });
-        setIsDialogOpen(false);
-        fetchData();
-      }
-    } else {
-      const { error } = await supabase.from("financial_transactions").insert({
-        user_id: user?.id,
-        clinic_id: clinic?.id || null,
-        partner_clinic_id: clinicId,
+    const { error } = await supabase
+      .from("financial_transactions")
+      .update({
         description,
         amount,
         transaction_date: txDate,
@@ -206,15 +208,15 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
         patient_name: txPatientName.trim(),
         owner_name: txOwnerName.trim() || null,
         service_id: txServiceId && txServiceId !== "other" ? txServiceId : null,
-      });
+      })
+      .eq("id", editingTx.id);
 
-      if (error) {
-        toast({ title: "Erro", description: "Erro ao criar lançamento", variant: "destructive" });
-      } else {
-        toast({ title: "Sucesso", description: "Lançamento criado!" });
-        setIsDialogOpen(false);
-        fetchData();
-      }
+    if (error) {
+      toast({ title: "Erro", description: "Erro ao atualizar lançamento", variant: "destructive" });
+    } else {
+      toast({ title: "Sucesso", description: "Lançamento atualizado!" });
+      setIsDialogOpen(false);
+      fetchData();
     }
     setSaving(false);
   };
@@ -389,14 +391,21 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
         </Table>
       )}
 
-      {/* Add/Edit Dialog */}
+      {/* Batch New Modal */}
+      <BatchTransactionModal
+        open={isBatchOpen}
+        onOpenChange={setIsBatchOpen}
+        services={services}
+        onSave={handleBatchSave}
+      />
+
+      {/* Edit Dialog (single item) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingTx ? "Editar Lançamento" : "Nova Cobrança"}</DialogTitle>
+            <DialogTitle>Editar Lançamento</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Service selector */}
             {services.length > 0 && (
               <div className="space-y-2">
                 <Label>Serviço</Label>
@@ -416,7 +425,6 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               </div>
             )}
 
-            {/* Description */}
             {(!txServiceId || txServiceId === "other" || services.length === 0) && (
               <div className="space-y-2">
                 <Label>Descrição</Label>
@@ -428,7 +436,6 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               </div>
             )}
 
-            {/* Patient */}
             <div className="space-y-2">
               <Label>Paciente *</Label>
               <Input
@@ -438,7 +445,6 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               />
             </div>
 
-            {/* Owner */}
             <div className="space-y-2">
               <Label>Tutor</Label>
               <Input
@@ -448,7 +454,6 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               />
             </div>
 
-            {/* Amount */}
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
               <div className="relative">
@@ -462,13 +467,11 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               </div>
             </div>
 
-            {/* Date */}
             <div className="space-y-2">
               <Label>Data</Label>
               <Input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
             </div>
 
-            {/* Status */}
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={txStatus} onValueChange={setTxStatus}>
@@ -484,7 +487,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
             </div>
 
             <Button onClick={handleSave} className="w-full" disabled={saving}>
-              {saving ? "Salvando..." : editingTx ? "Salvar Alterações" : "Criar Lançamento"}
+              {saving ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </div>
         </DialogContent>
