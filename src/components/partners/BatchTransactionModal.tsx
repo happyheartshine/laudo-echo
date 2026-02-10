@@ -49,6 +49,12 @@ export interface BatchSaveItem {
   partnerClinicId: string;
 }
 
+interface PrefillData {
+  patientName?: string;
+  ownerName?: string;
+  date?: string;
+}
+
 interface BatchTransactionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,6 +64,8 @@ interface BatchTransactionModalProps {
   partnerClinicId?: string;
   /** List of partner clinics for the dropdown (global mode) */
   partnerClinics?: PartnerClinic[];
+  /** Pre-fill header fields (for adding service to existing group) */
+  prefill?: PrefillData;
   onSave: (items: BatchSaveItem[]) => Promise<void>;
 }
 
@@ -82,6 +90,7 @@ export function BatchTransactionModal({
   services: externalServices,
   partnerClinicId,
   partnerClinics,
+  prefill,
   onSave,
 }: BatchTransactionModalProps) {
   // Header fields
@@ -105,15 +114,15 @@ export function BatchTransactionModal({
   useEffect(() => {
     if (open) {
       setSelectedClinicId(partnerClinicId || "");
-      setPatientName("");
-      setOwnerName("");
-      setDate(new Date().toISOString().split("T")[0]);
+      setPatientName(prefill?.patientName || "");
+      setOwnerName(prefill?.ownerName || "");
+      setDate(prefill?.date || new Date().toISOString().split("T")[0]);
       setItems([createEmptyServiceLine()]);
       if (!partnerClinicId) {
         setFetchedServices([]);
       }
     }
-  }, [open, partnerClinicId]);
+  }, [open, partnerClinicId, prefill]);
 
   // Fetch services when clinic changes in global mode
   useEffect(() => {
@@ -244,7 +253,7 @@ export function BatchTransactionModal({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Tutor</Label>
+                <Label className="text-xs">Responsável</Label>
                 <Input
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}

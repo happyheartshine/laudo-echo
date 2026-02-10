@@ -95,6 +95,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
 
   // Batch modal state
   const [isBatchOpen, setIsBatchOpen] = useState(false);
+  const [batchPrefill, setBatchPrefill] = useState<{ patientName?: string; ownerName?: string; date?: string } | undefined>(undefined);
 
   // Expanded groups
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -203,7 +204,19 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
   };
 
   // ---- Dialog ----
-  const openNewDialog = () => setIsBatchOpen(true);
+  const openNewDialog = () => {
+    setBatchPrefill(undefined);
+    setIsBatchOpen(true);
+  };
+
+  const openAddServiceToGroup = (group: TransactionGroup) => {
+    setBatchPrefill({
+      patientName: group.patientName !== "—" ? group.patientName : "",
+      ownerName: group.ownerName || "",
+      date: group.date,
+    });
+    setIsBatchOpen(true);
+  };
 
   const handleBatchSave = async (items: {
     description: string;
@@ -442,11 +455,12 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               <TableRow>
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Responsável</TableHead>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Serviço</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <TableHead className="w-28">Ações</TableHead>
+                <TableHead className="w-36">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -476,12 +490,12 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{formatDate(group.date)}</TableCell>
                       <TableCell>
-                        <div>
-                          <span className="font-medium">{group.patientName}</span>
-                          {group.ownerName && (
-                            <span className="block text-xs text-muted-foreground">{group.ownerName}</span>
-                          )}
-                        </div>
+                        {group.ownerName && (
+                          <span className="text-sm">{group.ownerName}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">{group.patientName}</span>
                       </TableCell>
                       <TableCell>
                         {isMulti ? (
@@ -519,6 +533,15 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Adicionar Serviço"
+                            onClick={() => openAddServiceToGroup(group)}
+                            className="text-primary hover:text-primary"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
                           {!group.hasCancelado && (
                             <Button
                               variant="ghost"
@@ -535,25 +558,14 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
                               <Edit2 className="w-4 h-4" />
                             </Button>
                           )}
-                          {isMulti ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteGroupTarget(group)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setDeleteGroupTarget(group)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteGroupTarget(group)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -561,7 +573,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
                     {/* Expanded sub-items */}
                     {isMulti && isExpanded && (
                       <TableRow>
-                        <TableCell colSpan={7} className="p-0 border-b">
+                        <TableCell colSpan={8} className="p-0 border-b">
                           <div className="bg-muted/30 px-6 py-3 space-y-1.5">
                             {group.transactions.map((tx) => (
                               <div
@@ -658,6 +670,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
           onOpenChange={setIsBatchOpen}
           services={services}
           partnerClinicId={clinicId}
+          prefill={batchPrefill}
           onSave={handleBatchSave}
         />
 
@@ -708,7 +721,7 @@ export function PartnerFinanceSection({ clinicId }: PartnerFinanceSectionProps) 
               </div>
 
               <div className="space-y-2">
-                <Label>Tutor</Label>
+                <Label>Responsável</Label>
                 <Input
                   value={txOwnerName}
                   onChange={(e) => setTxOwnerName(e.target.value)}

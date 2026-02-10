@@ -253,12 +253,12 @@ export function ManualTransactionModal({
 
           {/* Owner Name */}
           <div className="space-y-2">
-            <Label htmlFor="owner">Nome do Responsável (Tutor)</Label>
+            <Label htmlFor="owner">Responsável</Label>
             <Input
               id="owner"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="Nome do tutor/proprietário"
+              placeholder="Nome do responsável"
             />
           </div>
 

@@ -380,7 +380,7 @@ export default function Index() {
                     <tr className="border-b border-border">
                       <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Data</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground">Paciente</th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground hidden sm:table-cell">Tutor</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground hidden sm:table-cell">Responsável</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-muted-foreground hidden md:table-cell">Status</th>
                       <th className="text-right py-3 px-4 text-sm font-semibold text-muted-foreground">Ação</th>
                     </tr>

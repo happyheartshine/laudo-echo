@@ -116,7 +116,7 @@ export default function Historico() {
   // Filtra exames por busca de texto E por clínica selecionada
   const filteredExams = useMemo(() => {
     return exams.filter(exam => {
-      // Filtro de texto (nome do paciente ou tutor)
+      // Filtro de texto (nome do paciente ou responsável)
       const matchesSearch = exam.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         (exam.owner_name && exam.owner_name.toLowerCase().includes(searchTerm.toLowerCase()));
       
@@ -185,20 +185,20 @@ export default function Historico() {
         }
       }
       
-      // Fallback: Priority 2 - Tutor phone from exam content
+      // Fallback: Priority 2 - Responsável phone from exam content
       if (!phoneNumber) {
         const content = exam.content as Record<string, unknown>;
         const patientData = content?.patientData as Record<string, unknown>;
         if (patientData?.telefone && typeof patientData.telefone === 'string') {
           phoneNumber = patientData.telefone;
-          phoneSource = "tutor";
+          phoneSource = "responsável";
         }
       }
       
       if (!phoneNumber) {
         toast({
           title: "Nenhum telefone cadastrado",
-          description: "Cadastre o telefone na aba Parceiros ou nos dados do Tutor.",
+          description: "Cadastre o telefone na aba Parceiros ou nos dados do Responsável.",
           variant: "destructive"
         });
         return;
@@ -421,7 +421,7 @@ export default function Historico() {
             {/* Busca por texto */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input placeholder="Buscar por nome do paciente ou tutor..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              <Input placeholder="Buscar por nome do paciente ou responsável..." className="pl-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
             
             {/* Filtro por Clínica */}
