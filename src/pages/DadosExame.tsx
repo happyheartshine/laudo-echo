@@ -461,6 +461,25 @@ const [patientData, setPatientData] = useState<PatientData>({
     aorticaGradiente: "",
   });
 
+  // Bernoulli auto-calculation: Gradient = 4 * (V_m/s)² where V_m/s = V_cm/s / 100
+  const calculateBernoulliGradient = (velocityCmS: string): string => {
+    const v = parseDecimal(velocityCmS);
+    if (!v || isNaN(v) || v === 0) return "";
+    const vMs = Math.abs(v) / 100;
+    const gradient = 4 * Math.pow(vMs, 2);
+    return gradient.toFixed(1).replace(".", ",");
+  };
+
+  const handleVelocidadeChange = (valve: string, value: string) => {
+    const sanitized = sanitizeDecimalInput(value);
+    const gradient = calculateBernoulliGradient(sanitized);
+    setValvasDoppler(prev => ({
+      ...prev,
+      [`${valve}Velocidade`]: sanitized,
+      [`${valve}Gradiente`]: gradient,
+    }));
+  };
+
   const [outros, setOutros] = useState({
     septos: "interventricular e interatrial íntegros",
     pericardio: "normal, sem derrame",
@@ -1388,7 +1407,7 @@ if (content.patientData) {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IM (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, mitralVelocidade: sanitizeDecimalInput(e.target.value)})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.mitralVelocidade)} onChange={(e) => handleVelocidadeChange('mitral', e.target.value)} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
@@ -1411,7 +1430,7 @@ if (content.patientData) {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Retrógrado IT (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.tricuspideVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, tricuspideVelocidade: sanitizeDecimalInput(e.target.value)})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.tricuspideVelocidade)} onChange={(e) => handleVelocidadeChange('tricuspide', e.target.value)} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
@@ -1430,7 +1449,7 @@ if (content.patientData) {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.pulmonarVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, pulmonarVelocidade: sanitizeDecimalInput(e.target.value)})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.pulmonarVelocidade)} onChange={(e) => handleVelocidadeChange('pulmonar', e.target.value)} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>
@@ -1449,7 +1468,7 @@ if (content.patientData) {
                 <div className="space-y-3">
                   <div>
                     <Label className="label-vitaecor">Vel. Máx. Fluxo Transvalvar (cm/s)</Label>
-                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.aorticaVelocidade)} onChange={(e) => setValvasDoppler({...valvasDoppler, aorticaVelocidade: sanitizeDecimalInput(e.target.value)})} />
+                    <Input className="input-vitaecor" type="text" inputMode="decimal" value={formatDecimalForDisplay(valvasDoppler.aorticaVelocidade)} onChange={(e) => handleVelocidadeChange('aortica', e.target.value)} />
                   </div>
                   <div>
                     <Label className="label-vitaecor">Gradiente (mmHg)</Label>

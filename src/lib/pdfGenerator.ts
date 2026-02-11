@@ -919,7 +919,7 @@ export async function generateExamPdf(
     // VALVA AÓRTICA
     if (valvasDoppler?.aorticaVelocidade || valvasDoppler?.aorticaGradiente) {
       await addValveBlock("VALVA AÓRTICA", [
-        { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.aorticaVelocidade ? `${formatNumber(valvasDoppler.aorticaVelocidade)} cm/s` : "" },
+        { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.aorticaVelocidade ? `-${formatNumber(valvasDoppler.aorticaVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.aorticaGradiente ? `${formatNumber(valvasDoppler.aorticaGradiente)} mmHg` : "" },
       ]);
       if (observacoesValvas?.aortica?.trim()) {
@@ -935,7 +935,7 @@ export async function generateExamPdf(
     // VALVA PULMONAR
     if (valvasDoppler?.pulmonarVelocidade || valvasDoppler?.pulmonarGradiente) {
       await addValveBlock("VALVA PULMONAR", [
-        { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
+        { label: "Velocidade máxima do fluxo transvalvar", value: valvasDoppler.pulmonarVelocidade ? `-${formatNumber(valvasDoppler.pulmonarVelocidade)} cm/s` : "" },
         { label: "Gradiente", value: valvasDoppler.pulmonarGradiente ? `${formatNumber(valvasDoppler.pulmonarGradiente)} mmHg` : "" },
       ]);
       if (observacoesValvas?.pulmonar?.trim()) {
