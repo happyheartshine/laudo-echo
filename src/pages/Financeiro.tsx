@@ -67,10 +67,13 @@ interface PartnerClinic {
 interface ExamRecord {
   id: string;
   patient_name: string;
+  owner_name: string | null;
   exam_date: string;
   exam_price: number | null;
   partner_clinic_id: string | null;
+  service_id: string | null;
   partner_clinics: PartnerClinic | null;
+  clinic_services: { service_name: string } | null;
 }
 
 interface FinancialTransaction {
@@ -149,15 +152,20 @@ export default function Financeiro() {
       .select(`
         id,
         patient_name,
+        owner_name,
         exam_date,
         exam_price,
         partner_clinic_id,
+        service_id,
         partner_clinics (
           id,
           nome,
           telefone,
           email,
           logo_url
+        ),
+        clinic_services (
+          service_name
         )
       `)
       .not("partner_clinic_id", "is", null)
@@ -800,7 +808,9 @@ export default function Financeiro() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Data</TableHead>
+                            <TableHead>Responsável</TableHead>
                             <TableHead>Paciente</TableHead>
+                            <TableHead>Serviço</TableHead>
                             {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
                             <TableHead className="text-right">Valor</TableHead>
                           </TableRow>
@@ -809,7 +819,11 @@ export default function Financeiro() {
                           {filteredExams.map((exam) => (
                             <TableRow key={exam.id}>
                               <TableCell>{formatDate(exam.exam_date)}</TableCell>
+                              <TableCell>
+                                <span className="text-sm">{exam.owner_name || "—"}</span>
+                              </TableCell>
                               <TableCell className="font-medium">{exam.patient_name}</TableCell>
+                              <TableCell className="text-sm">{exam.clinic_services?.service_name || "Ecocardiograma"}</TableCell>
                               {selectedClinicId === "all" && (
                                 <TableCell>
                                   <Badge variant="secondary">
