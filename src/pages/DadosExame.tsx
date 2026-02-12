@@ -23,6 +23,7 @@ import { uploadAllExamImages, imageUrlToBase64, StoredImageData } from "@/lib/ex
 import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/lib/decimalInput";
 import { BillingConfirmationModal } from "@/components/financial/BillingConfirmationModal";
 import { ImageGalleryDrawer } from "@/components/exam/ImageGalleryDrawer";
+import { DiagnosticTemplateSelector } from "@/components/exam/DiagnosticTemplateSelector";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -1517,10 +1518,15 @@ if (content.patientData) {
 
           {/* Impressão Diagnóstica */}
           <div className="card-vitaecor animate-fade-in">
-            <h2 className="section-title">Impressão Diagnóstica</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="section-title mb-0">Impressão Diagnóstica</h2>
+              <DiagnosticTemplateSelector
+                onSelect={(text) => setConclusoes(prev => prev ? `${prev}\n${text}` : text)}
+              />
+            </div>
             <Textarea
               className="input-vitaecor min-h-[120px]"
-              placeholder="Digite a impressão diagnóstica do laudo..."
+              placeholder="Digite a impressão diagnóstica ou use 'Inserir Modelo'..."
               value={conclusoes}
               onChange={(e) => setConclusoes(e.target.value)}
             />
