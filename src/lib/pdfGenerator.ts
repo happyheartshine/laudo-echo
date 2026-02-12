@@ -339,6 +339,15 @@ export async function generateExamPdf(
     return isNaN(num) ? "-" : num.toFixed(1).replace(".", ",");
   };
 
+  // Format TDI e' and a' with negative sign for PDF convention
+  const formatTdiNegative = (value: string | undefined): string => {
+    if (!value || value === "-") return "-";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "-";
+    const abs = Math.abs(num);
+    return `-${abs.toFixed(1).replace(".", ",")}`;
+  };
+
   const addTableRow = async (label: string, value: string, col2Label?: string, col2Value?: string) => {
     if (isEmpty(value) && (!col2Value || isEmpty(col2Value))) return;
     // Verifica espaço antes de cada linha da tabela (5mm por linha)
@@ -769,8 +778,8 @@ export async function generateExamPdf(
 
         const tdiLivreValues: string[] = [];
         if (tdiLivre.s) tdiLivreValues.push(`s': ${formatTdi(tdiLivre.s)} cm/s`);
-        if (tdiLivre.e) tdiLivreValues.push(`e': ${formatTdi(tdiLivre.e)} cm/s`);
-        if (tdiLivre.a) tdiLivreValues.push(`a': ${formatTdi(tdiLivre.a)} cm/s`);
+        if (tdiLivre.e) tdiLivreValues.push(`e': ${formatTdiNegative(tdiLivre.e)} cm/s`);
+        if (tdiLivre.a) tdiLivreValues.push(`a': ${formatTdiNegative(tdiLivre.a)} cm/s`);
         if (calculatedValues.relacaoEePrimeLivre && calculatedValues.relacaoEePrimeLivre !== '-') {
           tdiLivreValues.push(`E/e': ${formatNumber(calculatedValues.relacaoEePrimeLivre)}`);
         }
@@ -792,8 +801,8 @@ export async function generateExamPdf(
 
         const tdiSeptalValues: string[] = [];
         if (tdiSeptal.s) tdiSeptalValues.push(`s': ${formatTdi(tdiSeptal.s)} cm/s`);
-        if (tdiSeptal.e) tdiSeptalValues.push(`e': ${formatTdi(tdiSeptal.e)} cm/s`);
-        if (tdiSeptal.a) tdiSeptalValues.push(`a': ${formatTdi(tdiSeptal.a)} cm/s`);
+        if (tdiSeptal.e) tdiSeptalValues.push(`e': ${formatTdiNegative(tdiSeptal.e)} cm/s`);
+        if (tdiSeptal.a) tdiSeptalValues.push(`a': ${formatTdiNegative(tdiSeptal.a)} cm/s`);
         if (calculatedValues.relacaoEePrimeSeptal && calculatedValues.relacaoEePrimeSeptal !== '-') {
           tdiSeptalValues.push(`E/e': ${formatNumber(calculatedValues.relacaoEePrimeSeptal)}`);
         }
