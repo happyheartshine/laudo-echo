@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProfile } from "@/hooks/useProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, User, Building2 } from "lucide-react";
+import { Loader2, Upload, User, Building2, FileText } from "lucide-react";
+import { DiagnosticTemplatesSection } from "@/components/settings/DiagnosticTemplatesSection";
 
 const UF_OPTIONS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -292,14 +293,18 @@ export default function Configuracoes() {
         </div>
 
         <Tabs defaultValue="veterinario" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="veterinario" className="flex items-center gap-2">
               <User className="w-4 h-4" />
-              Dados do Veterinário
+              Veterinário
             </TabsTrigger>
             <TabsTrigger value="clinica" className="flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              Clínica/Hospital
+              Clínica
+            </TabsTrigger>
+            <TabsTrigger value="modelos" className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Modelos
             </TabsTrigger>
           </TabsList>
 
@@ -574,6 +579,10 @@ export default function Configuracoes() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="modelos" className="mt-6">
+            <DiagnosticTemplatesSection />
           </TabsContent>
         </Tabs>
       </div>
