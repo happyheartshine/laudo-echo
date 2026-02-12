@@ -100,6 +100,34 @@ interface ClinicSummary {
   total_devido: number;
 }
 
+// Unified item for the combined table
+interface UnifiedItem {
+  id: string;
+  date: string;
+  patientName: string;
+  ownerName: string | null;
+  clinicName: string | null;
+  partnerId: string | null;
+  serviceName: string;
+  amount: number;
+  status: string;
+  source: "exam" | "manual";
+}
+
+interface UnifiedGroup {
+  key: string;
+  date: string;
+  patientName: string;
+  ownerName: string | null;
+  clinicName: string | null;
+  partnerId: string | null;
+  items: UnifiedItem[];
+  totalAmount: number;
+  servicesSummary: string;
+  allPago: boolean;
+  allAReceber: boolean;
+}
+
 export default function Financeiro() {
   const { user } = useAuth();
   const { profile } = useProfile();
@@ -287,58 +315,84 @@ export default function Financeiro() {
     });
   }, [manualTransactions, selectedClinicId, dateFrom, dateTo]);
 
-  // Group manual transactions by date + patient + clinic
-  interface TxGroup {
-    key: string;
-    date: string;
-    patientName: string;
-    ownerName: string | null;
-    clinicName: string | null;
-    partnerId: string | null;
-    transactions: FinancialTransaction[];
-    totalAmount: number;
-    descriptions: string[];
-    allPago: boolean;
-    allAReceber: boolean;
-  }
+  // Build unified items from exams + manual transactions
+  const unifiedGroups = useMemo(() => {
+    const allItems: UnifiedItem[] = [];
 
-  const groupedManualTransactions = useMemo(() => {
-    const map = new Map<string, TxGroup>();
+    // Add filtered exams
+    for (const exam of filteredExams) {
+      allItems.push({
+        id: exam.id,
+        date: exam.exam_date,
+        patientName: exam.patient_name,
+        ownerName: exam.owner_name,
+        clinicName: exam.partner_clinics?.nome || null,
+        partnerId: exam.partner_clinic_id,
+        serviceName: exam.clinic_services?.service_name || "Ecocardiograma",
+        amount: Number(exam.exam_price) || 0,
+        status: "a_receber",
+        source: "exam",
+      });
+    }
 
+    // Add filtered manual transactions
     for (const tx of filteredManualTransactions) {
-      const key = `${tx.transaction_date}__${(tx.patient_name || "").toLowerCase().trim()}__${tx.partner_clinic_id || ""}`;
+      allItems.push({
+        id: tx.id,
+        date: tx.transaction_date,
+        patientName: tx.patient_name || "—",
+        ownerName: tx.owner_name,
+        clinicName: tx.partner_clinics?.nome || null,
+        partnerId: tx.partner_clinic_id,
+        serviceName: tx.description || "Serviço Avulso",
+        amount: Number(tx.amount),
+        status: tx.status,
+        source: "manual",
+      });
+    }
 
+    // Group by date + patient (lowercase) + clinic
+    const map = new Map<string, UnifiedGroup>();
+    for (const item of allItems) {
+      const key = `${item.date}__${item.patientName.toLowerCase().trim()}__${item.partnerId || ""}`;
       if (!map.has(key)) {
         map.set(key, {
           key,
-          date: tx.transaction_date,
-          patientName: tx.patient_name || "—",
-          ownerName: tx.owner_name,
-          clinicName: tx.partner_clinics?.nome || null,
-          partnerId: tx.partner_clinic_id,
-          transactions: [],
+          date: item.date,
+          patientName: item.patientName,
+          ownerName: item.ownerName,
+          clinicName: item.clinicName,
+          partnerId: item.partnerId,
+          items: [],
           totalAmount: 0,
-          descriptions: [],
+          servicesSummary: "",
           allPago: true,
           allAReceber: true,
         });
       }
-
       const group = map.get(key)!;
-      group.transactions.push(tx);
-      group.totalAmount += Number(tx.amount);
-      if (tx.description && !group.descriptions.includes(tx.description)) {
-        group.descriptions.push(tx.description);
-      }
-      if (!group.ownerName && tx.owner_name) group.ownerName = tx.owner_name;
-      if (tx.status !== "pago") group.allPago = false;
-      if (tx.status !== "a_receber") group.allAReceber = false;
+      group.items.push(item);
+      group.totalAmount += item.amount;
+      if (!group.ownerName && item.ownerName) group.ownerName = item.ownerName;
+      if (item.status !== "pago") group.allPago = false;
+      if (item.status !== "a_receber") group.allAReceber = false;
     }
 
-    return Array.from(map.values());
-  }, [filteredManualTransactions]);
+    // Build service summaries
+    for (const group of map.values()) {
+      const services = [...new Set(group.items.map(i => i.serviceName))];
+      if (services.length === 1) {
+        group.servicesSummary = services[0];
+      } else {
+        group.servicesSummary = `${services[0]} + ${services.length - 1} outro${services.length > 2 ? "s" : ""}`;
+      }
+    }
 
-  const toggleTxGroup = (key: string) => {
+    // Sort by date descending
+    return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+  }, [filteredExams, filteredManualTransactions]);
+
+  const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -347,18 +401,10 @@ export default function Financeiro() {
     });
   };
 
-  const getGroupServiceSummary = (group: TxGroup) => {
-    const count = group.transactions.length;
-    if (count === 1) return group.descriptions[0] || "Serviço Avulso";
-    const first = group.descriptions[0] || "Serviço";
-    if (count === 2) return `${first} + 1 outro`;
-    return `${first} + ${count - 1} outros`;
-  };
-
-  const getGroupStatusBadge = (group: TxGroup) => {
+  const getGroupStatusBadge = (group: UnifiedGroup) => {
     if (group.allPago) return <Badge variant="default">Pago</Badge>;
     if (group.allAReceber) return <Badge variant="outline">A Receber</Badge>;
-    return <Badge variant="outline" className="bg-blue-500/15 text-blue-700 border-blue-500/30">Parcial</Badge>;
+    return <Badge variant="outline" className="bg-accent/50 text-accent-foreground">Parcial</Badge>;
   };
 
   const clinicsSummary = useMemo(() => {
@@ -800,182 +846,134 @@ export default function Financeiro() {
                 </div>
               ) : (
                 <>
-                  {/* Exams Table */}
-                  {filteredExams.length > 0 && (
-                    <>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Exames</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Responsável</TableHead>
-                            <TableHead>Paciente</TableHead>
-                            <TableHead>Serviço</TableHead>
-                            {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
-                            <TableHead className="text-right">Valor</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredExams.map((exam) => (
-                            <TableRow key={exam.id}>
-                              <TableCell>{formatDate(exam.exam_date)}</TableCell>
-                              <TableCell>
-                                <span className="text-sm">{exam.owner_name || "—"}</span>
-                              </TableCell>
-                              <TableCell className="font-medium">{exam.patient_name}</TableCell>
-                              <TableCell className="text-sm">{exam.clinic_services?.service_name || "Ecocardiograma"}</TableCell>
-                              {selectedClinicId === "all" && (
-                                <TableCell>
-                                  <Badge variant="secondary">
-                                    {exam.partner_clinics?.nome}
-                                  </Badge>
-                                </TableCell>
-                              )}
-                              <TableCell className="text-right">
-                                {formatCurrency(Number(exam.exam_price) || 0)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </>
-                  )}
+                  {/* Unified Grouped Table */}
+                  {unifiedGroups.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-8"></TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Responsável</TableHead>
+                          <TableHead>Paciente</TableHead>
+                          <TableHead>Serviços</TableHead>
+                          {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
+                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-12">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unifiedGroups.map((group) => {
+                          const isMulti = group.items.length > 1;
+                          const isExpanded = expandedGroups.has(group.key);
 
-                  {/* Manual Transactions Table - Grouped */}
-                  {groupedManualTransactions.length > 0 && (
-                    <>
-                      <h4 className="text-sm font-medium text-muted-foreground mb-2 mt-6">Outros Lançamentos</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-8"></TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Responsável</TableHead>
-                            <TableHead>Paciente</TableHead>
-                            <TableHead>Serviço</TableHead>
-                            {selectedClinicId === "all" && <TableHead>Clínica</TableHead>}
-                            <TableHead className="text-right">Valor</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="w-12">Ações</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {groupedManualTransactions.map((group) => {
-                            const isMulti = group.transactions.length > 1;
-                            const isExpanded = expandedGroups.has(group.key);
-
-                            return (
-                              <Fragment key={group.key}>
-                                <TableRow
-                                  className={`${group.allPago ? "opacity-60" : ""} ${isMulti ? "cursor-pointer hover:bg-muted/50" : ""}`}
-                                  onClick={isMulti ? () => toggleTxGroup(group.key) : undefined}
-                                >
-                                  <TableCell className="px-2">
-                                    {isMulti && (
-                                      isExpanded
-                                        ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                        : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>{formatDate(group.date)}</TableCell>
-                                  <TableCell>
-                                    {group.ownerName && (
-                                      <span className="text-sm">{group.ownerName}</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="font-medium">{group.patientName}</span>
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {isMulti ? (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <span className="cursor-default">{getGroupServiceSummary(group)}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom" align="start" className="max-w-xs">
-                                          <ul className="text-xs space-y-1">
-                                            {group.transactions.map((tx) => (
-                                              <li key={tx.id} className="flex justify-between gap-4">
-                                                <span>{tx.description}</span>
-                                                <span className="font-medium whitespace-nowrap">{formatCurrency(Number(tx.amount))}</span>
-                                              </li>
-                                            ))}
-                                          </ul>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    ) : (
-                                      group.transactions[0].description
-                                    )}
-                                  </TableCell>
-                                  {selectedClinicId === "all" && (
-                                    <TableCell>
-                                      {group.clinicName && <Badge variant="secondary">{group.clinicName}</Badge>}
-                                    </TableCell>
+                          return (
+                            <Fragment key={group.key}>
+                              <TableRow
+                                className={`${group.allPago ? "opacity-60" : ""} ${isMulti ? "cursor-pointer hover:bg-muted/50" : ""}`}
+                                onClick={isMulti ? () => toggleGroup(group.key) : undefined}
+                              >
+                                <TableCell className="px-2">
+                                  {isMulti && (
+                                    isExpanded
+                                      ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                      : <ChevronRight className="w-4 h-4 text-muted-foreground" />
                                   )}
-                                  <TableCell className="text-right font-medium">
-                                    {formatCurrency(group.totalAmount)}
+                                </TableCell>
+                                <TableCell>{formatDate(group.date)}</TableCell>
+                                <TableCell>
+                                  <span className="text-sm">{group.ownerName || "—"}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="font-medium">{group.patientName}</span>
+                                </TableCell>
+                                <TableCell>
+                                  {isMulti ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-default text-sm">{group.servicesSummary}</span>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="bottom" align="start" className="max-w-xs">
+                                        <ul className="text-xs space-y-1">
+                                          {group.items.map((item) => (
+                                            <li key={item.id} className="flex justify-between gap-4">
+                                              <span>{item.serviceName}</span>
+                                              <span className="font-medium whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    <span className="text-sm">{group.items[0].serviceName}</span>
+                                  )}
+                                </TableCell>
+                                {selectedClinicId === "all" && (
+                                  <TableCell>
+                                    {group.clinicName && <Badge variant="secondary">{group.clinicName}</Badge>}
                                   </TableCell>
-                                  <TableCell>{getGroupStatusBadge(group)}</TableCell>
-                                  <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      title="Adicionar Serviço"
-                                      onClick={() => {
-                                        setBatchPrefill({
-                                          patientName: group.patientName !== "—" ? group.patientName : "",
-                                          ownerName: group.ownerName || "",
-                                          date: group.date,
-                                        });
-                                        setShowManualModal(true);
-                                      }}
-                                      className="text-primary hover:text-primary"
-                                    >
-                                      <Plus className="w-4 h-4" />
-                                    </Button>
+                                )}
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(group.totalAmount)}
+                                </TableCell>
+                                <TableCell>{getGroupStatusBadge(group)}</TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Adicionar Serviço"
+                                    onClick={() => {
+                                      setBatchPrefill({
+                                        patientName: group.patientName !== "—" ? group.patientName : "",
+                                        ownerName: group.ownerName || "",
+                                        date: group.date,
+                                      });
+                                      setShowManualModal(true);
+                                    }}
+                                    className="text-primary hover:text-primary"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+
+                              {/* Expanded sub-items */}
+                              {isMulti && isExpanded && (
+                                <TableRow>
+                                  <TableCell colSpan={selectedClinicId === "all" ? 9 : 8} className="p-0 border-b">
+                                    <div className="bg-muted/30 px-6 py-3 space-y-1.5">
+                                      {group.items.map((item) => (
+                                        <div
+                                          key={item.id}
+                                          className={`flex items-center justify-between gap-4 py-1.5 px-3 rounded-md text-sm ${
+                                            item.status === "pago" ? "opacity-60" : item.status === "cancelado" ? "opacity-40 line-through" : "bg-background/60"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <span className="text-muted-foreground text-xs">1×</span>
+                                            <span className="truncate">{item.serviceName}</span>
+                                          </div>
+                                          <div className="flex items-center gap-3 shrink-0">
+                                            <span className="font-medium">{formatCurrency(item.amount)}</span>
+                                            <Badge
+                                              variant={item.status === "pago" ? "default" : item.status === "cancelado" ? "destructive" : "outline"}
+                                              className="text-xs"
+                                            >
+                                              {item.status === "a_receber" ? "A Receber" : item.status === "pago" ? "Pago" : "Cancelado"}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
-
-                                {/* Expanded sub-items */}
-                                {isMulti && isExpanded && (
-                                  <TableRow>
-                                    <TableCell colSpan={selectedClinicId === "all" ? 10 : 9} className="p-0 border-b">
-                                      <div className="bg-muted/30 px-6 py-3 space-y-1.5">
-                                        {group.transactions.map((tx) => (
-                                          <div
-                                            key={tx.id}
-                                            className={`flex items-center justify-between gap-4 py-1.5 px-3 rounded-md text-sm ${
-                                              tx.status === "pago" ? "opacity-60" : tx.status === "cancelado" ? "opacity-40 line-through" : "bg-background/60"
-                                            }`}
-                                          >
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                              <span className="text-muted-foreground text-xs">1×</span>
-                                              <span className="truncate">{tx.description}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
-                                              <span className="font-medium">{formatCurrency(Number(tx.amount))}</span>
-                                              <Badge
-                                                variant={tx.status === "pago" ? "default" : tx.status === "cancelado" ? "destructive" : "outline"}
-                                                className="text-xs"
-                                              >
-                                                {tx.status === "a_receber" ? "A Receber" : tx.status === "pago" ? "Pago" : "Cancelado"}
-                                              </Badge>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </Fragment>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </>
-                  )}
-
-                  {filteredExams.length === 0 && filteredManualTransactions.length === 0 && (
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       Nenhum registro encontrado no período selecionado.
                     </div>
@@ -985,13 +983,11 @@ export default function Financeiro() {
                   <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total de Exames</p>
-                        <p className="text-xl font-bold">{totalExames}</p>
-                        {filteredManualTransactions.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            + {filteredManualTransactions.length} lançamento(s) manual(is)
-                          </p>
-                        )}
+                        <p className="text-sm text-muted-foreground">Total de Atendimentos</p>
+                        <p className="text-xl font-bold">{unifiedGroups.length}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {filteredExams.length + filteredManualTransactions.length} lançamento(s) no período
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Valor Total</p>
