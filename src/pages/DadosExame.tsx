@@ -1518,8 +1518,10 @@ if (content.patientData) {
 
           {/* Impressão Diagnóstica */}
           <div className="card-vitaecor animate-fade-in">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="section-title mb-0">Impressão Diagnóstica</h2>
+            </div>
+            <div className="flex justify-end mb-2">
               <DiagnosticTemplateSelector
                 onSelect={(text) => setConclusoes(prev => prev ? `${prev}\n${text}` : text)}
               />

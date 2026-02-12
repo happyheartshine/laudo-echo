@@ -58,8 +58,8 @@ export function DiagnosticTemplateSelector({ onSelect }: DiagnosticTemplateSelec
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" type="button">
-          <FileText className="w-4 h-4 mr-2" />
+        <Button variant="default" size="sm" type="button" className="gap-2 shadow-sm">
+          <FileText className="w-4 h-4" />
           Inserir Modelo
         </Button>
       </PopoverTrigger>
