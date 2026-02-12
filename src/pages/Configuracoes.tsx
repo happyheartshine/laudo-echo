@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,8 @@ const UF_OPTIONS = [
 export default function Configuracoes() {
   const { profile, clinic, loading, updateProfile, updateClinic } = useProfile();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "veterinario";
   
   // Profile state
   const [nome, setNome] = useState("");
@@ -292,7 +295,7 @@ export default function Configuracoes() {
           <p className="text-muted-foreground">Gerencie seus dados e personalize sua clínica.</p>
         </div>
 
-        <Tabs defaultValue="veterinario" className="w-full">
+        <Tabs defaultValue={initialTab} className="w-full">
           <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="veterinario" className="flex items-center gap-2">
               <User className="w-4 h-4" />
