@@ -2,3 +2,6 @@ project_id = "dvvibuiokjbydymujbzi"
 
 [functions.send-email]
 verify_jwt = false
+
+[functions.extract-ocr]
+verify_jwt = false

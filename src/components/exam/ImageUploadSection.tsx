@@ -3,7 +3,9 @@ import { useState, useCallback, useRef } from "react";
 import { DicomViewer } from "./DicomViewer";
 import { DicomThumbnail } from "./DicomThumbnail";
 import { extractDicomMetadata, DicomPatientInfo } from "@/lib/dicomUtils";
+import { extractOcrFromImage } from "@/lib/ocrUtils";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 interface ImageUploadSectionProps {
   images: File[];
@@ -50,6 +52,10 @@ function isValidMediaFile(file: File): boolean {
   return isLikelyDicom;
 }
 
+function isStandardImage(file: File): boolean {
+  return file.type === "image/jpeg" || file.type === "image/png";
+}
+
 export function ImageUploadSection({
   images,
   onImagesChange,
@@ -57,6 +63,7 @@ export function ImageUploadSection({
   onSelectedImagesChange,
   onDicomMetadataExtracted,
 }: ImageUploadSectionProps) {
+  const { toast } = useToast();
   const [viewingDicomFile, setViewingDicomFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -76,7 +83,7 @@ export function ImageUploadSection({
         const newImages = [...images, ...validFiles];
         onImagesChange(newImages);
 
-        // Images start UNSELECTED by default - user must click to select
+        let didExtractDicom = false;
 
         // Extract metadata from first DICOM file
         for (const file of validFiles) {
@@ -84,7 +91,45 @@ export function ImageUploadSection({
             const metadata = await extractDicomMetadata(file);
             if (metadata && onDicomMetadataExtracted) {
               onDicomMetadataExtracted(metadata);
-              break; // Only extract from first DICOM
+              didExtractDicom = true;
+              break;
+            }
+          }
+        }
+
+        // If no DICOM metadata, try OCR on first JPG/PNG
+        if (!didExtractDicom && onDicomMetadataExtracted) {
+          const firstImage = validFiles.find(
+            (f) => isStandardImage(f) && !checkIsDicomFile(f)
+          );
+          if (firstImage) {
+            const ocrResult = await extractOcrFromImage(firstImage);
+            if (ocrResult.ok) {
+              const ocrData = ocrResult.data;
+              const hasData =
+                (ocrData.nome && ocrData.nome.trim()) ||
+                (ocrData.responsavel && ocrData.responsavel.trim()) ||
+                (ocrData.especie && ocrData.especie.trim());
+              if (hasData) {
+                onDicomMetadataExtracted(ocrData);
+                toast({
+                  title: "Dados extraídos via OCR",
+                  description: "As informações do paciente foram detectadas na imagem.",
+                });
+              } else {
+                toast({
+                  title: "OCR sem texto detectado",
+                  description: "Nenhum dado de paciente encontrado na imagem. Preencha manualmente.",
+                  variant: "destructive",
+                });
+              }
+            } else {
+              const errorMessage = "error" in ocrResult ? ocrResult.error : "Não foi possível usar o OCR.";
+              toast({
+                title: "OCR indisponível",
+                description: errorMessage,
+                variant: "destructive",
+              });
             }
           }
         }
@@ -92,7 +137,7 @@ export function ImageUploadSection({
 
       setIsProcessing(false);
     },
-    [images, onImagesChange, selectedImages, onSelectedImagesChange, onDicomMetadataExtracted]
+    [images, onImagesChange, onDicomMetadataExtracted, toast]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {

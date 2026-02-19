@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -17,6 +17,11 @@ import Financeiro from "./pages/Financeiro";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function ExameRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/novo-exame/dados-exame?id=${id ?? ""}`} replace />;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,7 +38,8 @@ const App = () => (
             <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
             <Route path="/minha-equipe" element={<ProtectedRoute><MinhaEquipe /></ProtectedRoute>} />
             <Route path="/historico" element={<ProtectedRoute><Historico /></ProtectedRoute>} />
-<Route path="/parceiros" element={<ProtectedRoute><Parceiros /></ProtectedRoute>} />
+            <Route path="/exame/:id" element={<ProtectedRoute><ExameRedirect /></ProtectedRoute>} />
+            <Route path="/parceiros" element={<ProtectedRoute><Parceiros /></ProtectedRoute>} />
             <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

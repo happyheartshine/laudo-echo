@@ -30,12 +30,12 @@ export default function NovoExame() {
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleDicomMetadataExtracted = (info: DicomPatientInfo) => {
+  const handleDicomMetadataExtracted = (info: DicomPatientInfo & { responsavelTelefone?: string; responsavelEmail?: string }) => {
     setPatientData((prev) => ({
       nome: prev.nome || info.nome,
       responsavel: prev.responsavel || info.responsavel,
-      responsavelTelefone: prev.responsavelTelefone || "",
-      responsavelEmail: prev.responsavelEmail || "",
+      responsavelTelefone: prev.responsavelTelefone || (info.responsavelTelefone ?? "") || "",
+      responsavelEmail: prev.responsavelEmail || (info.responsavelEmail ?? "") || "",
       especie: prev.especie || info.especie,
       raca: prev.raca || info.raca,
       sexo: prev.sexo || info.sexo,
