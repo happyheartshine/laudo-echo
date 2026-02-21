@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useDragControls, useMotionValue, PanInfo, AnimatePresence } from "framer-motion";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Images, X, ZoomIn, ChevronLeft, ChevronRight, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -287,6 +287,7 @@ export function ImageGalleryDrawer({ images, selectedIndices }: ImageGalleryDraw
       {/* Zoom Dialog / Lightbox */}
       <Dialog open={zoomedImage !== null} onOpenChange={(open) => !open && setZoomedImage(null)}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-black/95">
+          <DialogTitle className="sr-only">Visualização da imagem do exame</DialogTitle>
           <button
             onClick={() => setZoomedImage(null)}
             className="absolute top-4 right-4 z-50 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"

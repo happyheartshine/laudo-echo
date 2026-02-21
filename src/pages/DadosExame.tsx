@@ -5,7 +5,7 @@ import { MeasurementsSection, ClassificationsData, ReferencesData } from "@/comp
 import { RightVentricleSection, RightVentricleData } from "@/components/exam/RightVentricleSection";
 import { ValvesSection } from "@/components/exam/ValvesSection";
 import { Button } from "@/components/ui/button";
-import { FileDown, Save, ArrowLeft, Calendar, Eye } from "lucide-react";
+import { FileDown, Save, ArrowLeft, Calendar, Eye, Scan } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
@@ -24,6 +24,7 @@ import { formatDecimalForDisplay, sanitizeDecimalInput, parseDecimal } from "@/l
 import { BillingConfirmationModal } from "@/components/financial/BillingConfirmationModal";
 import { ImageGalleryDrawer } from "@/components/exam/ImageGalleryDrawer";
 import { DiagnosticTemplateSelector } from "@/components/exam/DiagnosticTemplateSelector";
+import { extractExamFromImage, mergeExtractedExamContent, type ExtractedExamContent } from "@/lib/ocrUtils";
 
 // Função utilitária para formatar números no padrão BR (vírgula como separador decimal)
 const formatNumber = (value: string | number): string => {
@@ -115,46 +116,43 @@ const [patientData, setPatientData] = useState<PatientData>({
   // Buscar clínicas, veterinários parceiros e membros da equipe
   useEffect(() => {
     const fetchPartnerData = async () => {
-      if (!user) {
-        console.log('DadosExame: No user yet, skipping fetch');
-        return;
-      }
-      
-      console.log('DadosExame: Fetching partner data for user:', user.id);
-      
+      if (!user) return;
+
       const { data: clinics, error: clinicsError } = await supabase
         .from("partner_clinics")
         .select("id, nome, valor_exame, responsavel, telefone")
         .eq("active", true)
         .order("nome");
-      
-      console.log('DadosExame: Clinics fetched:', clinics, 'Error:', clinicsError);
-      
+
+      if (clinicsError) {
+        console.error("DadosExame: Erro ao carregar clínicas parceiras", clinicsError);
+      }
+      if (clinics) setPartnerClinics(clinics);
+
       const { data: vets, error: vetsError } = await supabase
         .from("partner_veterinarians")
         .select("id, partner_clinic_id, nome")
         .order("nome");
-      
-      console.log('DadosExame: Vets fetched:', vets, 'Error:', vetsError);
-      
-      // Buscar membros da equipe (todos os profiles da mesma clínica)
+
+      if (vetsError) {
+        console.error("DadosExame: Erro ao carregar veterinários parceiros", vetsError);
+      }
+      if (vets) setPartnerVets(vets);
+
       const { data: members, error: membersError } = await supabase
         .from("profiles")
         .select("id, nome, crmv, uf_crmv, user_id")
         .order("nome");
-      
-      console.log('DadosExame: Team members fetched:', members, 'Error:', membersError);
-      
-      if (clinics) setPartnerClinics(clinics);
-      if (vets) setPartnerVets(vets);
+
+      if (membersError) {
+        console.error("DadosExame: Erro ao carregar membros da equipe", membersError);
+      }
       if (members) {
         setTeamMembers(members);
-        // Pré-selecionar o usuário logado se ainda não há seleção
         if (!examInfo.performingVetId && profile) {
-          const currentUserMember = members.find(m => m.user_id === user.id);
+          const currentUserMember = members.find((m) => m.user_id === user.id);
           if (currentUserMember) {
-            console.log('DadosExame: Pre-selecting current user as performing vet:', currentUserMember);
-            setExamInfo(prev => ({
+            setExamInfo((prev) => ({
               ...prev,
               performingVetId: currentUserMember.id,
               performingVetName: currentUserMember.nome,
@@ -163,7 +161,7 @@ const [patientData, setPatientData] = useState<PatientData>({
         }
       }
     };
-    
+
     fetchPartnerData();
   }, [user, profile]);
   
@@ -514,7 +512,135 @@ const [patientData, setPatientData] = useState<PatientData>({
   const [comentariosAdicionais, setComentariosAdicionais] = useState("");
   const [storedImages, setStoredImages] = useState<StoredImageData[]>([]);
   const [selectedImages, setSelectedImages] = useState<number[]>([]);
+  const [isExtractingExam, setIsExtractingExam] = useState(false);
   // Preview state no longer needed - opening in new tab
+
+  /** Get base64 from StoredImageData (data URL or fetch remote URL). */
+  const getBase64FromStoredImage = useCallback(async (img: StoredImageData): Promise<string | null> => {
+    if (img.dataUrl.startsWith("data:")) {
+      const base64 = img.dataUrl.split(",")[1];
+      return base64 || null;
+    }
+    try {
+      const res = await fetch(img.dataUrl);
+      const blob = await res.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          resolve(dataUrl.split(",")[1] ?? null);
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /** Fill form from all stored images using OCR (each image can contribute different sections). */
+  const handleFillFromImage = useCallback(async () => {
+    if (storedImages.length === 0) {
+      toast({
+        title: "Nenhuma imagem",
+        description: "Adicione ao menos uma imagem do exame para extrair os dados.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const maxImages = 10;
+    const imagesToProcess = storedImages.slice(0, maxImages);
+    setIsExtractingExam(true);
+    try {
+      let merged: ExtractedExamContent = {};
+      let successCount = 0;
+      for (const img of imagesToProcess) {
+        const base64 = await getBase64FromStoredImage(img);
+        if (!base64) continue;
+        const result = await extractExamFromImage(base64);
+        if (result.ok && result.data) {
+          merged = mergeExtractedExamContent(merged, result.data);
+          successCount += 1;
+        }
+      }
+      if (successCount === 0) {
+        toast({
+          title: "Extração indisponível",
+          description: "Não foi possível extrair dados de nenhuma imagem. Verifique a conexão ou tente outras imagens.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const d = merged;
+      const merge = (prev: Record<string, string>, next?: Record<string, string> | null): Record<string, string> => {
+        if (!next) return prev;
+        const filtered = Object.fromEntries(
+          Object.entries(next).filter(([, v]) => v != null && String(v).trim() !== "")
+        );
+        return { ...prev, ...filtered };
+      };
+      if (d.measurementsData) setMeasurementsData((prev) => merge(prev, d.measurementsData) as typeof measurementsData);
+      if (d.funcaoDiastolica) setFuncaoDiastolica((prev) => merge(prev, d.funcaoDiastolica) as typeof funcaoDiastolica);
+      if (d.funcaoSistolica) setFuncaoSistolica((prev) => merge(prev, d.funcaoSistolica) as typeof funcaoSistolica);
+      if (d.ventriculoDireito) {
+        const filtered = Object.fromEntries(
+          Object.entries(d.ventriculoDireito).filter(([, v]) => v != null && String(v).trim() !== "")
+        );
+        setVentriculoDireito((prev) => ({ ...prev, ...filtered } as RightVentricleData));
+      }
+      if (d.tdiLivre) setTdiLivre((prev) => merge(prev, d.tdiLivre) as typeof tdiLivre);
+      if (d.tdiSeptal) setTdiSeptal((prev) => merge(prev, d.tdiSeptal) as typeof tdiSeptal);
+      if (d.valvasDoppler) {
+        setValvasDoppler((prev) => {
+          const next = merge(prev, d.valvasDoppler) as typeof valvasDoppler;
+          const valveNames = ["mitral", "tricuspide", "pulmonar", "aortica"];
+          valveNames.forEach((valve) => {
+            const vel = next[`${valve}Velocidade`];
+            const gradKey = `${valve}Gradiente`;
+            if (vel && vel.trim() && (!next[gradKey] || !next[gradKey].trim()))
+              next[gradKey] = calculateBernoulliGradient(vel);
+          });
+          return next;
+        });
+      }
+      if (d.valvesData) setValvesData((prev) => merge(prev, d.valvesData) as typeof valvesData);
+      if (d.achados?.trim()) setAchados((prev) => prev.trim() ? prev : d.achados!.trim());
+      if (d.conclusoes?.trim()) setConclusoes((prev) => prev.trim() ? prev : d.conclusoes!.trim());
+      if (d.examInfo?.data?.trim()) setExamInfo((prev) => ({ ...prev, data: d.examInfo!.data!.trim() }));
+      if (d.examInfo?.frequenciaCardiaca?.trim()) setExamInfo((prev) => ({ ...prev, frequenciaCardiaca: d.examInfo!.frequenciaCardiaca!.trim() }));
+      if (d.patientData) {
+        const p = d.patientData;
+        const next = {
+          nome: p.nome ?? "",
+          responsavel: p.responsavel ?? "",
+          responsavelTelefone: p.responsavelTelefone ?? "",
+          responsavelEmail: p.responsavelEmail ?? "",
+          especie: p.especie ?? "",
+          raca: p.raca ?? "",
+          sexo: p.sexo ?? "",
+          idade: p.idade ?? "",
+          peso: p.peso ?? "",
+        };
+        if (Object.values(next).some((v) => v.trim() !== "")) setPatientData((prev) => ({ ...prev, ...next }));
+      }
+      const parts = [];
+      if (d.measurementsData && Object.keys(d.measurementsData).length) parts.push("medidas");
+      if (d.examInfo?.data || d.examInfo?.frequenciaCardiaca) parts.push("data/FC");
+      if (d.patientData && Object.values(d.patientData).some((v) => v?.trim())) parts.push("paciente");
+      if (d.valvasDoppler && Object.keys(d.valvasDoppler).length) parts.push("Doppler");
+      if (d.funcaoDiastolica && Object.keys(d.funcaoDiastolica).length) parts.push("função diastólica");
+      if (d.ventriculoDireito && Object.keys(d.ventriculoDireito).length) parts.push("VD");
+      const summary = parts.length ? parts.join(", ") : "dados";
+      toast({
+        title: "Dados extraídos",
+        description: successCount > 1
+          ? `${summary} preenchidos a partir de ${successCount} imagens. Revise e complete o que faltar.`
+          : `Medidas e textos detectados foram preenchidos. Revise e complete o que faltar.`,
+      });
+    } finally {
+      setIsExtractingExam(false);
+    }
+  }, [storedImages, getBase64FromStoredImage, toast]);
 
   // Load existing exam data if in edit mode
   const loadExamData = useCallback(async (id: string) => {
@@ -1034,7 +1160,18 @@ if (content.patientData) {
             </div>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
+            {storedImages.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleFillFromImage}
+                disabled={isExtractingExam}
+                title="Preencher medidas e textos a partir da primeira imagem (OCR)"
+              >
+                <Scan className="w-4 h-4 mr-2" />
+                {isExtractingExam ? "Analisando..." : "Preencher da imagem"}
+              </Button>
+            )}
             <Button variant="outline" onClick={handleSave} disabled={isSaving}>
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? "Salvando..." : "Salvar"}
